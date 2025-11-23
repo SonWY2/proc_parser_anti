@@ -1,0 +1,78 @@
+#include <stdio.h>
+#include <string.h>
+#include "sample.h"
+
+#define MAX_BUFFER 1024
+#define SUCCESS 0
+
+EXEC SQL INCLUDE sqlca;
+
+// Global variable
+int global_retry_count = 0;
+
+struct Employee {
+    int id;
+    char name[50];
+    float salary;
+};
+
+/*
+ * Function to connect to database
+ */
+void db_connect() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        char *username = "scott";
+        char *password = "tiger";
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONNECT :username IDENTIFIED BY :password;
+}
+
+void process_employee(int emp_id) {
+    struct Employee emp;
+    EXEC SQL BEGIN DECLARE SECTION;
+        int h_id;
+        char h_name[50];
+        float h_salary;
+        char *stmt = "UPDATE emp SET salary = salary * 1.1 WHERE id = :v1";
+    EXEC SQL END DECLARE SECTION;
+
+    h_id = emp_id;
+
+    /* Select employee data */
+    EXEC SQL SELECT name, salary 
+             INTO :h_name, :h_salary 
+             FROM emp 
+             WHERE id = :h_id;
+
+    if (sqlca.sqlcode != 0) {
+        printf("Error: %d\n", sqlca.sqlcode);
+        return;
+    }
+
+    // Dynamic SQL Example
+    EXEC SQL PREPARE s1 FROM :stmt;
+    EXEC SQL EXECUTE s1 USING :h_id;
+
+    // Cursor Example
+    EXEC SQL DECLARE emp_cursor CURSOR FOR 
+        SELECT id, name FROM emp WHERE salary > 5000;
+    
+    EXEC SQL OPEN emp_cursor;
+    
+    while(1) {
+        EXEC SQL FETCH emp_cursor INTO :h_id, :h_name;
+        if (sqlca.sqlcode == 1403) break;
+        printf("High earner: %s\n", h_name);
+    }
+    
+    EXEC SQL CLOSE emp_cursor;
+
+    // Edge case: Time string that looks like host var
+    char *time_str = "12:30:45";
+    printf("Time: %s\n", time_str);
+}
+
+void bam_call_example() {
+    BAMCALL(SERVICE_NAME, "input_data", "output_data");
+}

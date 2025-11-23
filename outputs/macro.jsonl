@@ -1,0 +1,11 @@
+{"type": "macro", "name": "MAX_BUFFER", "value": "4096", "line_start": 12, "line_end": 12, "raw_content": "#define MAX_BUFFER 4096", "function": null}
+{"type": "macro", "name": "SUCCESS", "value": "0", "line_start": 13, "line_end": 13, "raw_content": "#define SUCCESS 0", "function": null}
+{"type": "macro", "name": "ERROR", "value": "-1", "line_start": 14, "line_end": 14, "raw_content": "#define ERROR -1", "function": null}
+{"type": "macro", "name": "MAX_RETRIES", "value": "5", "line_start": 15, "line_end": 15, "raw_content": "#define MAX_RETRIES 5", "function": null}
+{"type": "macro", "name": "BATCH_SIZE", "value": "1000", "line_start": 16, "line_end": 16, "raw_content": "#define BATCH_SIZE 1000", "function": null}
+{"type": "macro", "name": "TIME_FORMAT", "value": "\"YYYY-MM-DD HH24:MI:SS\"", "line_start": 17, "line_end": 17, "raw_content": "#define TIME_FORMAT \"YYYY-MM-DD HH24:MI:SS\"", "function": null}
+{"type": "macro", "name": "MAX_RETRIES", "value": "5", "line_start": 4, "line_end": 4, "raw_content": "#define MAX_RETRIES 5", "function": null}
+{"type": "macro", "name": "QUERY_TEMPLATE", "value": "\"SELECT * FROM table WHERE id = :v1\"", "line_start": 5, "line_end": 5, "raw_content": "#define QUERY_TEMPLATE \"SELECT * FROM table WHERE id = :v1\"", "function": null}
+{"type": "macro", "name": "SAMPLE_H", "value": "#define VERSION \"1.0.0\"", "line_start": 2, "line_end": 4, "raw_content": "#define SAMPLE_H\n\n#define VERSION \"1.0.0\"", "function": null}
+{"type": "macro", "name": "MAX_BUFFER", "value": "1024", "line_start": 5, "line_end": 5, "raw_content": "#define MAX_BUFFER 1024", "function": null}
+{"type": "macro", "name": "SUCCESS", "value": "0", "line_start": 6, "line_end": 6, "raw_content": "#define SUCCESS 0", "function": null}

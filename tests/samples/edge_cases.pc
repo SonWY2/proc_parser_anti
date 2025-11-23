@@ -1,0 +1,66 @@
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_RETRIES 5
+#define QUERY_TEMPLATE "SELECT * FROM table WHERE id = :v1"
+
+// Edge Case 1: Comments inside SQL and C
+/* 
+   Multi-line comment 
+   EXEC SQL SELECT * FROM ignored; 
+*/
+void complex_function() {
+    int i;
+    char *time_str = "12:30:45"; // Should not be detected as host var :30, :45
+    char *sql_str = "SELECT * FROM emp WHERE id = :id"; // String literal, not SQL block
+    
+    // Edge Case 2: Complex Host Variables
+    struct {
+        int id;
+        char name[50];
+    } emp_struct;
+    
+    int emp_ids[10];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        int :h_id; // Colon in declaration? usually not needed but parser should handle
+        char *h_name;
+    EXEC SQL END DECLARE SECTION;
+
+    // Edge Case 3: Nested SQL and weird formatting
+    EXEC SQL 
+        SELECT 
+            /* Comment inside SQL */
+            name, 
+            salary -- Single line comment inside SQL
+        INTO 
+            :emp_struct.name, 
+            :emp_ids[0] 
+        FROM 
+            emp 
+        WHERE 
+            id = :h_id 
+            AND created_at > TO_DATE('2023-01-01 12:00:00', 'YYYY-MM-DD HH24:MI:SS'); // Time string inside SQL
+
+    // Edge Case 4: Dynamic SQL with string concatenation
+    char dyn_stmt[100];
+    sprintf(dyn_stmt, "DELETE FROM %s WHERE id = %%d", "emp");
+    
+    EXEC SQL PREPARE s2 FROM :dyn_stmt;
+    EXEC SQL EXECUTE s2;
+
+    // Edge Case 5: Plugin Edge Cases (BAMCALL)
+    // Nested parentheses and strings
+    BAMCALL(SERVICE_NAME, "func(arg)", "output with ) parenthesis");
+    
+    // Edge Case 6: Macro usage
+    for(i=0; i<MAX_RETRIES; i++) {
+        EXEC SQL COMMIT;
+    }
+    
+    // Edge Case 7: Unknown Syntax (Simulated)
+    // This block is neither valid C (standard) nor Pro*C regex match
+    UNKNOWN_MACRO_OR_SYNTAX {
+        weird_stuff;
+    }
+}

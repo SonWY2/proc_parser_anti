@@ -1,0 +1,3 @@
+{"type": "unknown", "line_start": 54, "line_end": 63, "raw_content": "void initialize_system();\nvoid process_large_dataset();\nvoid handle_complex_cursors();\nvoid execute_batch_updates();\nvoid generate_comprehensive_report();\nvoid cleanup_and_finalize();\nvoid validate_data_integrity();\nvoid process_transactions();\n\n", "function": null}
+{"type": "unknown", "line_start": 1, "line_end": 2, "raw_content": "#ifndef SAMPLE_H\n", "function": null}
+{"type": "unknown", "line_start": 11, "line_end": 15, "raw_content": "void db_connect();\nvoid process_employee(int emp_id);\n\n#endif\n", "function": null}

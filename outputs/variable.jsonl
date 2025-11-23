@@ -1,0 +1,80 @@
+{"type": "variable", "name": "global_transaction_count", "data_type": "int", "line_start": 48, "line_end": 48, "raw_content": "int global_transaction_count = 0;", "function": null}
+{"type": "variable", "name": "global_error_count", "data_type": "int", "line_start": 49, "line_end": 49, "raw_content": "int global_error_count = 0;", "function": null}
+{"type": "variable", "name": "current_employee", "data_type": "struct EmployeeRecord", "line_start": 50, "line_end": 50, "raw_content": "struct EmployeeRecord current_employee;", "function": null}
+{"type": "variable", "name": "global_query_buffer", "data_type": "char", "line_start": 51, "line_end": 51, "raw_content": "char global_query_buffer[MAX_BUFFER];", "function": null}
+{"type": "variable", "name": "username", "data_type": "char", "line_start": 69, "line_end": 69, "raw_content": "char *username = \"admin_user\";", "function": "initialize_system"}
+{"type": "variable", "name": "password", "data_type": "char", "line_start": 70, "line_end": 70, "raw_content": "char *password = \"secure_pass_123\";", "function": "initialize_system"}
+{"type": "variable", "name": "db_string", "data_type": "char", "line_start": 71, "line_end": 71, "raw_content": "char *db_string = \"production_db\";", "function": "initialize_system"}
+{"type": "variable", "name": "h_emp_id", "data_type": "int", "line_start": 97, "line_end": 97, "raw_content": "int h_emp_id;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_emp_name", "data_type": "char", "line_start": 98, "line_end": 98, "raw_content": "char h_emp_name[100];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_dept_name", "data_type": "char", "line_start": 99, "line_end": 99, "raw_content": "char h_dept_name[100];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_salary", "data_type": "float", "line_start": 100, "line_end": 100, "raw_content": "float h_salary;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_hire_date", "data_type": "char", "line_start": 101, "line_end": 101, "raw_content": "char h_hire_date[30];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_manager_id", "data_type": "int", "line_start": 102, "line_end": 102, "raw_content": "int h_manager_id;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_manager_name", "data_type": "char", "line_start": 103, "line_end": 103, "raw_content": "char h_manager_name[100];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_project_name", "data_type": "char", "line_start": 104, "line_end": 104, "raw_content": "char h_project_name[200];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_project_budget", "data_type": "float", "line_start": 105, "line_end": 105, "raw_content": "float h_project_budget;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_customer_name", "data_type": "char", "line_start": 106, "line_end": 106, "raw_content": "char h_customer_name[200];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_total_hours", "data_type": "int", "line_start": 107, "line_end": 107, "raw_content": "int h_total_hours;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_performance_score", "data_type": "float", "line_start": 108, "line_end": 108, "raw_content": "float h_performance_score;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_last_review_date", "data_type": "char", "line_start": 109, "line_end": 109, "raw_content": "char h_last_review_date[30];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_training_count", "data_type": "int", "line_start": 110, "line_end": 110, "raw_content": "int h_training_count;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_bonus_amount", "data_type": "float", "line_start": 111, "line_end": 111, "raw_content": "float h_bonus_amount;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_office_location", "data_type": "char", "line_start": 112, "line_end": 112, "raw_content": "char h_office_location[100];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_reports_count", "data_type": "int", "line_start": 113, "line_end": 113, "raw_content": "int h_reports_count;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_dept_avg_salary", "data_type": "float", "line_start": 114, "line_end": 114, "raw_content": "float h_dept_avg_salary;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_skill_list", "data_type": "char", "line_start": 115, "line_end": 115, "raw_content": "char h_skill_list[500];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_certification_count", "data_type": "int", "line_start": 116, "line_end": 116, "raw_content": "int h_certification_count;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_emergency_contact", "data_type": "char", "line_start": 117, "line_end": 117, "raw_content": "char h_emergency_contact[100];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_status", "data_type": "char", "line_start": 118, "line_end": 118, "raw_content": "char h_status[20];", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_vacation_days", "data_type": "int", "line_start": 119, "line_end": 119, "raw_content": "int h_vacation_days;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_overtime_hours", "data_type": "float", "line_start": 120, "line_end": 120, "raw_content": "float h_overtime_hours;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_project_count", "data_type": "int", "line_start": 121, "line_end": 121, "raw_content": "int h_project_count;", "function": "process_large_dataset"}
+{"type": "variable", "name": "h_revenue_generated", "data_type": "float", "line_start": 122, "line_end": 122, "raw_content": "float h_revenue_generated;", "function": "process_large_dataset"}
+{"type": "variable", "name": "c_emp_id", "data_type": "int", "line_start": 274, "line_end": 274, "raw_content": "int c_emp_id;", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "c_emp_name", "data_type": "char", "line_start": 275, "line_end": 275, "raw_content": "char c_emp_name[100];", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "c_dept", "data_type": "char", "line_start": 276, "line_end": 276, "raw_content": "char c_dept[50];", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "c_salary", "data_type": "float", "line_start": 277, "line_end": 277, "raw_content": "float c_salary;", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "c_dept_id", "data_type": "int", "line_start": 278, "line_end": 278, "raw_content": "int c_dept_id;", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "c_project_status", "data_type": "char", "line_start": 279, "line_end": 279, "raw_content": "char c_project_status[20];", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "c_hours_logged", "data_type": "int", "line_start": 280, "line_end": 280, "raw_content": "int c_hours_logged;", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "c_last_update", "data_type": "char", "line_start": 281, "line_end": 281, "raw_content": "char c_last_update[30];", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "row_count", "data_type": "int", "line_start": 284, "line_end": 284, "raw_content": "int row_count = 0;", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "work_time", "data_type": "char", "line_start": 366, "line_end": 366, "raw_content": "char *work_time = \"08:30:00\";", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "timestamp", "data_type": "char", "line_start": 367, "line_end": 367, "raw_content": "char *timestamp = \"2024-01-15 14:30:45\";", "function": "handle_complex_cursors"}
+{"type": "variable", "name": "dyn_stmt", "data_type": "char", "line_start": 415, "line_end": 415, "raw_content": "char dyn_stmt[MAX_BUFFER];", "function": "execute_batch_updates"}
+{"type": "variable", "name": "batch_id", "data_type": "int", "line_start": 416, "line_end": 416, "raw_content": "int batch_id;", "function": "execute_batch_updates"}
+{"type": "variable", "name": "affected_rows", "data_type": "int", "line_start": 417, "line_end": 417, "raw_content": "int affected_rows;", "function": "execute_batch_updates"}
+{"type": "variable", "name": "table_name", "data_type": "char", "line_start": 418, "line_end": 418, "raw_content": "char table_name[50];", "function": "execute_batch_updates"}
+{"type": "variable", "name": "adjustment_factor", "data_type": "float", "line_start": 419, "line_end": 419, "raw_content": "float adjustment_factor;", "function": "execute_batch_updates"}
+{"type": "variable", "name": "i", "data_type": "int", "line_start": 422, "line_end": 422, "raw_content": "int i, j;", "function": "execute_batch_updates"}
+{"type": "variable", "name": "old_sal", "data_type": "float", "line_start": 458, "line_end": 458, "raw_content": "float old_sal = 50000.0 + (j * 100);", "function": "execute_batch_updates"}
+{"type": "variable", "name": "r_total_employees", "data_type": "int", "line_start": 478, "line_end": 478, "raw_content": "int r_total_employees;", "function": "generate_comprehensive_report"}
+{"type": "variable", "name": "r_total_payroll", "data_type": "float", "line_start": 479, "line_end": 479, "raw_content": "float r_total_payroll;", "function": "generate_comprehensive_report"}
+{"type": "variable", "name": "r_avg_salary", "data_type": "float", "line_start": 480, "line_end": 480, "raw_content": "float r_avg_salary;", "function": "generate_comprehensive_report"}
+{"type": "variable", "name": "r_dept_count", "data_type": "int", "line_start": 481, "line_end": 481, "raw_content": "int r_dept_count;", "function": "generate_comprehensive_report"}
+{"type": "variable", "name": "r_active_projects", "data_type": "int", "line_start": 482, "line_end": 482, "raw_content": "int r_active_projects;", "function": "generate_comprehensive_report"}
+{"type": "variable", "name": "r_report_date", "data_type": "char", "line_start": 483, "line_end": 483, "raw_content": "char r_report_date[30];", "function": "generate_comprehensive_report"}
+{"type": "variable", "name": "orphan_count", "data_type": "int", "line_start": 532, "line_end": 532, "raw_content": "int orphan_count;", "function": "validate_data_integrity"}
+{"type": "variable", "name": "duplicate_count", "data_type": "int", "line_start": 533, "line_end": 533, "raw_content": "int duplicate_count;", "function": "validate_data_integrity"}
+{"type": "variable", "name": "invalid_salary_count", "data_type": "int", "line_start": 534, "line_end": 534, "raw_content": "int invalid_salary_count;", "function": "validate_data_integrity"}
+{"type": "variable", "name": "trans_id", "data_type": "long", "line_start": 581, "line_end": 581, "raw_content": "long trans_id;", "function": "process_transactions"}
+{"type": "variable", "name": "trans_type", "data_type": "char", "line_start": 582, "line_end": 582, "raw_content": "char trans_type[50];", "function": "process_transactions"}
+{"type": "variable", "name": "user_id", "data_type": "int", "line_start": 583, "line_end": 583, "raw_content": "int user_id;", "function": "process_transactions"}
+{"type": "variable", "name": "i", "data_type": "int", "line_start": 13, "line_end": 13, "raw_content": "int i;", "function": "complex_function"}
+{"type": "variable", "name": "time_str", "data_type": "char", "line_start": 14, "line_end": 14, "raw_content": "char *time_str = \"12:30:45\";", "function": "complex_function"}
+{"type": "variable", "name": "sql_str", "data_type": "char", "line_start": 15, "line_end": 15, "raw_content": "char *sql_str = \"SELECT * FROM emp WHERE id = :id\";", "function": "complex_function"}
+{"type": "variable", "name": "emp_struct", "data_type": "struct {\n        int id;\n        char name[50];\n    }", "line_start": 18, "line_end": 21, "raw_content": "struct {\n        int id;\n        char name[50];\n    } emp_struct;", "function": "complex_function"}
+{"type": "variable", "name": "emp_ids", "data_type": "int", "line_start": 23, "line_end": 23, "raw_content": "int emp_ids[10];", "function": "complex_function"}
+{"type": "variable", "name": "h_id", "data_type": "int", "line_start": 26, "line_end": 26, "raw_content": "int :h_id;", "function": "complex_function"}
+{"type": "variable", "name": "h_name", "data_type": "char", "line_start": 27, "line_end": 27, "raw_content": "char *h_name;", "function": "complex_function"}
+{"type": "variable", "name": "dyn_stmt", "data_type": "char", "line_start": 46, "line_end": 46, "raw_content": "char dyn_stmt[100];", "function": "complex_function"}
+{"type": "variable", "name": "global_retry_count", "data_type": "int", "line_start": 11, "line_end": 11, "raw_content": "int global_retry_count = 0;", "function": null}
+{"type": "variable", "name": "username", "data_type": "char", "line_start": 24, "line_end": 24, "raw_content": "char *username = \"scott\";", "function": "db_connect"}
+{"type": "variable", "name": "password", "data_type": "char", "line_start": 25, "line_end": 25, "raw_content": "char *password = \"tiger\";", "function": "db_connect"}
+{"type": "variable", "name": "emp", "data_type": "struct Employee", "line_start": 32, "line_end": 32, "raw_content": "struct Employee emp;", "function": "process_employee"}
+{"type": "variable", "name": "h_id", "data_type": "int", "line_start": 34, "line_end": 34, "raw_content": "int h_id;", "function": "process_employee"}
+{"type": "variable", "name": "h_name", "data_type": "char", "line_start": 35, "line_end": 35, "raw_content": "char h_name[50];", "function": "process_employee"}
+{"type": "variable", "name": "h_salary", "data_type": "float", "line_start": 36, "line_end": 36, "raw_content": "float h_salary;", "function": "process_employee"}
+{"type": "variable", "name": "stmt", "data_type": "char", "line_start": 37, "line_end": 37, "raw_content": "char *stmt = \"UPDATE emp SET salary = salary * 1.1 WHERE id = :v1\";", "function": "process_employee"}
+{"type": "variable", "name": "time_str", "data_type": "char", "line_start": 72, "line_end": 72, "raw_content": "char *time_str = \"12:30:45\";", "function": "process_employee"}

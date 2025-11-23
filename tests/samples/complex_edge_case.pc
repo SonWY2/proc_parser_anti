@@ -1,0 +1,665 @@
+/* ============================================================================
+   Complex Pro*C Edge Case Sample - Large Scale Test
+   ============================================================================ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sqlca.h>
+#include <sqlda.h>
+
+/* Macros and Constants */
+#define MAX_BUFFER 4096
+#define SUCCESS 0
+#define ERROR -1
+#define MAX_RETRIES 5
+#define BATCH_SIZE 1000
+#define TIME_FORMAT "YYYY-MM-DD HH24:MI:SS"
+
+/* Global Structures */
+struct EmployeeRecord {
+    int emp_id;
+    char emp_name[100];
+    char department[50];
+    float salary;
+    char hire_date[20];
+    int manager_id;
+    char email[100];
+    char phone[20];
+};
+
+struct DepartmentStats {
+    int dept_id;
+    char dept_name[100];
+    int emp_count;
+    float avg_salary;
+    float total_budget;
+};
+
+struct TransactionLog {
+    long trans_id;
+    char trans_type[20];
+    char trans_date[30];
+    int user_id;
+    char description[500];
+};
+
+/* Global Variables */
+int global_transaction_count = 0;
+int global_error_count = 0;
+struct EmployeeRecord current_employee;
+char global_query_buffer[MAX_BUFFER];
+
+/* Function Prototypes */
+void initialize_system();
+void process_large_dataset();
+void handle_complex_cursors();
+void execute_batch_updates();
+void generate_comprehensive_report();
+void cleanup_and_finalize();
+void validate_data_integrity();
+void process_transactions();
+
+/* ============================================================================
+   Function: initialize_system
+   Purpose: Initialize database connections and prepare environment
+   ============================================================================ */
+void initialize_system() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        char *username = "admin_user";
+        char *password = "secure_pass_123";
+        char *db_string = "production_db";
+    EXEC SQL END DECLARE SECTION;
+    
+    printf("Initializing system...\n");
+    
+    /* Connect to database */
+    EXEC SQL CONNECT :username IDENTIFIED BY :password USING :db_string;
+    
+    if (sqlca.sqlcode != 0) {
+        printf("Error connecting to database: %d\n", sqlca.sqlcode);
+        exit(ERROR);
+    }
+    
+    /* Set session parameters */
+    EXEC SQL ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
+    EXEC SQL ALTER SESSION SET NLS_NUMERIC_CHARACTERS = '.,';
+    
+    printf("System initialized successfully.\n");
+}
+
+/* ============================================================================
+   Function: process_large_dataset
+   Purpose: Process complex multi-table joins with 200+ line SQL
+   ============================================================================ */
+void process_large_dataset() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        int h_emp_id;
+        char h_emp_name[100];
+        char h_dept_name[100];
+        float h_salary;
+        char h_hire_date[30];
+        int h_manager_id;
+        char h_manager_name[100];
+        char h_project_name[200];
+        float h_project_budget;
+        char h_customer_name[200];
+        int h_total_hours;
+        float h_performance_score;
+        char h_last_review_date[30];
+        int h_training_count;
+        float h_bonus_amount;
+        char h_office_location[100];
+        int h_reports_count;
+        float h_dept_avg_salary;
+        char h_skill_list[500];
+        int h_certification_count;
+        char h_emergency_contact[100];
+        char h_status[20];
+        int h_vacation_days;
+        float h_overtime_hours;
+        int h_project_count;
+        float h_revenue_generated;
+    EXEC SQL END DECLARE SECTION;
+    
+    printf("Processing large dataset with complex joins...\n");
+    
+    /* This is a massive SELECT with multiple joins, subqueries, and aggregations
+       spanning over 200 lines to test parser's ability to handle large SQL blocks */
+    EXEC SQL SELECT 
+        e.employee_id,
+        e.first_name || ' ' || e.last_name AS full_name,
+        d.department_name,
+        e.salary,
+        TO_CHAR(e.hire_date, 'YYYY-MM-DD HH24:MI:SS') AS hire_date_str,
+        e.manager_id,
+        m.first_name || ' ' || m.last_name AS manager_full_name,
+        p.project_name,
+        p.budget AS project_budget,
+        c.customer_name,
+        (SELECT SUM(wh.hours_worked) 
+         FROM work_hours wh 
+         WHERE wh.employee_id = e.employee_id
+         AND wh.work_date >= TRUNC(SYSDATE, 'MONTH')) AS total_hours_this_month,
+        (SELECT AVG(pr.performance_rating)
+         FROM performance_reviews pr
+         WHERE pr.employee_id = e.employee_id
+         AND pr.review_date >= ADD_MONTHS(SYSDATE, -12)) AS avg_performance_score,
+        (SELECT MAX(pr2.review_date)
+         FROM performance_reviews pr2
+         WHERE pr2.employee_id = e.employee_id) AS last_review_date,
+        (SELECT COUNT(*)
+         FROM training_records tr
+         WHERE tr.employee_id = e.employee_id
+         AND tr.completion_date IS NOT NULL) AS training_completed,
+        (SELECT NVL(SUM(b.bonus_amount), 0)
+         FROM bonuses b
+         WHERE b.employee_id = e.employee_id
+         AND EXTRACT(YEAR FROM b.bonus_date) = EXTRACT(YEAR FROM SYSDATE)) AS ytd_bonus,
+        o.office_name || ', ' || o.city || ', ' || o.country AS office_location,
+        (SELECT COUNT(DISTINCT e2.employee_id)
+         FROM employees e2
+         WHERE e2.manager_id = e.employee_id) AS direct_reports,
+        (SELECT AVG(e3.salary)
+         FROM employees e3
+         WHERE e3.department_id = e.department_id) AS dept_average_salary,
+        (SELECT LISTAGG(s.skill_name, ', ') WITHIN GROUP (ORDER BY s.skill_name)
+         FROM employee_skills es
+         JOIN skills s ON es.skill_id = s.skill_id
+         WHERE es.employee_id = e.employee_id) AS skill_list,
+        (SELECT COUNT(*)
+         FROM certifications cert
+         WHERE cert.employee_id = e.employee_id
+         AND cert.expiry_date > SYSDATE) AS active_certifications,
+        ec.contact_name || ' (' || ec.relationship || ')' AS emergency_contact,
+        CASE 
+            WHEN e.termination_date IS NOT NULL THEN 'TERMINATED'
+            WHEN e.on_leave = 'Y' THEN 'ON_LEAVE'
+            ELSE 'ACTIVE'
+        END AS employment_status,
+        (SELECT NVL(SUM(vd.days_taken), 0)
+         FROM vacation_days vd
+         WHERE vd.employee_id = e.employee_id
+         AND EXTRACT(YEAR FROM vd.start_date) = EXTRACT(YEAR FROM SYSDATE)) AS vacation_days_used,
+        (SELECT NVL(SUM(ot.hours), 0)
+         FROM overtime_log ot
+         WHERE ot.employee_id = e.employee_id
+         AND ot.overtime_date >= TRUNC(SYSDATE, 'MONTH')) AS overtime_hours_this_month,
+        (SELECT COUNT(DISTINCT pa.project_id)
+         FROM project_assignments pa
+         WHERE pa.employee_id = e.employee_id
+         AND pa.status = 'ACTIVE') AS active_project_count,
+        (SELECT NVL(SUM(rev.revenue_amount), 0)
+         FROM revenue_tracking rev
+         JOIN project_assignments pa2 ON rev.project_id = pa2.project_id
+         WHERE pa2.employee_id = e.employee_id
+         AND rev.revenue_date >= TRUNC(ADD_MONTHS(SYSDATE, -3), 'Q')) AS quarterly_revenue
+    INTO
+        :h_emp_id,
+        :h_emp_name,
+        :h_dept_name,
+        :h_salary,
+        :h_hire_date,
+        :h_manager_id,
+        :h_manager_name,
+        :h_project_name,
+        :h_project_budget,
+        :h_customer_name,
+        :h_total_hours,
+        :h_performance_score,
+        :h_last_review_date,
+        :h_training_count,
+        :h_bonus_amount,
+        :h_office_location,
+        :h_reports_count,
+        :h_dept_avg_salary,
+        :h_skill_list,
+        :h_certification_count,
+        :h_emergency_contact,
+        :h_status,
+        :h_vacation_days,
+        :h_overtime_hours,
+        :h_project_count,
+        :h_revenue_generated
+    FROM 
+        employees e
+    INNER JOIN 
+        departments d ON e.department_id = d.department_id
+    LEFT JOIN 
+        employees m ON e.manager_id = m.employee_id
+    LEFT JOIN 
+        project_assignments pa ON e.employee_id = pa.employee_id AND pa.is_primary = 'Y'
+    LEFT JOIN 
+        projects p ON pa.project_id = p.project_id
+    LEFT JOIN 
+        customers c ON p.customer_id = c.customer_id
+    LEFT JOIN 
+        offices o ON e.office_id = o.office_id
+    LEFT JOIN 
+        emergency_contacts ec ON e.employee_id = ec.employee_id AND ec.is_primary = 'Y'
+    WHERE 
+        e.employee_id = :h_emp_id
+        AND e.status IN ('ACTIVE', 'ON_LEAVE')
+        AND d.department_id IN (
+            SELECT dept_id 
+            FROM department_hierarchy 
+            WHERE parent_dept_id IS NOT NULL
+            CONNECT BY PRIOR dept_id = parent_dept_id
+            START WITH dept_id = (SELECT department_id FROM employees WHERE employee_id = :h_emp_id)
+        )
+        AND EXISTS (
+            SELECT 1 
+            FROM work_hours wh2
+            WHERE wh2.employee_id = e.employee_id
+            AND wh2.work_date >= ADD_MONTHS(SYSDATE, -6)
+        )
+        AND e.hire_date < SYSDATE
+        AND (e.termination_date IS NULL OR e.termination_date > SYSDATE)
+    ORDER BY 
+        e.employee_id;
+        
+    if (sqlca.sqlcode == 0) {
+        printf("Employee: %s (ID: %d)\n", h_emp_name, h_emp_id);
+        printf("Department: %s, Salary: %.2f\n", h_dept_name, h_salary);
+        printf("Skills: %s\n", h_skill_list);
+    }
+}
+
+/* ============================================================================
+   Function: handle_complex_cursors
+   Purpose: Demonstrate complex cursor operations with nested logic
+   ============================================================================ */
+void handle_complex_cursors() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        int c_emp_id;
+        char c_emp_name[100];
+        char c_dept[50];
+        float c_salary;
+        int c_dept_id;
+        char c_project_status[20];
+        int c_hours_logged;
+        char c_last_update[30];
+    EXEC SQL END DECLARE SECTION;
+    
+    int row_count = 0;
+    
+    printf("Processing complex cursor operations...\n");
+    
+    /* Declare a complex cursor with joins and aggregations */
+    EXEC SQL DECLARE emp_details_cursor CURSOR FOR
+        SELECT 
+            e.employee_id,
+            e.first_name || ' ' || e.last_name,
+            d.department_name,
+            e.salary,
+            e.department_id,
+            CASE 
+                WHEN pa.status = 'ACTIVE' THEN 'IN_PROGRESS'
+                WHEN pa.status = 'COMPLETED' THEN 'DONE'
+                ELSE 'NOT_ASSIGNED'
+            END AS project_status,
+            NVL(SUM(wh.hours_worked), 0) AS total_hours,
+            TO_CHAR(MAX(wh.work_date), 'YYYY-MM-DD HH24:MI:SS') AS last_activity
+        FROM 
+            employees e
+        JOIN 
+            departments d ON e.department_id = d.department_id
+        LEFT JOIN 
+            project_assignments pa ON e.employee_id = pa.employee_id
+        LEFT JOIN 
+            work_hours wh ON e.employee_id = wh.employee_id
+        WHERE 
+            e.status = 'ACTIVE'
+            AND d.budget > 100000
+        GROUP BY 
+            e.employee_id, e.first_name, e.last_name, 
+            d.department_name, e.salary, e.department_id, pa.status
+        HAVING 
+            NVL(SUM(wh.hours_worked), 0) > 0
+        ORDER BY 
+            e.salary DESC, e.employee_id;
+    
+    /* Open cursor */
+    EXEC SQL OPEN emp_details_cursor;
+    
+    if (sqlca.sqlcode != 0) {
+        printf("Error opening cursor: %d\n", sqlca.sqlcode);
+        return;
+    }
+    
+    /* Fetch and process rows */
+    while (1) {
+        EXEC SQL FETCH emp_details_cursor INTO 
+            :c_emp_id, :c_emp_name, :c_dept, :c_salary,
+            :c_dept_id, :c_project_status, :c_hours_logged, :c_last_update;
+        
+        if (sqlca.sqlcode == 1403) {
+            /* No more rows */
+            break;
+        }
+        
+        if (sqlca.sqlcode != 0) {
+            printf("Fetch error: %d\n", sqlca.sqlcode);
+            break;
+        }
+        
+        row_count++;
+        
+        /* Process each row */
+        printf("Employee %d: %s - %s (%.2f)\n", c_emp_id, c_emp_name, c_dept, c_salary);
+        
+        /* Nested processing */
+        if (c_salary > 100000) {
+            /* High earner - call special processing */
+            BAMCALL(HR_AUDIT_SERVICE, "log_high_salary", c_emp_id);
+            
+            /* Update audit log */
+            EXEC SQL INSERT INTO audit_log (
+                log_date, employee_id, action_type, description
+            ) VALUES (
+                SYSDATE, :c_emp_id, 'HIGH_SALARY_REVIEW',
+                'Employee flagged for high salary: ' || TO_CHAR(:c_salary)
+            );
+        }
+        
+        /* Time string test - should not confuse parser */
+        char *work_time = "08:30:00";
+        char *timestamp = "2024-01-15 14:30:45";
+        
+        if (c_hours_logged > 160) {
+            /* Overtime processing */
+            EXEC SQL UPDATE overtime_tracking 
+            SET flagged = 'Y', flag_date = SYSDATE
+            WHERE employee_id = :c_emp_id
+            AND EXTRACT(MONTH FROM work_date) = EXTRACT(MONTH FROM SYSDATE);
+        }
+    }
+    
+    /* Close cursor */
+    EXEC SQL CLOSE emp_details_cursor;
+    
+    printf("Processed %d employee records.\n", row_count);
+    
+    /* Another cursor for department-level processing */
+    EXEC SQL DECLARE dept_summary_cursor CURSOR FOR
+        SELECT 
+            d.department_id,
+            d.department_name,
+            COUNT(e.employee_id) AS emp_count,
+            AVG(e.salary) AS avg_salary,
+            SUM(e.salary) AS total_payroll,
+            MAX(e.salary) AS max_salary,
+            MIN(e.salary) AS min_salary
+        FROM 
+            departments d
+        LEFT JOIN 
+            employees e ON d.department_id = e.department_id
+        WHERE 
+            d.status = 'ACTIVE'
+        GROUP BY 
+            d.department_id, d.department_name
+        HAVING 
+            COUNT(e.employee_id) > 0;
+    
+    EXEC SQL OPEN dept_summary_cursor;
+    /* Additional cursor processing would continue here... */
+    EXEC SQL CLOSE dept_summary_cursor;
+}
+
+/* ============================================================================
+   Function: execute_batch_updates
+   Purpose: Execute batch operations with dynamic SQL
+   ============================================================================ */
+void execute_batch_updates() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        char dyn_stmt[MAX_BUFFER];
+        int batch_id;
+        int affected_rows;
+        char table_name[50];
+        float adjustment_factor;
+    EXEC SQL END DECLARE SECTION;
+    
+    int i, j;
+    
+    printf("Executing batch update operations...\n");
+    
+    /* Dynamic SQL for flexible updates */
+    strcpy(table_name, "employees");
+    adjustment_factor = 1.05;
+    
+    sprintf(dyn_stmt, 
+        "UPDATE %s SET salary = salary * :v1, last_modified = SYSDATE "
+        "WHERE department_id = :v2 AND status = 'ACTIVE'",
+        table_name);
+    
+    EXEC SQL PREPARE update_stmt FROM :dyn_stmt;
+    
+    /* Execute for multiple departments */
+    for (i = 1; i <= 20; i++) {
+        EXEC SQL EXECUTE update_stmt USING :adjustment_factor, :i;
+        
+        affected_rows = sqlca.sqlerrd[2];
+        printf("Updated %d employees in department %d\n", affected_rows, i);
+        
+        if (i % 5 == 0) {
+            EXEC SQL COMMIT;
+        }
+    }
+    
+    /* Another complex dynamic operation */
+    sprintf(dyn_stmt,
+        "INSERT INTO salary_history (emp_id, old_salary, new_salary, change_date) "
+        "SELECT employee_id, :v1, salary, SYSDATE FROM employees "
+        "WHERE last_modified > SYSDATE - 1");
+    
+    EXEC SQL PREPARE history_stmt FROM :dyn_stmt;
+    
+    for (j = 1; j <= 100; j++) {
+        float old_sal = 50000.0 + (j * 100);
+        EXEC SQL EXECUTE history_stmt USING :old_sal;
+    }
+    
+    EXEC SQL COMMIT;
+    
+    /* Batch delete with conditions */
+    EXEC SQL DELETE FROM temp_processing_log
+    WHERE process_date < SYSDATE - 30
+    AND status = 'COMPLETED';
+    
+    printf("Batch operations completed.\n");
+}
+
+/* ============================================================================
+   Function: generate_comprehensive_report
+   Purpose: Generate detailed reports from multiple sources
+   ============================================================================ */
+void generate_comprehensive_report() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        int r_total_employees;
+        float r_total_payroll;
+        float r_avg_salary;
+        int r_dept_count;
+        int r_active_projects;
+        char r_report_date[30];
+    EXEC SQL END DECLARE SECTION;
+    
+    printf("Generating comprehensive report...\n");
+    
+    /* Summary statistics */
+    EXEC SQL SELECT 
+        COUNT(*),
+        SUM(salary),
+        AVG(salary),
+        COUNT(DISTINCT department_id),
+        (SELECT COUNT(*) FROM projects WHERE status = 'ACTIVE'),
+        TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS')
+    INTO
+        :r_total_employees,
+        :r_total_payroll,
+        :r_avg_salary,
+        :r_dept_count,
+        :r_active_projects,
+        :r_report_date
+    FROM employees
+    WHERE status = 'ACTIVE';
+    
+    printf("=== Report Generated: %s ===\n", r_report_date);
+    printf("Total Employees: %d\n", r_total_employees);
+    printf("Total Payroll: %.2f\n", r_total_payroll);
+    printf("Average Salary: %.2f\n", r_avg_salary);
+    printf("Active Departments: %d\n", r_dept_count);
+    printf("Active Projects: %d\n", r_active_projects);
+    
+    /* Store report in database */
+    EXEC SQL INSERT INTO system_reports (
+        report_type, report_date, total_emp, total_payroll, avg_salary
+    ) VALUES (
+        'MONTHLY_SUMMARY', SYSDATE, :r_total_employees, :r_total_payroll, :r_avg_salary
+    );
+    
+    EXEC SQL COMMIT;
+    
+    /* Trigger report generation service */
+    BAMCALL(REPORT_SERVICE, "finalize_report", "monthly_summary");
+}
+
+/* ============================================================================
+   Function: validate_data_integrity
+   Purpose: Perform data validation and integrity checks
+   ============================================================================ */
+void validate_data_integrity() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        int orphan_count;
+        int duplicate_count;
+        int invalid_salary_count;
+    EXEC SQL END DECLARE SECTION;
+    
+    printf("Validating data integrity...\n");
+    
+    /* Check for orphaned records */
+    EXEC SQL SELECT COUNT(*) INTO :orphan_count
+    FROM employees e
+    WHERE NOT EXISTS (
+        SELECT 1 FROM departments d WHERE d.department_id = e.department_id
+    );
+    
+    if (orphan_count > 0) {
+        printf("WARNING: Found %d orphaned employee records!\n", orphan_count);
+    }
+    
+    /* Check for duplicates */
+    EXEC SQL SELECT COUNT(*) INTO :duplicate_count
+    FROM (
+        SELECT email, COUNT(*) as cnt
+        FROM employees
+        GROUP BY email
+        HAVING COUNT(*) > 1
+    );
+    
+    if (duplicate_count > 0) {
+        printf("WARNING: Found %d duplicate email addresses!\n", duplicate_count);
+    }
+    
+    /* Validate salary ranges */
+    EXEC SQL SELECT COUNT(*) INTO :invalid_salary_count
+    FROM employees
+    WHERE salary < 0 OR salary > 1000000;
+    
+    if (invalid_salary_count > 0) {
+        printf("WARNING: Found %d records with invalid salaries!\n", invalid_salary_count);
+    }
+    
+    printf("Integrity validation completed.\n");
+}
+
+/* ============================================================================
+   Function: process_transactions
+   Purpose: Process transaction logs with complex filtering
+   ============================================================================ */
+void process_transactions() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        long trans_id;
+        char trans_type[50];
+        int user_id;
+    EXEC SQL END DECLARE SECTION;
+    
+    printf("Processing transaction logs...\n");
+    
+    EXEC SQL DECLARE trans_cursor CURSOR FOR
+        SELECT transaction_id, transaction_type, user_id
+        FROM transaction_log
+        WHERE transaction_date >= TRUNC(SYSDATE) - 7
+        AND status = 'PENDING'
+        ORDER BY transaction_id;
+    
+    EXEC SQL OPEN trans_cursor;
+    
+    while (1) {
+        EXEC SQL FETCH trans_cursor INTO :trans_id, :trans_type, :user_id;
+        if (sqlca.sqlcode != 0) break;
+        
+        /* Process transaction */
+        printf("Processing transaction %ld: %s\n", trans_id, trans_type);
+        
+        /* Update status */
+        EXEC SQL UPDATE transaction_log 
+        SET status = 'PROCESSED', processed_date = SYSDATE
+        WHERE transaction_id = :trans_id;
+    }
+    
+    EXEC SQL CLOSE trans_cursor;
+    EXEC SQL COMMIT;
+}
+
+/* ============================================================================
+   Function: cleanup_and_finalize
+   Purpose: Cleanup resources and finalize operations
+   ============================================================================ */
+void cleanup_and_finalize() {
+    printf("Cleaning up resources...\n");
+    
+    /* Commit any pending transactions */
+    EXEC SQL COMMIT WORK;
+    
+    /* Archive old logs */
+    EXEC SQL INSERT INTO archived_logs
+    SELECT * FROM system_logs
+    WHERE log_date < SYSDATE - 90;
+    
+    EXEC SQL DELETE FROM system_logs
+    WHERE log_date < SYSDATE - 90;
+    
+    EXEC SQL COMMIT;
+    
+    /* Disconnect from database */
+    EXEC SQL COMMIT WORK RELEASE;
+    
+    printf("Cleanup completed successfully.\n");
+}
+
+/* ============================================================================
+   Main Function
+   ============================================================================ */
+int main(int argc, char *argv[]) {
+    printf("Starting Complex Pro*C Application...\n");
+    printf("===========================================\n\n");
+    
+    /* Initialize */
+    initialize_system();
+    
+    /* Execute main processing functions */
+    process_large_dataset();
+    handle_complex_cursors();
+    execute_batch_updates();
+    generate_comprehensive_report();
+    validate_data_integrity();
+    process_transactions();
+    
+    /* Cleanup */
+    cleanup_and_finalize();
+    
+    printf("\n===========================================\n");
+    printf("Application completed successfully.\n");
+    
+    return SUCCESS;
+}
