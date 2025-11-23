@@ -37,3 +37,9 @@ PATTERN_COMMENT_MULTI = re.compile(r'/\*.*?\*/', re.DOTALL)
 # Variable Declaration (Heuristic)
 # Type Name; or Type Name = Value;
 
+# Array DML pattern (FOR clause)
+# EXEC SQL FOR :array_size INSERT/UPDATE/DELETE ...
+PATTERN_ARRAY_DML = re.compile(
+    r'EXEC\s+SQL\s+FOR\s+:?\w+\s+(INSERT|UPDATE|DELETE).*?;',
+    re.IGNORECASE | re.DOTALL
+)

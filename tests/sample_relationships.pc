@@ -1,0 +1,128 @@
+/*
+ * Sample Pro*C file with various SQL patterns
+ * Tests cursor, dynamic SQL, transaction, and array DML
+ */
+
+#include <stdio.h>
+#include <sqlca.h>
+
+EXEC SQL INCLUDE sqlca;
+
+/* Function with cursor pattern */
+int get_employees_by_dept(int dept_id) {
+    EXEC SQL BEGIN DECLARE SECTION;
+    int emp_id;
+    char emp_name[50];
+    char emp_salary[20];
+    int v_dept_id = dept_id;
+    EXEC SQL END DECLARE SECTION;
+    
+    /* Declare cursor */
+    EXEC SQL DECLARE emp_cursor CURSOR FOR
+        SELECT employee_id, name, salary
+        FROM employees
+        WHERE department_id = :v_dept_id;
+    
+    /* Open cursor */
+    EXEC SQL OPEN emp_cursor;
+    
+    /* Fetch loop */
+    while (1) {
+        EXEC SQL FETCH emp_cursor INTO :emp_id, :emp_name, :emp_salary;
+        
+        if (sqlca.sqlcode != 0) break;
+        
+        printf("Employee: %d, %s, %s\n", emp_id, emp_name, emp_salary);
+    }
+    
+    /* Close cursor */
+    EXEC SQL CLOSE emp_cursor;
+    
+    return 0;
+}
+
+/* Function with dynamic SQL */
+int execute_dynamic_query(char *query_string) {
+    EXEC SQL BEGIN DECLARE SECTION;
+    char *v_query = query_string;
+    int param1 = 100;
+    int param2 = 200;
+    EXEC SQL END DECLARE SECTION;
+    
+    /* Prepare statement */
+    EXEC SQL PREPARE dyn_stmt FROM :v_query;
+    
+    /* Execute with parameters */
+    EXEC SQL EXECUTE dyn_stmt USING :param1, :param2;
+    
+    /* Deallocate */
+    EXEC SQL DEALLOCATE PREPARE dyn_stmt;
+    
+    return sqlca.sqlcode;
+}
+
+/* Function with transaction */
+int save_audit_log(char *message) {
+    EXEC SQL BEGIN DECLARE SECTION;
+    char *log_msg = message;
+    EXEC SQL END DECLARE SECTION;
+    
+    /* Insert operation */
+    EXEC SQL INSERT INTO audit_log (message, timestamp)
+        VALUES (:log_msg, SYSDATE);
+    
+    if (sqlca.sqlcode != 0) {
+        EXEC SQL ROLLBACK;
+        return -1;
+    }
+    
+    /* Commit transaction */
+    EXEC SQL COMMIT;
+    
+    return 0;
+}
+
+/* Function with array DML */
+int batch_insert_data(int *ids, char names[][50], int count) {
+    EXEC SQL BEGIN DECLARE SECTION;
+    int v_ids[100];
+    char v_names[100][50];
+    int v_count = count;
+    EXEC SQL END DECLARE SECTION;
+    
+    /* Copy data */
+    for (int i = 0; i < count; i++) {
+        v_ids[i] = ids[i];
+        strcpy(v_names[i], names[i]);
+    }
+    
+    /* Array DML insert */
+    EXEC SQL FOR :v_count
+        INSERT INTO temp_data (id, name)
+        VALUES (:v_ids, :v_names);
+    
+    if (sqlca.sqlcode != 0) {
+        return -1;
+    }
+    
+    EXEC SQL COMMIT;
+    
+    return 0;
+}
+
+/* Simple SELECT example */
+int get_employee_count() {
+    EXEC SQL BEGIN DECLARE SECTION;
+    int emp_count;
+    EXEC SQL END DECLARE SECTION;
+    
+    EXEC SQL SELECT COUNT(*) INTO :emp_count FROM employees;
+    
+    return emp_count;
+}
+
+/* BAMCALL example (custom plugin) */
+int call_stored_proc() {
+    BAMCALL("SP_UPDATE_STATUS", "param1", "param2");
+    return 0;
+}

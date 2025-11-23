@@ -13,8 +13,11 @@ class SQLConverter:
         
         # Determine SQL Type
         sql_type = "UNKNOWN"
-        first_word = clean_sql.split(' ')[0].upper()
-        if first_word in ["SELECT", "INSERT", "UPDATE", "DELETE", "DECLARE", "OPEN", "FETCH", "CLOSE", "PREPARE", "EXECUTE", "CONNECT", "COMMIT", "ROLLBACK"]:
+        # Remove EXEC SQL prefix for type detection
+        type_check_sql = re.sub(r'^EXEC\s+SQL\s+', '', clean_sql, flags=re.IGNORECASE).strip()
+        first_word = type_check_sql.split(' ')[0].upper()
+        
+        if first_word in ["SELECT", "INSERT", "UPDATE", "DELETE", "DECLARE", "OPEN", "FETCH", "CLOSE", "PREPARE", "EXECUTE", "CONNECT", "COMMIT", "ROLLBACK", "ALTER"]:
             sql_type = first_word
         
         input_vars = []

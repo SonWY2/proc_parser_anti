@@ -2,16 +2,28 @@ from patterns import *
 from c_parser import CParser
 from sql_converter import SQLConverter
 from plugins.bam_call import BamCallPlugin
+from plugins.cursor_relationship import CursorRelationshipPlugin
+from plugins.dynamic_sql_relationship import DynamicSQLRelationshipPlugin
+from plugins.transaction_relationship import TransactionRelationshipPlugin
+from plugins.array_dml_relationship import ArrayDMLRelationshipPlugin
 import re
 
 class ProCParser:
     def __init__(self):
         self.c_parser = CParser()
         self.sql_converter = SQLConverter()
-        # Initialize plugins
-        # In a real system, this could be dynamic loading
+        
+        # Initialize code element plugins
         self.plugins = [
             BamCallPlugin()
+        ]
+        
+        # Initialize SQL relationship plugins
+        self.sql_relationship_plugins = [
+            CursorRelationshipPlugin(),
+            DynamicSQLRelationshipPlugin(),
+            TransactionRelationshipPlugin(),
+            ArrayDMLRelationshipPlugin()
         ]
 
     def parse_file(self, file_path):
@@ -70,19 +82,23 @@ class ProCParser:
             mark_covered(match.start(), match.end())
 
         # SQL Blocks
+        sql_id_counter = 1
         for match in PATTERN_SQL.finditer(content):
             raw_sql = match.group(0)
             normalized_data = self.sql_converter.normalize_sql(raw_sql)
             
             element = {
                 "type": "sql",
+                "sql_id": f"sql_{sql_id_counter:03d}",
                 "line_start": content.count('\n', 0, match.start()) + 1,
                 "line_end": content.count('\n', 0, match.end()) + 1,
                 "raw_content": raw_sql,
-                "function": None # Will be filled later by scope resolution
+                "function": None, # Will be filled later by scope resolution
+                "relationship": None  # Will be filled by relationship plugins
             }
             element.update(normalized_data)
             elements.append(element)
+            sql_id_counter += 1
             
             # Blank out SQL for C parser
             blank_out(match.start(), match.end())
@@ -179,6 +195,34 @@ class ProCParser:
                 if func['line_start'] <= el['line_start'] and func['line_end'] >= el['line_end']:
                     el['function'] = func['name']
                     break
+        
+        # 3.5. Extract SQL Relationships
+        # Run relationship plugins on SQL elements
+        sql_elements = [e for e in elements if e['type'] == 'sql']
+        all_relationships = []
+        
+        for plugin in self.sql_relationship_plugins:
+            try:
+                if plugin.can_handle(sql_elements):
+                    rels = plugin.extract_relationships(sql_elements)
+                    all_relationships.extend(rels)
+            except Exception as e:
+                # Log error but continue with other plugins
+                print(f"Warning: Relationship plugin {plugin.__class__.__name__} failed: {e}")
+        
+        # Inject relationship info back to SQL elements
+        for rel in all_relationships:
+            for i, sql_id in enumerate(rel['sql_ids']):
+                for el in sql_elements:
+                    if el.get('sql_id') == sql_id:
+                        el['relationship'] = {
+                            'relationship_id': rel['relationship_id'],
+                            'relationship_type': rel['relationship_type'],
+                            'sequence_in_group': i + 1,
+                            'total_in_group': len(rel['sql_ids']),
+                            'metadata': rel.get('metadata', {})
+                        }
+                        break
         
         # 4. Unknown Element Detection
         # We need to mark C elements as covered.
