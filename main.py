@@ -1,3 +1,7 @@
+"""
+Pro*C 파서의 메인 진입점입니다.
+커맨드 라인 인자를 처리하고 파싱 작업을 시작합니다.
+"""
 import argparse
 import sys
 from file_handler import process_directory

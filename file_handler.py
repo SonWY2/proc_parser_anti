@@ -1,24 +1,28 @@
+"""
+파일 및 디렉토리 처리를 담당하는 모듈입니다.
+입력 디렉토리를 순회하며 파일을 파싱하고 결과를 출력 디렉토리에 저장합니다.
+"""
 import os
 import json
 from parser_core import ProCParser
 
 def process_directory(input_dir, output_dir):
     """
-    Walk through input_dir, parse .pc and .h files, and write results to output_dir.
-    Results are separated by element type (e.g., sql.jsonl, function.jsonl).
+    입력 디렉토리를 순회하며 .pc 및 .h 파일을 파싱하고 결과를 출력 디렉토리에 씁니다.
+    결과는 요소 유형별로 분리되어 저장됩니다 (예: sql.jsonl, function.jsonl).
     """
     parser = ProCParser()
     
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         
-    # Clear existing type files or prepare to append? 
-    # For a fresh run, we should probably overwrite.
-    # Let's collect all elements first or write incrementally?
-    # Writing incrementally is better for large datasets.
-    # But we need to ensure we start fresh.
+    # 기존 타입 파일을 지우거나 추가할 준비를 할까요?
+    # 새로운 실행을 위해서는 아마 덮어써야 할 것입니다.
+    # 모든 요소를 먼저 수집할까요 아니면 점진적으로 쓸까요?
+    # 대규모 데이터셋의 경우 점진적으로 쓰는 것이 좋습니다.
+    # 하지만 신선하게 시작하는지 확인해야 합니다.
     
-    # We'll use a set to track which files we've opened in this run to truncate them first
+    # 이번 실행에서 열었던 파일을 추적하여 먼저 자르기 위해 세트를 사용합니다.
     initialized_files = set()
 
     for root, dirs, files in os.walk(input_dir):
@@ -30,7 +34,7 @@ def process_directory(input_dir, output_dir):
                 try:
                     elements = parser.parse_file(file_path)
                     
-                    # Group by type
+                    # 타입별 그룹화
                     elements_by_type = {}
                     for el in elements:
                         el_type = el.get('type', 'unknown')
@@ -38,14 +42,14 @@ def process_directory(input_dir, output_dir):
                             elements_by_type[el_type] = []
                         elements_by_type[el_type].append(el)
                     
-                    # Write to type-specific files
+                    # 타입별 파일에 쓰기
                     for el_type, items in elements_by_type.items():
                         output_filename = f"{el_type}.jsonl"
                         output_file_path = os.path.join(output_dir, output_filename)
                         
                         mode = 'a'
                         if output_filename not in initialized_files:
-                            mode = 'w' # Overwrite on first write of this run
+                            mode = 'w' # 이번 실행의 첫 번째 쓰기에서 덮어쓰기
                             initialized_files.add(output_filename)
                             
                         with open(output_file_path, mode, encoding='utf-8') as f:

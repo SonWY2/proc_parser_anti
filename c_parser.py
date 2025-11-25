@@ -1,3 +1,7 @@
+"""
+Tree-sitter를 사용하여 C 코드를 파싱하는 모듈입니다.
+함수 정의, 변수 선언, 구조체 정의, 함수 호출 등을 추출합니다.
+"""
 import tree_sitter
 try:
     import tree_sitter_c
@@ -16,7 +20,7 @@ class CParser:
 
     def parse(self, source_code):
         """
-        Parse C source code and extract functions, structs, variables.
+        C 소스 코드를 파싱하여 함수, 구조체, 변수 등을 추출합니다.
         """
         elements = []
         if not self.parser:
@@ -25,19 +29,19 @@ class CParser:
         tree = self.parser.parse(bytes(source_code, "utf8"))
         root_node = tree.root_node
         
-        # Use manual traversal instead of queries for better compatibility
-        # across different tree-sitter versions
+        # 다양한 tree-sitter 버전 간의 호환성을 위해
+        # 쿼리 대신 수동 순회 사용
         self._traverse(root_node, elements)
         
         return elements
 
     def _traverse(self, node, elements, current_function=None):
-        # Recursive traversal
+        # 재귀적 순회
         
         node_type = node.type
         
         if node_type == 'function_definition':
-            # Extract function name
+            # 함수 이름 추출
             func_name = self._get_function_name(node)
             if func_name:
                 elements.append({
@@ -46,12 +50,12 @@ class CParser:
                     "line_start": node.start_point.row + 1,
                     "line_end": node.end_point.row + 1,
                     "raw_content": node.text.decode('utf8'),
-                    "function": None # Top level
+                    "function": None # 최상위 레벨
                 })
                 current_function = func_name
         
         elif node_type == 'declaration':
-            # Variable declaration
+            # 변수 선언
             var_name, var_type = self._get_variable_info(node)
             if var_name:
                 elements.append({
@@ -76,11 +80,24 @@ class CParser:
                     "function": current_function
                 })
 
+        elif node_type == 'call_expression':
+            func_name, args, raw_args = self._get_function_call_info(node)
+            if func_name:
+                elements.append({
+                    "type": "function_call",
+                    "name": func_name,
+                    "args": args,
+                    "raw_content": node.text.decode('utf8'),
+                    "line_start": node.start_point.row + 1,
+                    "line_end": node.end_point.row + 1,
+                    "function": current_function
+                })
+
         for child in node.children:
             self._traverse(child, elements, current_function)
 
     def _get_function_name(self, node):
-        # child: declarator -> function_declarator -> declarator -> identifier
+        # 자식: declarator -> function_declarator -> declarator -> identifier
         declarator = node.child_by_field_name('declarator')
         if not declarator: return None
         
@@ -102,7 +119,7 @@ class CParser:
         
         var_type = type_node.text.decode('utf8')
         
-        # Handle pointers, arrays, inits
+        # 포인터, 배열, 초기화 처리
         while declarator.type in ['pointer_declarator', 'array_declarator', 'init_declarator']:
             declarator = declarator.child_by_field_name('declarator')
             
@@ -116,4 +133,25 @@ class CParser:
         if name_node and name_node.type == 'type_identifier':
             return name_node.text.decode('utf8')
         return None
+
+    def _get_function_call_info(self, node):
+        # function: identifier
+        # arguments: argument_list
+        function_node = node.child_by_field_name('function')
+        arguments_node = node.child_by_field_name('arguments')
+        
+        if not function_node: return None, [], ""
+        
+        func_name = function_node.text.decode('utf8')
+        args = []
+        raw_args = ""
+        
+        if arguments_node:
+            raw_args = arguments_node.text.decode('utf8')
+            # 간단한 인자 추출 (자식의 텍스트만)
+            for child in arguments_node.children:
+                if child.type not in ['(', ')', ',']:
+                    args.append(child.text.decode('utf8'))
+                    
+        return func_name, args, raw_args
 

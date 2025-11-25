@@ -1,7 +1,7 @@
 """
-Test SQL Relationship Plugins
+SQL 관계 플러그인 테스트 모듈
 
-Tests cursor, dynamic SQL, transaction, and array DML relationship detection.
+커서, 동적 SQL, 트랜잭션 및 Array DML 관계 감지를 테스트합니다.
 """
 
 import sys
@@ -15,7 +15,7 @@ from plugins.array_dml_relationship import ArrayDMLRelationshipPlugin
 
 
 def test_cursor_relationship():
-    """Test cursor pattern detection"""
+    """커서 패턴 감지를 테스트합니다."""
     plugin = CursorRelationshipPlugin()
     
     sql_elements = [
@@ -73,7 +73,7 @@ def test_cursor_relationship():
 
 
 def test_dynamic_sql_relationship():
-    """Test dynamic SQL pattern detection"""
+    """동적 SQL 패턴 감지를 테스트합니다."""
     plugin = DynamicSQLRelationshipPlugin()
     
     sql_elements = [
@@ -113,7 +113,7 @@ def test_dynamic_sql_relationship():
 
 
 def test_transaction_relationship():
-    """Test transaction boundary detection"""
+    """트랜잭션 경계 감지를 테스트합니다."""
     plugin = TransactionRelationshipPlugin()
     
     sql_elements = [
@@ -152,7 +152,7 @@ def test_transaction_relationship():
 
 
 def test_array_dml_relationship():
-    """Test array DML pattern detection"""
+    """Array DML 패턴 감지를 테스트합니다."""
     plugin = ArrayDMLRelationshipPlugin()
     
     sql_elements = [
