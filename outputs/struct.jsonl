@@ -1,7 +1,0 @@
-{"type": "struct", "name": "EmployeeRecord", "line_start": 20, "line_end": 29, "raw_content": "struct EmployeeRecord {\n    int emp_id;\n    char emp_name[100];\n    char department[50];\n    float salary;\n    char hire_date[20];\n    int manager_id;\n    char email[100];\n    char phone[20];\n}", "function": null}
-{"type": "struct", "name": "DepartmentStats", "line_start": 31, "line_end": 37, "raw_content": "struct DepartmentStats {\n    int dept_id;\n    char dept_name[100];\n    int emp_count;\n    float avg_salary;\n    float total_budget;\n}", "function": null}
-{"type": "struct", "name": "TransactionLog", "line_start": 39, "line_end": 45, "raw_content": "struct TransactionLog {\n    long trans_id;\n    char trans_type[20];\n    char trans_date[30];\n    int user_id;\n    char description[500];\n}", "function": null}
-{"type": "struct", "name": "EmployeeRecord", "line_start": 50, "line_end": 50, "raw_content": "struct EmployeeRecord", "function": null}
-{"type": "struct", "name": "Config", "line_start": 6, "line_end": 9, "raw_content": "struct Config {\n    char db_url[100];\n    int timeout;\n}", "function": null}
-{"type": "struct", "name": "Employee", "line_start": 13, "line_end": 17, "raw_content": "struct Employee {\n    int id;\n    char name[50];\n    float salary;\n}", "function": null}
-{"type": "struct", "name": "Employee", "line_start": 32, "line_end": 32, "raw_content": "struct Employee", "function": "process_employee"}

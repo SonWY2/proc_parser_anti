@@ -1,4 +1,0 @@
-{"type": "bam_call", "args": "HR_AUDIT_SERVICE, \"log_high_salary\", c_emp_id", "line_start": 354, "line_end": 354, "raw_content": "BAMCALL(HR_AUDIT_SERVICE, \"log_high_salary\", c_emp_id);", "function": "handle_complex_cursors"}
-{"type": "bam_call", "args": "REPORT_SERVICE, \"finalize_report\", \"monthly_summary\"", "line_start": 523, "line_end": 523, "raw_content": "BAMCALL(REPORT_SERVICE, \"finalize_report\", \"monthly_summary\");", "function": "generate_comprehensive_report"}
-{"type": "bam_call", "args": "SERVICE_NAME, \"func(arg)\", \"output with ) parenthesis\"", "line_start": 54, "line_end": 54, "raw_content": "BAMCALL(SERVICE_NAME, \"func(arg)\", \"output with ) parenthesis\");", "function": "complex_function"}
-{"type": "bam_call", "args": "SERVICE_NAME, \"input_data\", \"output_data\"", "line_start": 77, "line_end": 77, "raw_content": "BAMCALL(SERVICE_NAME, \"input_data\", \"output_data\");", "function": "bam_call_example"}

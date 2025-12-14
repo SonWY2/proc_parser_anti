@@ -7,8 +7,52 @@ from patterns import PATTERN_HOST_VAR
 from plugins.naming_convention import NamingConventionPlugin
 
 class SQLConverter:
-    def __init__(self, naming_convention: NamingConventionPlugin = None):
+    def __init__(self, naming_convention: NamingConventionPlugin = None, strip_semicolon: bool = True):
         self.naming_convention = naming_convention
+        self.strip_semicolon = strip_semicolon
+
+    def _strip_comments(self, sql):
+        """
+        SQL에서 주석을 제거합니다 (타입 감지용).
+        문자열 리터럴 내부의 주석 구문은 제거하지 않습니다.
+        """
+        result = []
+        i = 0
+        in_string = False
+        while i < len(sql):
+            # 문자열 시작/종료
+            if sql[i] == "'" and not in_string:
+                in_string = True
+                result.append(sql[i])
+                i += 1
+            elif sql[i] == "'" and in_string:
+                # 이스케이프된 따옴표 확인
+                if i + 1 < len(sql) and sql[i+1] == "'":
+                    result.append("''")
+                    i += 2
+                else:
+                    in_string = False
+                    result.append(sql[i])
+                    i += 1
+            elif in_string:
+                result.append(sql[i])
+                i += 1
+            # 블록 주석
+            elif sql[i:i+2] == '/*':
+                end = sql.find('*/', i + 2)
+                if end == -1:
+                    break
+                i = end + 2
+            # 라인 주석
+            elif sql[i:i+2] == '--':
+                end = sql.find('\n', i)
+                if end == -1:
+                    break
+                i = end
+            else:
+                result.append(sql[i])
+                i += 1
+        return ''.join(result)
 
     def normalize_sql(self, raw_sql):
         """
@@ -16,19 +60,20 @@ class SQLConverter:
         호스트 변수를 추출하고 플레이스홀더로 대체합니다.
         네이밍 컨벤션 플러그인이 제공되면 AS 구문을 사용하여 호스트 변수에 별칭을 지정합니다.
         """
-        # 단일 라인 주석을 올바르게 처리하기 위해 raw_sql을 직접 처리합니다.
-        # 미리 줄바꿈을 없애면 단일 라인 주석(-- ...)이 망가집니다.
+        # 타입 감지를 위해 주석을 먼저 제거
+        clean_for_type = self._strip_comments(raw_sql)
+        clean_for_type = re.sub(r'\s+', ' ', clean_for_type).strip()
         
-        # SQL 타입 결정 (먼저 원시 문자열에 대한 간단한 확인, 주석 처리된 경우 부정확할 수 있지만
-        # 대개 EXEC SQL은 시작 부분에 있음)
-        # 필요한 경우 토큰화 후 타입 감지를 개선할 수 있지만 지금은 간단하게 유지합니다.
-        # 타입 감지를 위해 정리 (EXEC SQL 제거)
-        clean_for_type = re.sub(r'\s+', ' ', raw_sql).strip()
+        # EXEC SQL prefix 제거
         type_check_sql = re.sub(r'^EXEC\s+SQL\s+', '', clean_for_type, flags=re.IGNORECASE).strip()
-        first_word = type_check_sql.split(' ')[0].upper()
+        
+        # FOR :array_size 처리 (Array DML)
+        type_check_sql = re.sub(r'^FOR\s+:?\w+(?:\[\w+\])?\s+', '', type_check_sql, flags=re.IGNORECASE).strip()
+        
+        first_word = type_check_sql.split(' ')[0].upper() if type_check_sql else ""
         
         sql_type = "UNKNOWN"
-        if first_word in ["SELECT", "INSERT", "UPDATE", "DELETE", "DECLARE", "OPEN", "FETCH", "CLOSE", "PREPARE", "EXECUTE", "CONNECT", "COMMIT", "ROLLBACK", "ALTER"]:
+        if first_word in ["SELECT", "INSERT", "UPDATE", "DELETE", "DECLARE", "OPEN", "FETCH", "CLOSE", "PREPARE", "EXECUTE", "CONNECT", "COMMIT", "ROLLBACK", "ALTER", "CREATE", "DROP", "TRUNCATE", "MERGE", "CALL", "BEGIN", "END", "SET", "SAVEPOINT", "WHENEVER"]:
             sql_type = first_word
         
         input_vars = []
@@ -37,24 +82,24 @@ class SQLConverter:
         # 토큰화를 위한 Regex
         # 1. 문자열: '...' (이스케이프된 따옴표 '' 처리)
         # 2. 주석: --... (줄바꿈까지) 또는 /*...*/
-        # 3. 호스트 변수: :var
-        # 4. INTO 절 키워드
-        # 5. FROM 키워드
-        # 6. 공백 (정규화용)
-        # 7. 기타 텍스트
-        
-        # 참고: 여러 줄 일치를 위해 re.DOTALL을 사용하지만 -- 주석에 주의해야 합니다.
-        # -- 주석은 줄바꿈과 일치해서는 안 됩니다.
-        # 따라서 특정 정규식을 사용합니다.
+        # 3. 호스트 변수: :var 또는 :var:indicator 또는 :arr[i]
+        # 4. EXEC SQL 키워드 (제거용)
+        # 5. INTO 절 키워드
+        # 6. FROM 키워드
+        # 7. 공백 (정규화용)
+        # 8. 기타 텍스트
         
         token_pattern = re.compile(
             r"(?P<string>'([^']|'')*')|"
             r"(?P<comment_single>--[^\n]*)|"
             r"(?P<comment_multi>/\*[\s\S]*?\*/)|"
-            r"(?P<host_var>:[a-zA-Z_]\w*)|"
+            r"(?P<exec_sql>\bEXEC\s+SQL\s+)|"
+            r"(?P<for_clause>\bFOR\s+:?\w+(?:\[[^\]]+\])?\s+)|"
+            r"(?P<host_var>:[a-zA-Z_]\w*(?:\[[^\]]+\])?(?::[a-zA-Z_]\w*)?)|"
             r"(?P<into_keyword>\bINTO\b)|"
             r"(?P<from_keyword>\bFROM\b)|"
             r"(?P<whitespace>\s+)|"
+            r"(?P<semicolon>;)|"
             r"(?P<other>.)",
             re.IGNORECASE | re.DOTALL
         )
@@ -67,6 +112,7 @@ class SQLConverter:
         iterator = token_pattern.finditer(raw_sql)
         
         in_into_clause = False
+        last_token_was_semicolon = False
         
         for match in iterator:
             token_type = match.lastgroup
@@ -79,25 +125,25 @@ class SQLConverter:
             elif token_type == "comment_single":
                 if not in_into_clause:
                     normalized_parts.append(token_value)
-                    # 소비되었다면 줄바꿈을 추가해야 할까요?
-                    # 정규식 --[^\n]*은 줄바꿈을 소비하지 않습니다 (EOF 제외).
-                    # 하지만 공백 정규식이 다음 줄바꿈을 소비할 수 있습니다.
-                    # 공백을 스페이스로 정규화하면 주석을 다음 줄과 병합할 수 있습니다.
-                    # 예: -- comment \n SELECT
-                    # -- comment 는 "-- comment "와 일치
-                    # \n 은 공백 -> " "과 일치
-                    # 결과: -- comment  SELECT
-                    # 이것은 효과적으로 SELECT를 주석 처리합니다!
-                    # 따라서 단일 라인 주석의 경우 끝에 줄바꿈을 보존해야 합니다.
                     normalized_parts.append('\n')
 
             elif token_type == "comment_multi":
                 if not in_into_clause:
                     normalized_parts.append(token_value)
             
+            elif token_type == "exec_sql":
+                # EXEC SQL은 normalized_sql에서 제거 (건너뜀)
+                pass
+            
+            elif token_type == "for_clause":
+                # FOR :array_size 절은 제거 (건너뜀)
+                # 하지만 array_size 변수는 input으로 추출
+                for_match = re.search(r':([a-zA-Z_]\w*(?:\[[^\]]+\])?)', token_value)
+                if for_match:
+                    input_vars.append(':' + for_match.group(1))
+            
             elif token_type == "whitespace":
                 if not in_into_clause:
-                    # 단일 스페이스로 정규화
                     normalized_parts.append(" ")
             
             elif token_type == "host_var":
@@ -113,16 +159,37 @@ class SQLConverter:
                     if not in_into_clause:
                         normalized_parts.append(token_value)
                 else:
-                    if in_into_clause:
-                        output_vars.append(var_name)
-                    else:
-                        input_vars.append(var_name)
-                        if self.naming_convention:
-                            clean_name = var_name[1:]
-                            alias = self.naming_convention.convert(clean_name)
-                            normalized_parts.append(f"{var_name} AS {alias}")
+                    # 인디케이터 변수 분리 (:var:ind)
+                    if ':' in var_name[1:]:
+                        parts = var_name.split(':')
+                        main_var = ':' + parts[1]
+                        indicator_var = ':' + parts[2] if len(parts) > 2 else None
+                        
+                        if in_into_clause:
+                            output_vars.append(main_var)
+                            if indicator_var:
+                                output_vars.append(indicator_var)
                         else:
-                            normalized_parts.append("?")
+                            input_vars.append(main_var)
+                            if indicator_var:
+                                input_vars.append(indicator_var)
+                            if self.naming_convention:
+                                clean_name = main_var[1:].split('[')[0]  # 배열 인덱스 제거
+                                alias = self.naming_convention.convert(clean_name)
+                                normalized_parts.append(f"{main_var} AS {alias}")
+                            else:
+                                normalized_parts.append("?")
+                    else:
+                        if in_into_clause:
+                            output_vars.append(var_name)
+                        else:
+                            input_vars.append(var_name)
+                            if self.naming_convention:
+                                clean_name = var_name[1:].split('[')[0]  # 배열 인덱스 제거
+                                alias = self.naming_convention.convert(clean_name)
+                                normalized_parts.append(f"{var_name} AS {alias}")
+                            else:
+                                normalized_parts.append("?")
 
             elif token_type == "into_keyword":
                 if is_select_or_fetch and not is_insert:
@@ -137,17 +204,21 @@ class SQLConverter:
                 else:
                     normalized_parts.append(token_value)
             
+            elif token_type == "semicolon":
+                if not in_into_clause:
+                    if self.strip_semicolon:
+                        last_token_was_semicolon = True
+                    else:
+                        normalized_parts.append(token_value)
+            
             elif token_type == "other":
                 if not in_into_clause:
                     normalized_parts.append(token_value)
         
         # 정규화된 SQL 재구성
-        # 여분의 공백이나 줄바꿈이 있을 수 있지만 깨진 SQL보다는 낫습니다.
         normalized_sql = "".join(normalized_parts).strip()
-        # 다시 여러 공백을 정리할까요?
-        # normalized_sql = re.sub(r'\s+', ' ', normalized_sql) 
-        # 아니요, 그러면 단일 라인 주석이 다시 망가집니다!
-        # 우리가 추가한 줄바꿈을 존중해야 합니다.
+        
+        # 세미콜론이 마지막에 있었고 strip_semicolon이 False면 다시 추가할 필요 없음 (이미 처리됨)
         
         # 동적 SQL 처리
         dynamic_sql_stmt = None

@@ -1,0 +1,580 @@
+/*
+ * complex_test.pc - Pro*C SQL 추출기 테스트용 복잡한 샘플 파일
+ * 
+ * 이 파일은 다양한 SQL 구문과 호스트 변수 패턴을 포함합니다:
+ * - 여러 줄에 걸친 복잡한 SELECT 문
+ * - 커서 작업 (DECLARE, OPEN, FETCH, CLOSE)
+ * - DML 구문 (INSERT, UPDATE, DELETE)
+ * - 트랜잭션 제어 (COMMIT, ROLLBACK)
+ * - 동적 SQL (PREPARE, EXECUTE)
+ * - 호스트 변수 패턴 (기본, 배열, 구조체, 인디케이터)
+ * - DB2 스타일 구문 (WITH UR, FETCH FIRST)
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+/* SQLCA 포함 */
+EXEC SQL INCLUDE SQLCA;
+
+/* ========================================
+ * DECLARE SECTION - 호스트 변수 선언
+ * ======================================== */
+EXEC SQL BEGIN DECLARE SECTION;
+    /* 기본 타입 변수 */
+    int         user_id;
+    int         order_id;
+    int         item_count;
+    double      total_amount;
+    double      discount_rate;
+    
+    /* 문자열 변수 */
+    char        user_name[101];
+    char        user_email[256];
+    char        order_status[21];
+    char        product_code[51];
+    char        error_message[501];
+    
+    /* VARCHAR 타입 */
+    VARCHAR     description[1001];
+    VARCHAR     notes[2001];
+    
+    /* 인디케이터 변수 */
+    short       ind_user_name;
+    short       ind_user_email;
+    short       ind_total_amount;
+    short       ind_discount;
+    short       ind_notes;
+    
+    /* 구조체 정의 */
+    struct user_info {
+        int     id;
+        char    name[101];
+        char    email[256];
+        double  balance;
+    } user_rec;
+    
+    struct order_detail {
+        int     order_id;
+        int     product_id;
+        int     quantity;
+        double  unit_price;
+        double  subtotal;
+    } order_items[100];
+    
+    /* 동적 SQL용 */
+    char        dynamic_sql[4001];
+    char        stmt_name[33];
+
+EXEC SQL END DECLARE SECTION;
+
+/* ========================================
+ * 함수 선언
+ * ======================================== */
+int initialize_database(void);
+int process_user_orders(int user_id);
+int fetch_order_details(int order_id);
+int update_inventory(void);
+int execute_dynamic_query(const char* query);
+int cleanup_and_disconnect(void);
+
+/* ========================================
+ * 메인 함수
+ * ======================================== */
+int main(int argc, char* argv[]) {
+    int rc = 0;
+    
+    printf("Pro*C Complex Test Program Starting...\n");
+    
+    /* 데이터베이스 연결 */
+    EXEC SQL CONNECT :user_name IDENTIFIED BY :user_email;
+    
+    if (sqlca.sqlcode != 0) {
+        printf("Connection failed: %s\n", sqlca.sqlerrm.sqlerrmc);
+        return -1;
+    }
+    
+    /* 에러 핸들러 설정 */
+    EXEC SQL WHENEVER SQLERROR GOTO error_handler;
+    EXEC SQL WHENEVER NOT FOUND CONTINUE;
+    
+    /* 초기화 */
+    rc = initialize_database();
+    if (rc != 0) goto cleanup;
+    
+    /* 사용자 주문 처리 */
+    user_id = 12345;
+    rc = process_user_orders(user_id);
+    if (rc != 0) goto cleanup;
+    
+    /* 재고 업데이트 */
+    rc = update_inventory();
+    if (rc != 0) goto cleanup;
+    
+    /* 트랜잭션 커밋 */
+    EXEC SQL COMMIT WORK;
+    
+    printf("All operations completed successfully.\n");
+    goto cleanup;
+    
+error_handler:
+    printf("SQL Error: %d - %s\n", sqlca.sqlcode, sqlca.sqlerrm.sqlerrmc);
+    EXEC SQL ROLLBACK WORK;
+    rc = -1;
+    
+cleanup:
+    cleanup_and_disconnect();
+    return rc;
+}
+
+/* ========================================
+ * 데이터베이스 초기화
+ * ======================================== */
+int initialize_database(void) {
+    
+    /* 복잡한 다중 테이블 조인 SELECT (100+ 줄)
+     * 사용자의 주문 정보, 상품 정보, 배송 정보를 한번에 조회
+     */
+    EXEC SQL 
+        /* Main Query: User Order Summary with Product Details */
+        SELECT 
+            /* User Information */
+            u.user_id,
+            u.user_name,
+            u.email,
+            u.registration_date,
+            u.account_status,
+            u.credit_limit,
+            u.current_balance,
+            
+            /* Order Summary */
+            o.order_id,
+            o.order_date,
+            o.order_status,
+            o.shipping_method,
+            o.shipping_address,
+            o.billing_address,
+            o.payment_method,
+            o.payment_status,
+            
+            /* Order Items Aggregation */
+            COUNT(DISTINCT oi.item_id) AS total_items,
+            SUM(oi.quantity) AS total_quantity,
+            SUM(oi.unit_price * oi.quantity) AS subtotal,
+            
+            /* Discounts and Promotions */
+            COALESCE(d.discount_percentage, 0) AS discount_pct,
+            COALESCE(d.discount_amount, 0) AS discount_amt,
+            CASE 
+                WHEN d.discount_type = 'PERCENT' THEN 
+                    SUM(oi.unit_price * oi.quantity) * (1 - d.discount_percentage/100)
+                WHEN d.discount_type = 'FIXED' THEN 
+                    SUM(oi.unit_price * oi.quantity) - d.discount_amount
+                ELSE 
+                    SUM(oi.unit_price * oi.quantity)
+            END AS discounted_total,
+            
+            /* Taxes */
+            t.tax_rate,
+            t.tax_description,
+            CASE 
+                WHEN d.discount_type = 'PERCENT' THEN 
+                    SUM(oi.unit_price * oi.quantity) * (1 - d.discount_percentage/100) * t.tax_rate
+                WHEN d.discount_type = 'FIXED' THEN 
+                    (SUM(oi.unit_price * oi.quantity) - d.discount_amount) * t.tax_rate
+                ELSE 
+                    SUM(oi.unit_price * oi.quantity) * t.tax_rate
+            END AS tax_amount,
+            
+            /* Shipping Costs */
+            s.base_shipping_cost,
+            s.weight_surcharge,
+            s.express_surcharge,
+            s.base_shipping_cost + 
+                COALESCE(s.weight_surcharge, 0) + 
+                COALESCE(s.express_surcharge, 0) AS total_shipping,
+            
+            /* Final Calculations */
+            CASE 
+                WHEN d.discount_type = 'PERCENT' THEN 
+                    SUM(oi.unit_price * oi.quantity) * (1 - d.discount_percentage/100) * (1 + t.tax_rate)
+                WHEN d.discount_type = 'FIXED' THEN 
+                    (SUM(oi.unit_price * oi.quantity) - d.discount_amount) * (1 + t.tax_rate)
+                ELSE 
+                    SUM(oi.unit_price * oi.quantity) * (1 + t.tax_rate)
+            END + s.base_shipping_cost + 
+                COALESCE(s.weight_surcharge, 0) + 
+                COALESCE(s.express_surcharge, 0) AS grand_total,
+            
+            /* Loyalty Points */
+            FLOOR(
+                CASE 
+                    WHEN d.discount_type = 'PERCENT' THEN 
+                        SUM(oi.unit_price * oi.quantity) * (1 - d.discount_percentage/100)
+                    ELSE 
+                        SUM(oi.unit_price * oi.quantity)
+                END / 100
+            ) AS earned_points,
+            
+            /* Estimated Delivery */
+            CASE 
+                WHEN o.shipping_method = 'EXPRESS' THEN 
+                    o.order_date + INTERVAL '2' DAY
+                WHEN o.shipping_method = 'STANDARD' THEN 
+                    o.order_date + INTERVAL '5' DAY
+                ELSE 
+                    o.order_date + INTERVAL '7' DAY
+            END AS estimated_delivery
+            
+        INTO 
+            :user_rec.id,
+            :user_rec.name:ind_user_name,
+            :user_rec.email:ind_user_email,
+            :user_id,
+            :order_status,
+            :total_amount:ind_total_amount,
+            :discount_rate:ind_discount,
+            :user_name,
+            :order_id,
+            :item_count,
+            :notes:ind_notes,
+            :description,
+            :product_code,
+            :error_message,
+            :order_items[0].order_id,
+            :order_items[0].product_id,
+            :order_items[0].quantity,
+            :order_items[0].unit_price,
+            :order_items[0].subtotal,
+            :dynamic_sql,
+            :stmt_name
+            
+        FROM 
+            users u
+            INNER JOIN orders o 
+                ON u.user_id = o.user_id 
+                AND o.order_status NOT IN ('CANCELLED', 'REFUNDED', 'PENDING_PAYMENT')
+            INNER JOIN order_items oi 
+                ON o.order_id = oi.order_id
+            LEFT OUTER JOIN discounts d 
+                ON o.discount_code = d.discount_code 
+                AND d.valid_from <= CURRENT_DATE 
+                AND d.valid_until >= CURRENT_DATE
+                AND d.is_active = 'Y'
+            INNER JOIN tax_rates t 
+                ON o.tax_region = t.region_code
+                AND t.effective_date <= o.order_date
+                AND (t.expiry_date IS NULL OR t.expiry_date > o.order_date)
+            LEFT OUTER JOIN shipping_rates s 
+                ON o.shipping_method = s.method_code
+                AND o.shipping_zone = s.zone_code
+                AND s.effective_date <= o.order_date
+        
+        WHERE 
+            u.user_id = :user_id
+            AND u.account_status = 'ACTIVE'
+            AND o.order_date >= ADD_MONTHS(SYSDATE, -12)
+            AND o.order_date <= SYSDATE
+            AND NOT EXISTS (
+                SELECT 1 
+                FROM order_hold oh 
+                WHERE oh.order_id = o.order_id 
+                AND oh.hold_status = 'ACTIVE'
+            )
+            AND EXISTS (
+                SELECT 1 
+                FROM inventory inv 
+                WHERE inv.product_id = oi.product_id 
+                AND inv.available_quantity >= oi.quantity
+            )
+        
+        GROUP BY 
+            u.user_id, u.user_name, u.email, u.registration_date,
+            u.account_status, u.credit_limit, u.current_balance,
+            o.order_id, o.order_date, o.order_status, o.shipping_method,
+            o.shipping_address, o.billing_address, o.payment_method,
+            o.payment_status, d.discount_percentage, d.discount_amount,
+            d.discount_type, t.tax_rate, t.tax_description,
+            s.base_shipping_cost, s.weight_surcharge, s.express_surcharge
+        
+        HAVING 
+            SUM(oi.unit_price * oi.quantity) >= 100.00
+            AND COUNT(DISTINCT oi.item_id) > 0
+        
+        ORDER BY 
+            o.order_date DESC,
+            grand_total DESC
+        
+        FETCH FIRST 100 ROWS ONLY;
+    
+    if (sqlca.sqlcode != 0 && sqlca.sqlcode != 1403) {
+        return -1;
+    }
+    
+    return 0;
+}
+
+/* ========================================
+ * 커서를 사용한 주문 상세 조회
+ * ======================================== */
+int process_user_orders(int p_user_id) {
+    int row_count = 0;
+    
+    /* 커서 선언 - 복잡한 서브쿼리 포함 */
+    EXEC SQL DECLARE order_cursor CURSOR FOR
+        SELECT 
+            o.order_id,
+            o.order_date,
+            o.total_amount,
+            (SELECT COUNT(*) 
+             FROM order_items oi 
+             WHERE oi.order_id = o.order_id) AS item_count,
+            (SELECT SUM(oi2.quantity * oi2.unit_price)
+             FROM order_items oi2
+             WHERE oi2.order_id = o.order_id
+             GROUP BY oi2.order_id) AS calculated_total,
+            NVL(
+                (SELECT MAX(sh.status_date)
+                 FROM shipping_history sh
+                 WHERE sh.order_id = o.order_id),
+                o.order_date
+            ) AS last_status_update
+        FROM 
+            orders o
+        WHERE 
+            o.user_id = :p_user_id
+            AND o.order_status IN ('PROCESSING', 'SHIPPED', 'DELIVERED')
+        ORDER BY 
+            o.order_date DESC;
+    
+    /* 커서 열기 */
+    EXEC SQL OPEN order_cursor;
+    
+    if (sqlca.sqlcode != 0) {
+        printf("Failed to open cursor: %d\n", sqlca.sqlcode);
+        return -1;
+    }
+    
+    /* 커서에서 데이터 가져오기 */
+    while (1) {
+        EXEC SQL FETCH order_cursor 
+            INTO :order_id, 
+                 :order_status, 
+                 :total_amount:ind_total_amount,
+                 :item_count,
+                 :discount_rate,
+                 :user_name;
+        
+        if (sqlca.sqlcode == 1403) {  /* NOT FOUND */
+            break;
+        }
+        
+        if (sqlca.sqlcode != 0) {
+            printf("Fetch error: %d\n", sqlca.sqlcode);
+            EXEC SQL CLOSE order_cursor;
+            return -1;
+        }
+        
+        row_count++;
+        printf("Order %d: Amount=%.2f, Items=%d\n", 
+               order_id, total_amount, item_count);
+        
+        /* 주문 상세 처리 */
+        fetch_order_details(order_id);
+    }
+    
+    /* 커서 닫기 */
+    EXEC SQL CLOSE order_cursor;
+    
+    printf("Processed %d orders for user %d\n", row_count, p_user_id);
+    return 0;
+}
+
+/* ========================================
+ * 주문 상세 항목 조회 (WITH UR - DB2 스타일)
+ * ======================================== */
+int fetch_order_details(int p_order_id) {
+    int i;
+    
+    /* DB2 스타일: WITH UR (Uncommitted Read) */
+    EXEC SQL 
+        SELECT 
+            oi.order_id,
+            oi.product_id,
+            oi.quantity,
+            oi.unit_price,
+            oi.quantity * oi.unit_price AS subtotal,
+            p.product_name,
+            p.category_code,
+            inv.available_quantity,
+            inv.reserved_quantity,
+            CASE 
+                WHEN inv.available_quantity - inv.reserved_quantity >= oi.quantity 
+                THEN 'IN_STOCK'
+                WHEN inv.available_quantity - inv.reserved_quantity > 0 
+                THEN 'LOW_STOCK'
+                ELSE 'OUT_OF_STOCK'
+            END AS stock_status
+        INTO 
+            :order_items[0].order_id,
+            :order_items[0].product_id,
+            :order_items[0].quantity,
+            :order_items[0].unit_price,
+            :order_items[0].subtotal,
+            :product_code,
+            :order_status,
+            :item_count,
+            :user_id,
+            :user_name
+        FROM 
+            order_items oi
+            INNER JOIN products p ON oi.product_id = p.product_id
+            LEFT JOIN inventory inv ON p.product_id = inv.product_id
+        WHERE 
+            oi.order_id = :p_order_id
+        WITH UR;
+    
+    return 0;
+}
+
+/* ========================================
+ * 재고 업데이트 (복잡한 UPDATE)
+ * ======================================== */
+int update_inventory(void) {
+    
+    /* 복잡한 UPDATE 문 */
+    EXEC SQL 
+        UPDATE inventory
+        SET 
+            available_quantity = available_quantity - (
+                SELECT SUM(oi.quantity)
+                FROM order_items oi
+                INNER JOIN orders o ON oi.order_id = o.order_id
+                WHERE o.order_status = 'SHIPPED'
+                AND o.shipped_date = CURRENT_DATE
+                AND oi.product_id = inventory.product_id
+            ),
+            reserved_quantity = reserved_quantity + (
+                SELECT COALESCE(SUM(oi.quantity), 0)
+                FROM order_items oi
+                INNER JOIN orders o ON oi.order_id = o.order_id
+                WHERE o.order_status = 'PROCESSING'
+                AND o.order_date = CURRENT_DATE
+                AND oi.product_id = inventory.product_id
+            ),
+            last_updated = CURRENT_TIMESTAMP,
+            updated_by = :user_name
+        WHERE 
+            product_id IN (
+                SELECT DISTINCT oi.product_id
+                FROM order_items oi
+                INNER JOIN orders o ON oi.order_id = o.order_id
+                WHERE o.order_status IN ('SHIPPED', 'PROCESSING')
+                AND o.order_date >= CURRENT_DATE - 1
+            )
+            AND warehouse_id = 'WH001';
+    
+    printf("Updated %d inventory records\n", sqlca.sqlerrd[2]);
+    
+    /* 재고 부족 상품 INSERT */
+    EXEC SQL 
+        INSERT INTO reorder_queue (
+            product_id,
+            product_name,
+            current_quantity,
+            reorder_point,
+            suggested_quantity,
+            priority,
+            requested_date,
+            requested_by
+        )
+        SELECT 
+            inv.product_id,
+            p.product_name,
+            inv.available_quantity,
+            p.reorder_point,
+            p.economic_order_quantity,
+            CASE 
+                WHEN inv.available_quantity <= 0 THEN 'CRITICAL'
+                WHEN inv.available_quantity < p.reorder_point / 2 THEN 'HIGH'
+                WHEN inv.available_quantity < p.reorder_point THEN 'MEDIUM'
+                ELSE 'LOW'
+            END,
+            CURRENT_TIMESTAMP,
+            :user_name
+        FROM 
+            inventory inv
+            INNER JOIN products p ON inv.product_id = p.product_id
+        WHERE 
+            inv.available_quantity < p.reorder_point
+            AND NOT EXISTS (
+                SELECT 1 
+                FROM reorder_queue rq 
+                WHERE rq.product_id = inv.product_id 
+                AND rq.status = 'PENDING'
+            );
+    
+    printf("Inserted %d reorder requests\n", sqlca.sqlerrd[2]);
+    
+    /* 오래된 주문 삭제 */
+    EXEC SQL 
+        DELETE FROM order_archive oa
+        WHERE 
+            oa.archived_date < ADD_MONTHS(CURRENT_DATE, -24)
+            AND oa.order_status = 'COMPLETED'
+            AND NOT EXISTS (
+                SELECT 1 
+                FROM order_disputes od 
+                WHERE od.order_id = oa.order_id 
+                AND od.resolution_status = 'OPEN'
+            );
+    
+    printf("Deleted %d archived orders\n", sqlca.sqlerrd[2]);
+    
+    return 0;
+}
+
+/* ========================================
+ * 동적 SQL 실행
+ * ======================================== */
+int execute_dynamic_query(const char* query) {
+    
+    /* 동적 SQL 문자열 복사 */
+    strcpy(dynamic_sql, query);
+    strcpy(stmt_name, "DYNAMIC_STMT");
+    
+    /* PREPARE */
+    EXEC SQL PREPARE :stmt_name FROM :dynamic_sql;
+    
+    if (sqlca.sqlcode != 0) {
+        printf("PREPARE failed: %d\n", sqlca.sqlcode);
+        return -1;
+    }
+    
+    /* EXECUTE */
+    EXEC SQL EXECUTE :stmt_name USING :user_id, :user_name, :total_amount;
+    
+    if (sqlca.sqlcode != 0) {
+        printf("EXECUTE failed: %d\n", sqlca.sqlcode);
+        return -1;
+    }
+    
+    printf("Dynamic query executed successfully\n");
+    return 0;
+}
+
+/* ========================================
+ * 정리 및 연결 해제
+ * ======================================== */
+int cleanup_and_disconnect(void) {
+    
+    /* 남은 커서 정리 */
+    EXEC SQL CLOSE order_cursor;
+    
+    /* 커넥션 해제 */
+    EXEC SQL DISCONNECT;
+    
+    printf("Disconnected from database.\n");
+    return 0;
+}
