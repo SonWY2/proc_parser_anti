@@ -61,6 +61,13 @@ from .comment_marker import (
 from .cursor_merger import CursorMerger, CursorGroup, MergedCursorSQL
 from .dynamic_sql_extractor import DynamicSQLExtractor, DynamicSQL
 
+# 플러그인 (별도 모듈)
+from .plugins import (
+    SQLRelationshipPlugin,
+    CursorRelationshipPlugin,
+    DynamicSQLRelationshipPlugin,
+)
+
 __all__ = [
     # 메인 클래스
     "SQLExtractor",
@@ -112,4 +119,10 @@ __all__ = [
     # 동적 SQL 추출
     "DynamicSQLExtractor",
     "DynamicSQL",
+    
+    # 플러그인
+    "SQLRelationshipPlugin",
+    "CursorRelationshipPlugin",
+    "DynamicSQLRelationshipPlugin",
 ]
+
