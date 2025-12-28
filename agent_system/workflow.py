@@ -31,6 +31,8 @@ class WorkflowStep:
     on_failure: Optional[str] = None     # 실패 시 다음 단계
     timeout: Optional[int] = None        # 타임아웃 (초)
     retry: int = 0                       # 재시도 횟수
+    self_improve: Optional[bool] = None  # 자가개선 (None=에이전트 설정 따름)
+
 
 
 @dataclass

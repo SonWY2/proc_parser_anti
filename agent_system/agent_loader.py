@@ -20,6 +20,7 @@ class AgentDefinition:
     file_path: Path
     tools: List[str] = field(default_factory=list)
     model: str = "inherit"  # 'sonnet', 'opus', 'haiku', 'inherit'
+    self_improve: bool = False  # 자가개선 체크리스트 활성화
     
     def matches_request(self, user_request: str) -> bool:
         """사용자 요청이 이 에이전트의 description과 매칭되는지 확인"""
@@ -224,9 +225,11 @@ class AgentLoader:
             description=frontmatter['description'],
             tools=tools,
             model=frontmatter.get('model', 'inherit'),
+            self_improve=frontmatter.get('self_improve', False),  # 자가개선 설정
             system_prompt=system_prompt,
             file_path=file_path
         )
+
     
     def _parse_orchestrator_content(self, content: str, file_path: Path) -> Optional[OrchestratorDefinition]:
         """

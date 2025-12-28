@@ -927,3 +927,99 @@ orchestrator.load_agents()
 2. **추론 작업 → LLM**: 해석, 분석, 생성
 3. **도구 출력은 JSON**: LLM이 해석하기 쉬움
 4. **실패 처리는 LLM**: 오류 분석 및 재시도 결정
+
+---
+
+## 9️⃣ 자가개선 체크리스트 시스템
+
+> 💡 반복 발생하는 실패를 자동으로 체크리스트로 변환하여 에이전트 프롬프트에 주입
+
+### 에이전트 레벨 설정
+
+```markdown
+<!-- .agents/parsing-agent.md -->
+---
+name: parsing-agent
+self_improve: true    # ⭐ 자가개선 활성화
+tools: Read, ProcParser, Write
+---
+```
+
+### 워크플로우 레벨 오버라이드
+
+```yaml
+# workflows/convert-proc.yaml
+steps:
+  - name: parse_code
+    agent: parsing-agent
+    self_improve: true       # 활성화
+
+  - name: validate
+    agent: critic-agent
+    self_improve: false      # 비활성화 (정적 규칙만 사용)
+```
+
+### 우선순위
+
+```
+워크플로우 설정 > 에이전트 설정 > 기본값(false)
+```
+
+### Python에서 훅 통합
+
+```python
+from agent_system import (
+    SelfImprovingChecklist, HookRegistry, AgentLoader, WorkflowEngine
+)
+from pathlib import Path
+
+# 초기화
+loader = AgentLoader([Path(".agents")])
+loader.load_all()
+
+hooks = HookRegistry()
+si = SelfImprovingChecklist()
+
+# 훅 등록 (자동 이슈 수집 + 체크리스트 주입)
+si.setup_hooks(hooks, loader)
+
+# 워크플로우 엔진에 훅 전달
+engine = WorkflowEngine(orchestrator)
+engine.hooks = hooks
+```
+
+### 자동 생성 체크리스트 예시
+
+```markdown
+## ⚠️ 자동 생성 체크리스트 (과거 실패 사례 기반)
+
+> 다음 항목들은 과거 반복 발생한 이슈입니다. 작업 전에 확인하세요.
+
+- [ ] **확인: 매크로 내부의 함수 호출을 놓침** (발생 5회)
+      ```
+      #define PROCESS(x) do_process(x)
+      ```
+- [ ] **확인: typedef struct 패턴에서 타입 이름 누락** (발생 3회)
+```
+
+### 수동 체크리스트 추가
+
+```python
+si.add_manual_check(
+    agent="parsing-agent",
+    check="EXEC SQL INCLUDE 구문도 #include처럼 처리",
+    example="EXEC SQL INCLUDE sqlca;"
+)
+```
+
+### 자가개선 권장 에이전트
+
+| 에이전트 | self_improve | 이유 |
+|----------|-------------|------|
+| `parsing-agent` | ✅ true | 다양한 코드 패턴 |
+| `sql-analyst` | ✅ true | SQL 패턴 학습 |
+| `transformer-agent` | ✅ true | 변환 오류 패턴 |
+| `build-debug-agent` | ✅ true | 빌드 오류 패턴 |
+| `critic-agent` | ❌ false | 정적 평가 기준 |
+| `dependency-analyst` | ❌ false | 결정론적 분석 |
+

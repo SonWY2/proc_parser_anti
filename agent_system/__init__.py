@@ -38,6 +38,8 @@ from .file_mediator import FileMediator, IntermediateArtifact
 from .commands import CommandRegistry, SlashCommand
 from .cli import InteractiveCLI, run_cli
 from .gui import WorkflowGUI, run_gui
+from .self_improve import SelfImprovingChecklist, Issue, ChecklistItem
+
 
 __all__ = [
     # 에이전트 로더
@@ -84,4 +86,8 @@ __all__ = [
     # v3: UI
     'InteractiveCLI', 'run_cli',
     'WorkflowGUI', 'run_gui',
+    
+    # v3: 자가개선
+    'SelfImprovingChecklist', 'Issue', 'ChecklistItem',
 ]
+

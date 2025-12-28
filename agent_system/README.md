@@ -300,3 +300,60 @@ model: inherit
 - 패턴 기반 파일 찾기
 - 구조 분석 및 보고
 ```
+
+---
+
+## 🆕 v3 기능
+
+### 추가된 모듈
+
+| 파일 | 기능 |
+|------|------|
+| `hooks.py` | 워크플로우 훅 시스템 |
+| `validator.py` | 품질 게이트, 완료 검증 |
+| `checkpoint.py` | 상태 저장/복원, 사용자 승인 |
+| `file_mediator.py` | 에이전트 간 파일 기반 통신 |
+| `commands.py` | 슬래시 명령어 (`/convert`) |
+| `cli.py` | Interactive CLI |
+| `gui.py` | Tkinter GUI |
+| `self_improve.py` | 자가개선 체크리스트 |
+
+---
+
+## 🔄 자가개선 체크리스트 시스템
+
+반복 발생하는 실패를 자동으로 체크리스트로 변환하여 에이전트에 주입합니다.
+
+### 활성화
+
+```markdown
+<!-- 에이전트 정의 -->
+---
+name: parsing-agent
+self_improve: true
+---
+```
+
+```yaml
+# 워크플로우에서 오버라이드
+steps:
+  - name: parse
+    agent: parsing-agent
+    self_improve: false    # 이 단계에서는 비활성화
+```
+
+### Python 코드
+
+```python
+from agent_system import SelfImprovingChecklist, HookRegistry
+
+si = SelfImprovingChecklist()
+hooks = HookRegistry()
+si.setup_hooks(hooks, loader)  # 자동 이슈 수집/체크리스트 주입
+```
+
+### 참고 문서
+
+- [example.md](example.md) - Pro*C→Java 변환 가이드
+- [context관리예시.md](context관리예시.md) - 메타데이터 구조
+
