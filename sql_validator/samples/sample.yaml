@@ -1,0 +1,60 @@
+# Pro*C to MyBatis SQL 변환 샘플
+# sql: 원본 Pro*C SQL
+# parsed_sql: 변환된 MyBatis SQL
+
+- sql: |
+    EXEC SQL SELECT emp_id, emp_name, salary
+    INTO :emp_id, :emp_name, :salary
+    FROM employees
+    WHERE dept_id = :dept_id
+    AND status = 'ACTIVE';
+  parsed_sql: |
+    SELECT emp_id, emp_name, salary
+    FROM employees
+    WHERE dept_id = #{deptId}
+    AND status = 'ACTIVE'
+
+- sql: |
+    EXEC SQL INSERT INTO orders
+    (order_id, customer_id, order_date, amount)
+    VALUES
+    (:order_id, :customer_id, SYSDATE, :amount);
+  parsed_sql: |
+    INSERT INTO orders
+    (order_id, customer_id, order_date, amount)
+    VALUES
+    (#{orderId}, #{customerId}, SYSDATE, #{amount})
+
+- sql: |
+    EXEC SQL UPDATE products
+    SET price = :new_price,
+        updated_at = SYSDATE
+    WHERE product_id = :product_id
+    AND status != 'DELETED';
+  parsed_sql: |
+    UPDATE products
+    SET price = #{newPrice},
+        updated_at = SYSDATE
+    WHERE product_id = #{productId}
+    AND status != 'DELETED'
+
+- sql: |
+    EXEC SQL DELETE FROM temp_records
+    WHERE created_at < :cutoff_date
+    AND user_id = :user_id;
+  parsed_sql: |
+    DELETE FROM temp_records
+    WHERE created_at < #{cutoffDate}
+    AND user_id = #{userId}
+
+- sql: |
+    EXEC SQL SELECT COUNT(*)
+    INTO :total_count
+    FROM customers c
+    INNER JOIN orders o ON c.id = o.customer_id
+    WHERE o.order_date BETWEEN :start_date AND :end_date;
+  parsed_sql: |
+    SELECT COUNT(*)
+    FROM customers c
+    INNER JOIN orders o ON c.id = o.customer_id
+    WHERE o.order_date BETWEEN #{startDate} AND #{endDate}
