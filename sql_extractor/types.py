@@ -86,3 +86,11 @@ class ExtractedSQL:
             "sql_type": self.sql_type,
             "function_name": self.function_name,
         }
+
+
+# MyBatisSQL은 mybatis_converter 모듈에 정의됨
+# 편의를 위한 re-export
+try:
+    from .mybatis_converter import MyBatisSQL
+except ImportError:
+    pass

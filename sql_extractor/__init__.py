@@ -43,6 +43,24 @@ from .registry import SQLTypeRegistry, HostVariableRegistry
 from .tree_sitter_extractor import TreeSitterSQLExtractor, SQLBlock
 from .rules import SQLTypeRule, HostVariableRule, RuleMatch
 
+# 신규 모듈 (MyBatis 변환 관련)
+from .mybatis_converter import (
+    MyBatisConverter, 
+    MyBatisSQL,
+    default_input_formatter,
+    default_output_formatter,
+    camel_case_input_formatter,
+)
+from .sql_id_generator import SQLIdGenerator, get_global_generator, reset_global_generator
+from .comment_marker import (
+    SQLCommentMarker,
+    create_marker,
+    default_comment_formatter,
+    detailed_comment_formatter,
+)
+from .cursor_merger import CursorMerger, CursorGroup, MergedCursorSQL
+from .dynamic_sql_extractor import DynamicSQLExtractor, DynamicSQL
+
 __all__ = [
     # 메인 클래스
     "SQLExtractor",
@@ -67,4 +85,31 @@ __all__ = [
     "HostVariable",
     "VariableDirection",
     "HostVariableType",
+    
+    # MyBatis 변환
+    "MyBatisConverter",
+    "MyBatisSQL",
+    "default_input_formatter",
+    "default_output_formatter",
+    "camel_case_input_formatter",
+    
+    # SQL ID 생성
+    "SQLIdGenerator",
+    "get_global_generator",
+    "reset_global_generator",
+    
+    # 주석 마커
+    "SQLCommentMarker",
+    "create_marker",
+    "default_comment_formatter",
+    "detailed_comment_formatter",
+    
+    # 커서 병합
+    "CursorMerger",
+    "CursorGroup",
+    "MergedCursorSQL",
+    
+    # 동적 SQL 추출
+    "DynamicSQLExtractor",
+    "DynamicSQL",
 ]

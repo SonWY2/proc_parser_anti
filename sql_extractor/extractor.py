@@ -8,12 +8,19 @@ Tree-sitter 기반 추출과 규칙 기반 타입 결정을 사용합니다.
 import re
 import os
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Callable
 
 from .types import SqlType, ExtractedSQL, HostVariable, HostVariableType, VariableDirection
 from .config import SQLExtractorConfig
 from .registry import SQLTypeRegistry, HostVariableRegistry
 from .tree_sitter_extractor import TreeSitterSQLExtractor, SQLBlock, get_tree_sitter_extractor
+
+# 신규 모듈
+from .mybatis_converter import MyBatisConverter, MyBatisSQL, default_input_formatter, default_output_formatter
+from .sql_id_generator import SQLIdGenerator
+from .comment_marker import SQLCommentMarker, default_comment_formatter
+from .cursor_merger import CursorMerger, CursorGroup, MergedCursorSQL
+from .dynamic_sql_extractor import DynamicSQLExtractor, DynamicSQL
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +89,13 @@ class SQLExtractor:
             f"{self.sql_type_registry.rule_count} SQL type rules, "
             f"{self.host_var_registry.rule_count} host variable rules"
         )
+        
+        # MyBatis 변환 관련 컴포넌트 (지연 초기화)
+        self._mybatis_converter: Optional[MyBatisConverter] = None
+        self._id_generator: Optional[SQLIdGenerator] = None
+        self._comment_marker: Optional[SQLCommentMarker] = None
+        self._cursor_merger: Optional[CursorMerger] = None
+        self._dynamic_sql_extractor: Optional[DynamicSQLExtractor] = None
     
     def decompose_declare_section(
         self, code: str, file_key: str, program_dict: Dict
@@ -381,3 +395,197 @@ class SQLExtractor:
             import json
             with open(sql_yaml_path.replace('.yaml', '.json'), 'w', encoding='utf-8') as f:
                 json.dump(sql_data, f, ensure_ascii=False, indent=2)
+    
+    # =========================================================================
+    # MyBatis 변환 관련 메서드
+    # =========================================================================
+    
+    def get_mybatis_converter(
+        self,
+        input_formatter: Callable[[str], str] = None,
+        output_formatter: Callable[[str], str] = None
+    ) -> MyBatisConverter:
+        """MyBatis 변환기 반환 (지연 초기화)"""
+        if self._mybatis_converter is None or input_formatter or output_formatter:
+            self._mybatis_converter = MyBatisConverter(
+                input_formatter=input_formatter,
+                output_formatter=output_formatter
+            )
+        return self._mybatis_converter
+    
+    def get_id_generator(self) -> SQLIdGenerator:
+        """SQL ID 생성기 반환 (지연 초기화)"""
+        if self._id_generator is None:
+            self._id_generator = SQLIdGenerator()
+        return self._id_generator
+    
+    def get_comment_marker(
+        self,
+        formatter: Callable = None,
+        template: str = None
+    ) -> SQLCommentMarker:
+        """주석 마커 반환 (지연 초기화)"""
+        if self._comment_marker is None or formatter or template:
+            if template:
+                self._comment_marker = SQLCommentMarker(format_template=template)
+            elif formatter:
+                self._comment_marker = SQLCommentMarker(formatter=formatter)
+            else:
+                self._comment_marker = SQLCommentMarker()
+        return self._comment_marker
+    
+    def get_cursor_merger(self) -> CursorMerger:
+        """커서 병합기 반환 (지연 초기화)"""
+        if self._cursor_merger is None:
+            self._cursor_merger = CursorMerger()
+        return self._cursor_merger
+    
+    def get_dynamic_sql_extractor(self) -> DynamicSQLExtractor:
+        """동적 SQL 추출기 반환 (지연 초기화)"""
+        if self._dynamic_sql_extractor is None:
+            self._dynamic_sql_extractor = DynamicSQLExtractor()
+        return self._dynamic_sql_extractor
+    
+    def extract_with_mybatis_conversion(
+        self,
+        code: str,
+        file_key: str,
+        input_formatter: Callable[[str], str] = None,
+        output_formatter: Callable[[str], str] = None,
+        comment_template: str = None
+    ) -> Tuple[str, List[MyBatisSQL]]:
+        """
+        SQL을 추출하고 MyBatis 형식으로 변환
+        
+        Args:
+            code: 소스 코드
+            file_key: 파일 키
+            input_formatter: 입력 변수 포맷터 (기본: #{varName})
+            output_formatter: 출력 변수 포맷터 (기본: varName)
+            comment_template: 주석 템플릿 (기본: /* sql extracted: {sql_id} */)
+        
+        Returns:
+            (주석이 삽입된 코드, MyBatisSQL 목록) 튜플
+        """
+        # 컴포넌트 초기화
+        converter = self.get_mybatis_converter(input_formatter, output_formatter)
+        id_gen = self.get_id_generator()
+        id_gen.reset()  # 파일별로 ID 리셋
+        
+        marker = self.get_comment_marker(template=comment_template)
+        cursor_merger = self.get_cursor_merger()
+        
+        result_code = code
+        mybatis_sqls = []
+        
+        # SQL 블록 추출
+        if self.use_tree_sitter:
+            sql_blocks = self._extract_with_tree_sitter(code)
+        else:
+            sql_blocks = self._extract_with_regex(code)
+        
+        # 커서 그룹 찾기
+        block_dicts = [{
+            'sql': b.text,
+            'text': b.text,
+            'sql_type': self.sql_type_registry.determine_type(b.text).value,
+            'line_start': b.start_line,
+            'line_end': b.end_line,
+            'function_name': b.containing_function,
+        } for b in sql_blocks]
+        
+        cursor_groups = cursor_merger.find_cursor_groups(block_dicts)
+        merged_cursor_names = set()
+        for group in cursor_groups:
+            merged_cursor_names.add(group.cursor_name)
+        
+        for block in sql_blocks:
+            # SQL 타입 결정
+            result = self.sql_type_registry.determine_type(block.text)
+            sql_type = result.value
+            
+            # INCLUDE, DECLARE_SECTION 등은 스킵
+            if sql_type in ["include", "declare_section_begin", "declare_section_end"]:
+                result_code = self._find_and_replace(result_code, block.text, "")
+                continue
+            
+            # 커서 관련 문은 병합 처리 (OPEN/FETCH/CLOSE는 스킵)
+            if sql_type in ["open", "close", "fetch_into"]:
+                # 커서 이름이 병합 대상인지 확인
+                is_merged = any(name.upper() in block.text.upper() for name in merged_cursor_names)
+                if is_merged:
+                    # 주석만 남기고 제거
+                    comment = marker.mark("cursor_op", sql_type, function_name=block.containing_function)
+                    indent = self._get_indent(block.text)
+                    result_code = self._find_and_replace(result_code, block.text, indent + comment + "\n")
+                    continue
+            
+            # ID 생성
+            sql_id = id_gen.generate_id(sql_type)
+            
+            # 호스트 변수 추출
+            input_vars, output_vars = self.host_var_registry.classify_by_direction(
+                block.text, sql_type
+            )
+            input_var_strs = [v.get('raw', '') for v in input_vars]
+            output_var_strs = [v.get('raw', '') for v in output_vars]
+            
+            # DECLARE CURSOR는 커서 병합 결과 사용
+            if sql_type == "declare_cursor":
+                for group in cursor_groups:
+                    if group.declare_sql.get('sql', '') == block.text or group.declare_sql.get('text', '') == block.text:
+                        merged = cursor_merger.merge(group)
+                        mybatis_sql = converter.convert_sql(
+                            sql=merged.merged_sql,
+                            sql_type=sql_type,
+                            sql_id=sql_id,
+                            input_vars=merged.input_vars,
+                            output_vars=merged.output_vars
+                        )
+                        mybatis_sqls.append(mybatis_sql)
+                        break
+                else:
+                    # 병합 대상 아닌 경우 일반 처리
+                    mybatis_sql = converter.convert_sql(
+                        sql=block.text,
+                        sql_type=sql_type,
+                        sql_id=sql_id,
+                        input_vars=input_var_strs,
+                        output_vars=output_var_strs
+                    )
+                    mybatis_sqls.append(mybatis_sql)
+            else:
+                # 일반 SQL 변환
+                mybatis_sql = converter.convert_sql(
+                    sql=block.text,
+                    sql_type=sql_type,
+                    sql_id=sql_id,
+                    input_vars=input_var_strs,
+                    output_vars=output_var_strs
+                )
+                mybatis_sqls.append(mybatis_sql)
+            
+            # 주석 삽입 및 원본 교체
+            comment = marker.mark(
+                sql_id, sql_type, 
+                function_name=block.containing_function,
+                line_start=block.start_line
+            )
+            indent = self._get_indent(block.text)
+            replacement = indent + comment + "\n"
+            result_code = self._find_and_replace(result_code, block.text, replacement)
+        
+        return result_code, mybatis_sqls
+    
+    def extract_dynamic_sql(
+        self,
+        variable_name: str,
+        c_elements: List[Dict],
+        before_line: int,
+        function_name: Optional[str] = None
+    ) -> Optional[DynamicSQL]:
+        """동적 SQL 추출 (strncpy/sprintf 추적)"""
+        extractor = self.get_dynamic_sql_extractor()
+        return extractor.extract_dynamic_sql(
+            variable_name, c_elements, before_line, function_name
+        )
