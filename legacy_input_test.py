@@ -23,16 +23,46 @@ from sql_extractor import (
     SQLExtractor,
     MyBatisSQL,
     SQLCommentMarker,
+    # Transform Plugins
+    TransformPipeline,
+    MySQLPaginationPlugin,
+    OraclePaginationPlugin,
+    PostgreSQLPaginationPlugin,
+    DB2PaginationPlugin,
+    OracleToMySQLPlugin,
+    DB2ToMySQLPlugin,
 )
 
+# 지원하는 페이징 플러그인 매핑
+PAGINATION_PLUGINS = {
+    'mysql': MySQLPaginationPlugin,
+    'oracle': OraclePaginationPlugin,
+    'postgresql': PostgreSQLPaginationPlugin,
+    'postgres': PostgreSQLPaginationPlugin,
+    'db2': DB2PaginationPlugin,
+}
 
-def analyze_pc_file(input_file: str, save_as: str) -> Dict[str, Any]:
+# 지원하는 방언 변환 플러그인 매핑
+DIALECT_PLUGINS = {
+    'oracle_to_mysql': OracleToMySQLPlugin,
+    'db2_to_mysql': DB2ToMySQLPlugin,
+}
+
+
+def analyze_pc_file(
+    input_file: str, 
+    save_as: str,
+    pagination: str = None,
+    dialect: str = None
+) -> Dict[str, Any]:
     """
     .pc 파일을 분석하고 결과를 YAML로 저장
     
     Args:
         input_file: Pro*C 파일 경로
         save_as: 결과 YAML 저장 경로
+        pagination: 페이징 플러그인 (mysql, oracle, postgresql, db2)
+        dialect: 방언 변환 플러그인 (oracle_to_mysql, db2_to_mysql)
     
     Returns:
         분석 결과 딕셔너리
@@ -46,6 +76,21 @@ def analyze_pc_file(input_file: str, save_as: str) -> Dict[str, Any]:
     
     print(f"[INFO] 입력 파일 로드: {input_file} ({len(code)} bytes)")
     
+    # Transform Pipeline 설정
+    pipeline = None
+    if pagination or dialect:
+        pipeline = TransformPipeline()
+        
+        # 방언 변환 플러그인 (먼저 실행)
+        if dialect and dialect in DIALECT_PLUGINS:
+            pipeline.register(DIALECT_PLUGINS[dialect]())
+            print(f"[INFO] 방언 변환 플러그인 적용: {dialect}")
+        
+        # 페이징 플러그인
+        if pagination and pagination in PAGINATION_PLUGINS:
+            pipeline.register(PAGINATION_PLUGINS[pagination]())
+            print(f"[INFO] 페이징 플러그인 적용: {pagination}")
+    
     # SQLExtractor 초기화
     extractor = SQLExtractor()
     
@@ -57,10 +102,30 @@ def analyze_pc_file(input_file: str, save_as: str) -> Dict[str, Any]:
     
     print(f"[INFO] 추출된 SQL 수: {len(mybatis_sqls)}")
     
+    # Transform Pipeline 적용
+    if pipeline:
+        for sql in mybatis_sqls:
+            # 커서 기반 여부 판단 (declare_cursor, fetch_into는 커서 기반)
+            is_cursor_based = sql.mybatis_type in ['select'] and sql.output_fields
+            
+            result = pipeline.transform(
+                sql=sql.sql,
+                sql_type=sql.mybatis_type,
+                metadata={'is_cursor_based': is_cursor_based}
+            )
+            
+            if result.transformed:
+                sql.sql = result.sql
+                print(f"  [TRANSFORM] {sql.id}: {result.plugin_name}")
+    
     # 결과 구성
     result = {
         'source_file': input_file,
         'total_sql_count': len(mybatis_sqls),
+        'plugins_applied': {
+            'pagination': pagination,
+            'dialect': dialect,
+        },
         'sql_statements': []
     }
     
@@ -134,8 +199,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 예제:
+  # 기본 변환
   python legacy_input_test.py --input_file sample.pc --save_as output.yaml
-  python legacy_input_test.py -i tests/samples/complex_test.pc -o result.yaml
+  
+  # MySQL 페이징 적용
+  python legacy_input_test.py -i sample.pc -o output.yaml --pagination mysql
+  
+  # Oracle→MySQL 방언 변환 + 페이징
+  python legacy_input_test.py -i sample.pc -o output.yaml --dialect oracle_to_mysql --pagination mysql
+  
+지원 플러그인:
+  --pagination: mysql, oracle, postgresql, db2
+  --dialect: oracle_to_mysql, db2_to_mysql
         """
     )
     
@@ -151,6 +226,20 @@ def main():
         help='결과를 저장할 YAML 파일 경로'
     )
     
+    parser.add_argument(
+        '--pagination', '-p',
+        type=str,
+        choices=['mysql', 'oracle', 'postgresql', 'postgres', 'db2'],
+        help='페이징 플러그인 (mysql, oracle, postgresql, db2)'
+    )
+    
+    parser.add_argument(
+        '--dialect', '-d',
+        type=str,
+        choices=['oracle_to_mysql', 'db2_to_mysql'],
+        help='DB 방언 변환 플러그인 (oracle_to_mysql, db2_to_mysql)'
+    )
+    
     args = parser.parse_args()
     
     # 대화형 모드
@@ -163,10 +252,17 @@ def main():
     
     # 분석 실행
     try:
-        result = analyze_pc_file(args.input_file, args.save_as)
+        result = analyze_pc_file(
+            args.input_file, 
+            args.save_as,
+            pagination=args.pagination,
+            dialect=args.dialect
+        )
         print(f"\n[SUCCESS] 분석 완료!")
         print(f"  - 추출된 SQL: {result['total_sql_count']}개")
         print(f"  - 결과 파일: {args.save_as}")
+        if args.pagination or args.dialect:
+            print(f"  - 적용된 플러그인: {', '.join(filter(None, [args.dialect, args.pagination]))}")
     except Exception as e:
         print(f"[ERROR] 분석 실패: {e}")
         import traceback

@@ -9,6 +9,16 @@ import re
 from typing import List, Dict, Optional, Callable
 from dataclasses import dataclass, field
 
+# ColumnAliasMapper (지연 import로 순환 참조 방지)
+_alias_mapper = None
+
+def _get_alias_mapper():
+    global _alias_mapper
+    if _alias_mapper is None:
+        from .column_alias_mapper import ColumnAliasMapper
+        _alias_mapper = ColumnAliasMapper()
+    return _alias_mapper
+
 
 @dataclass
 class MyBatisSQL:
@@ -128,6 +138,19 @@ class MyBatisConverter:
             '|'.join(TIME_FORMAT_PATTERNS), 
             re.IGNORECASE
         )
+        self._alias_mapper = None  # 지연 초기화
+        self._add_column_aliases = True  # alias 추가 활성화
+    
+    @property
+    def alias_mapper(self):
+        """ColumnAliasMapper 인스턴스 (지연 초기화)"""
+        if self._alias_mapper is None:
+            self._alias_mapper = _get_alias_mapper()
+        return self._alias_mapper
+    
+    def set_alias_enabled(self, enabled: bool):
+        """컬럼 alias 추가 기능 활성화/비활성화"""
+        self._add_column_aliases = enabled
     
     def convert_sql(
         self,
@@ -156,20 +179,29 @@ class MyBatisConverter:
         # 1. EXEC SQL 제거
         converted = self._remove_exec_sql(sql)
         
-        # 2. INTO 절 제거 (SELECT의 경우)
+        # 2. SELECT 컬럼에 alias 추가 (INTO 절 변수 기반)
+        if self._add_column_aliases and output_vars and sql_type in ["select", "fetch_into", "declare_cursor"]:
+            converted = self.alias_mapper.add_aliases(converted, output_vars, sql_type)
+        
+        # 3. RETURNING 절 alias 추가 (Oracle INSERT/UPDATE/DELETE RETURNING)
+        if self._add_column_aliases and output_vars and sql_type in ["insert", "update", "delete"]:
+            if 'RETURNING' in converted.upper():
+                converted = self.alias_mapper.add_aliases(converted, output_vars, sql_type)
+        
+        # 4. INTO 절 제거 (SELECT의 경우)
         if sql_type in ["select", "fetch_into"]:
             converted = self.remove_into_clause(converted)
         
-        # 3. 시간 포맷 보호 (임시 치환)
+        # 5. 시간 포맷 보호 (임시 치환)
         converted, time_placeholders = self._protect_time_formats(converted)
         
-        # 4. 호스트 변수 변환
+        # 6. 호스트 변수 변환
         converted = self._convert_host_variables(converted, input_vars)
         
-        # 5. 시간 포맷 복원
+        # 7. 시간 포맷 복원
         converted = self._restore_time_formats(converted, time_placeholders)
         
-        # 6. 정리
+        # 8. 정리
         converted = self._cleanup_sql(converted)
         
         # 출력 필드 처리

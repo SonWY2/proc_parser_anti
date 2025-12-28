@@ -153,6 +153,55 @@ MyBatisSQL(
 | 동적 SQL | `DynamicSQLExtractor` | strncpy/sprintf 재구성 |
 | 포맷터 | `default_input_formatter` | `:var` → `#{var}` |
 | 주석 | `SQLCommentMarker` | 커스텀 주석 생성 |
+| **컬럼 Alias** | `ColumnAliasMapper` | SELECT 컬럼에 AS alias 추가 |
+
+---
+
+## Column Alias Mapper
+
+SELECT 컬럼에 INTO 절 변수 기반 alias를 추가합니다.
+
+### 지원 구문
+
+| SQL 타입 | 설명 |
+|---------|------|
+| SELECT ... INTO | 컬럼에 AS alias 추가 |
+| DECLARE CURSOR FOR SELECT | 커서 쿼리 컬럼에 alias |
+| INSERT/UPDATE/DELETE RETURNING | RETURNING 절 컬럼에 alias |
+
+### 사용법
+
+```python
+from sql_extractor import ColumnAliasMapper, snake_to_camel
+
+mapper = ColumnAliasMapper(alias_formatter=snake_to_camel)
+
+result = mapper.add_aliases(
+    sql="SELECT emp_name, emp_age FROM users",
+    output_vars=[":out_emp_name", ":out_emp_age"]
+)
+# 결과: SELECT emp_name AS outEmpName, emp_age AS outEmpAge FROM users
+```
+
+### MyBatis 변환시 자동 적용
+
+`MyBatisConverter.convert_sql()` 호출 시 자동으로 alias가 추가됩니다:
+
+```python
+from sql_extractor import MyBatisConverter
+
+converter = MyBatisConverter()
+result = converter.convert_sql(
+    sql="EXEC SQL SELECT name, age INTO :out_name, :out_age FROM users WHERE id = :in_id",
+    sql_type="select",
+    sql_id="select_0",
+    input_vars=[":in_id"],
+    output_vars=[":out_name", ":out_age"]
+)
+
+print(result.sql)
+# SELECT name AS outName, age AS outAge FROM users WHERE id = #{inId}
+```
 
 ---
 
@@ -205,4 +254,64 @@ sql_statements:
     input_params:
       - log_msg
     output_fields: []
+```
+
+---
+
+## Transform Plugin System
+
+SQL 변환 플러그인 시스템으로 페이징, DB 방언 변환 등을 지원합니다.
+
+### 기본 사용법
+
+```python
+from sql_extractor import (
+    TransformPipeline,
+    MySQLPaginationPlugin,
+    OracleToMySQLPlugin
+)
+
+# 파이프라인 생성 및 플러그인 등록
+pipeline = TransformPipeline()
+pipeline.register(OracleToMySQLPlugin())  # Oracle→MySQL 변환
+pipeline.register(MySQLPaginationPlugin())  # 페이징 추가
+
+# SQL 변환
+result = pipeline.transform(
+    sql="SELECT NVL(name, 'unknown') FROM users",
+    sql_type="select",
+    metadata={"is_cursor_based": True}
+)
+
+print(result.sql)
+# SELECT IFNULL(name, 'unknown') FROM users LIMIT #{limit} OFFSET #{offset}
+```
+
+### 지원 플러그인
+
+| 플러그인 | 설명 |
+|---------|------|
+| `MySQLPaginationPlugin` | MySQL LIMIT/OFFSET 추가 |
+| `OraclePaginationPlugin` | Oracle ROWNUM 또는 12c OFFSET/FETCH |
+| `PostgreSQLPaginationPlugin` | PostgreSQL LIMIT/OFFSET |
+| `DB2PaginationPlugin` | DB2 FETCH FIRST / ROW_NUMBER |
+| `OracleToMySQLPlugin` | Oracle→MySQL 함수 변환 (NVL→IFNULL 등) |
+| `DB2ToMySQLPlugin` | DB2→MySQL 함수 변환 |
+
+### 커스텀 플러그인
+
+```python
+from sql_extractor import SQLTransformPlugin
+
+class MyPlugin(SQLTransformPlugin):
+    name = "my_plugin"
+    priority = 50  # 낮을수록 먼저 실행
+    
+    def can_transform(self, sql, sql_type, metadata):
+        return sql_type == "select"
+    
+    def transform(self, sql, sql_type, metadata):
+        return sql.replace("OLD_TABLE", "NEW_TABLE")
+
+pipeline.register(MyPlugin())
 ```

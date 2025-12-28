@@ -61,11 +61,32 @@ from .comment_marker import (
 from .cursor_merger import CursorMerger, CursorGroup, MergedCursorSQL
 from .dynamic_sql_extractor import DynamicSQLExtractor, DynamicSQL
 
+# Column Alias Mapper
+from .column_alias_mapper import (
+    ColumnAliasMapper,
+    add_column_aliases,
+    snake_to_camel,
+    keep_original,
+)
+
 # 플러그인 (별도 모듈)
 from .plugins import (
     SQLRelationshipPlugin,
     CursorRelationshipPlugin,
     DynamicSQLRelationshipPlugin,
+)
+
+# Transform Plugins
+from .transform_plugins import (
+    SQLTransformPlugin,
+    TransformPipeline,
+    TransformResult,
+    MySQLPaginationPlugin,
+    OraclePaginationPlugin,
+    PostgreSQLPaginationPlugin,
+    DB2PaginationPlugin,
+    OracleToMySQLPlugin,
+    DB2ToMySQLPlugin,
 )
 
 __all__ = [
@@ -120,9 +141,26 @@ __all__ = [
     "DynamicSQLExtractor",
     "DynamicSQL",
     
+    # Column Alias Mapper
+    "ColumnAliasMapper",
+    "add_column_aliases",
+    "snake_to_camel",
+    "keep_original",
+    
     # 플러그인
     "SQLRelationshipPlugin",
     "CursorRelationshipPlugin",
     "DynamicSQLRelationshipPlugin",
+    
+    # Transform Plugins
+    "SQLTransformPlugin",
+    "TransformPipeline",
+    "TransformResult",
+    "MySQLPaginationPlugin",
+    "OraclePaginationPlugin",
+    "PostgreSQLPaginationPlugin",
+    "DB2PaginationPlugin",
+    "OracleToMySQLPlugin",
+    "DB2ToMySQLPlugin",
 ]
 
