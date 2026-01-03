@@ -118,29 +118,6 @@ class ProCParser:
                 elements.append(element)
                 blank_out(match.start(), match.end())
 
-        # 주석
-        for match in PATTERN_COMMENT_SINGLE.finditer(content):
-            elements.append({
-                "type": "comment",
-                "is_multiline": False,
-                "line_start": content.count('\n', 0, match.start()) + 1,
-                "line_end": content.count('\n', 0, match.end()) + 1,
-                "raw_content": match.group(0),
-                "function": None
-            })
-            mark_covered(match.start(), match.end())
-            
-        for match in PATTERN_COMMENT_MULTI.finditer(content):
-            elements.append({
-                "type": "comment",
-                "is_multiline": True,
-                "line_start": content.count('\n', 0, match.start()) + 1,
-                "line_end": content.count('\n', 0, match.end()) + 1,
-                "raw_content": match.group(0),
-                "function": None
-            })
-            mark_covered(match.start(), match.end())
-
         # 2. Tree-sitter를 사용하여 C 요소 추출
         c_source = "".join(c_parsing_content)
         c_elements = self.c_parser.parse(c_source)
