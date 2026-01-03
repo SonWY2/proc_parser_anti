@@ -104,7 +104,9 @@ class CursorRelationshipPlugin(SQLRelationshipPlugin):
             merged_sql = cursor_query
             if all_output_vars:
                 # INTO 절 구성
-                into_clause = "INTO " + ", ".join([f":{v}" for v in all_output_vars])
+                # all_output_vars already have colons if they came from sql_converter
+                vars_list = [v if v.startswith(':') else f":{v}" for v in all_output_vars]
+                into_clause = "INTO " + ", ".join(vars_list)
                 
                 # SELECT 목록 뒤에 삽입 시도
                 # 간단한 휴리스틱: FROM 키워드 찾기

@@ -94,7 +94,7 @@ class SQLConverter:
             r"(?P<comment_single>--[^\n]*)|"
             r"(?P<comment_multi>/\*[\s\S]*?\*/)|"
             r"(?P<exec_sql>\bEXEC\s+SQL\s+)|"
-            r"(?P<for_clause>\bFOR\s+:?\w+(?:\[[^\]]+\])?\s+)|"
+            r"(?P<for_clause>\bFOR\s+(?::\w+(?:\[[^\]]+\])?|\d+)\s+)|"
             r"(?P<host_var>:[a-zA-Z_]\w*(?:\[[^\]]+\])?(?::[a-zA-Z_]\w*)?)|"
             r"(?P<into_keyword>\bINTO\b)|"
             r"(?P<from_keyword>\bFROM\b)|"

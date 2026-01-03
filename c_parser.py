@@ -10,6 +10,14 @@ except ImportError:
     HAS_TREE_SITTER = False
     print("Warning: tree-sitter-c not found. C parsing will be limited.")
 
+KEYWORDS = {
+    'auto', 'break', 'case', 'char', 'const', 'continue', 'default', 'do',
+    'double', 'else', 'enum', 'extern', 'float', 'for', 'goto', 'if',
+    'int', 'long', 'register', 'return', 'short', 'signed', 'sizeof', 'static',
+    'struct', 'switch', 'typedef', 'union', 'unsigned', 'void', 'volatile',
+    'while', '_Bool', '_Complex', '_Imaginary', 'inline', 'restrict', '_Atomic'
+}
+
 class CParser:
     def __init__(self):
         if HAS_TREE_SITTER:
@@ -40,10 +48,20 @@ class CParser:
         
         node_type = node.type
         
-        if node_type == 'function_definition':
+        if node_type == 'comment':
+            elements.append({
+                "type": "comment",
+                "is_multiline": node.text.startswith(b'/*'),
+                "line_start": node.start_point.row + 1,
+                "line_end": node.end_point.row + 1,
+                "raw_content": node.text.decode('utf8'),
+                "function": current_function
+            })
+
+        elif node_type == 'function_definition':
             # 함수 이름 추출
             func_name = self._get_function_name(node)
-            if func_name:
+            if func_name and func_name not in KEYWORDS:
                 elements.append({
                     "type": "function",
                     "name": func_name,
