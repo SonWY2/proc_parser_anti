@@ -4,7 +4,7 @@ Pro*C 파서의 메인 진입점입니다.
 """
 import argparse
 import sys
-from file_handler import process_directory
+from proc_parser import process_directory
 
 def main():
     parser = argparse.ArgumentParser(description='Pro*C Parser')
