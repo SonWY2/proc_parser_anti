@@ -155,6 +155,146 @@ delegate_rules:
 
 ---
 
+## 🛠️ 커스텀 도구 등록
+
+### 방법 1: Tool 클래스 상속
+
+자체 Python 함수를 도구로 사용하려면 `Tool` 클래스를 상속하여 구현합니다.
+
+```python
+from agent_system.tools import Tool, ToolResult, ToolRegistry
+from typing import Dict, Any
+
+class MyCustomTool(Tool):
+    """내 커스텀 도구"""
+    
+    name = "MyTool"  # 도구 이름 (에이전트에서 사용)
+    description = "커스텀 작업을 수행합니다."  # LLM이 참조하는 설명
+    is_readonly = True  # 읽기 전용 여부 (파일 수정 등이 없으면 True)
+    
+    def execute(self, param1: str, param2: int = 10) -> ToolResult:
+        """
+        도구 실행 로직
+        
+        Args:
+            param1: 필수 파라미터
+            param2: 선택 파라미터 (기본값 10)
+        """
+        try:
+            # 실제 로직 구현
+            result = f"처리 완료: {param1}, {param2}"
+            return ToolResult(success=True, output=result)
+        except Exception as e:
+            return ToolResult(success=False, output="", error=str(e))
+    
+    def _get_parameters(self) -> Dict[str, Any]:
+        """LLM function calling을 위한 파라미터 스키마"""
+        return {
+            "type": "object",
+            "properties": {
+                "param1": {"type": "string", "description": "필수 파라미터"},
+                "param2": {"type": "integer", "description": "선택 파라미터", "default": 10}
+            },
+            "required": ["param1"]
+        }
+```
+
+### 방법 2: 기존 함수를 래핑
+
+이미 작성된 Python 함수를 도구로 래핑할 수 있습니다.
+
+```python
+from agent_system.tools import Tool, ToolResult, ToolRegistry
+from typing import Dict, Any
+
+# 기존에 작성한 함수
+def my_existing_function(file_path: str, options: dict = None) -> dict:
+    """기존 Pro*C 분석 함수"""
+    # ... 기존 로직
+    return {"status": "success", "data": [...]}
+
+# Tool 클래스로 래핑
+class MyExistingFunctionTool(Tool):
+    name = "AnalyzeProC"
+    description = "Pro*C 파일을 분석하여 SQL 패턴을 추출합니다."
+    is_readonly = True
+    
+    def execute(self, file_path: str, use_cache: bool = True) -> ToolResult:
+        try:
+            # 기존 함수 호출
+            result = my_existing_function(file_path, {"cache": use_cache})
+            
+            # 결과를 문자열로 변환 (LLM이 해석 가능하도록)
+            import json
+            output = json.dumps(result, ensure_ascii=False, indent=2)
+            return ToolResult(success=True, output=output)
+        except Exception as e:
+            return ToolResult(success=False, output="", error=str(e))
+    
+    def _get_parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "분석할 Pro*C 파일 경로"},
+                "use_cache": {"type": "boolean", "description": "캐시 사용 여부", "default": True}
+            },
+            "required": ["file_path"]
+        }
+```
+
+### ToolRegistry에 등록
+
+커스텀 도구를 시스템에 등록합니다.
+
+```python
+from agent_system import Orchestrator
+from agent_system.tools import ToolRegistry
+
+# 레지스트리에 도구 등록
+registry = ToolRegistry()
+registry.register(MyCustomTool())
+registry.register(MyExistingFunctionTool())
+
+# 오케스트레이터에 전달
+orchestrator = Orchestrator()
+orchestrator.load_agents()
+orchestrator.tool_registry = registry  # 커스텀 레지스트리 사용
+
+# 또는 Subagent에 직접 전달
+from agent_system import Subagent
+subagent = Subagent(
+    definition=agent_definition,
+    llm_client=llm_client,
+    tool_registry=registry  # 커스텀 도구 포함
+)
+```
+
+### 에이전트 정의에서 도구 사용
+
+등록된 커스텀 도구를 에이전트에서 사용하려면 `.md` 파일의 `tools` 필드에 추가합니다.
+
+```markdown
+---
+name: proc-analyzer
+description: Pro*C 코드 분석 전문 에이전트
+tools: Read, Grep, MyTool, AnalyzeProC
+---
+
+시스템 프롬프트...
+```
+
+### 주의사항
+
+| 항목 | 설명 |
+|------|------|
+| `name` | 영문 카멜케이스 권장, 에이전트 정의의 `tools` 필드와 일치해야 함 |
+| `description` | LLM이 도구 선택 시 참조하므로 명확하게 작성 |
+| `is_readonly` | 파일 수정, 외부 API 호출 등이 있으면 `False`로 설정 |
+| `execute()` 반환값 | 반드시 `ToolResult` 객체 반환 |
+| `_get_parameters()` | JSON Schema 형식으로 파라미터 정의, LLM function calling에 사용됨 |
+
+---
+
 ## 📂 핵심 클래스
 
 ### Orchestrator
