@@ -4,26 +4,30 @@
 LLM이 생성한 클래스 스켈레톤과 개별 메소드들을 하나의 완전한 Java 클래스로 병합.
 """
 
-from typing import List
+from typing import List, Optional
 
 from .types import MethodTranslation, MergeResult
 from .java_parser import JavaParser
+from .plugins import load_plugins_by_phase, PluginPhase
 
 
 class TranslationMerger:
     """Pro*C → Java 변환 결과물 병합 클래스."""
     
-    def __init__(self, parser: JavaParser = None):
+    def __init__(self, parser: JavaParser = None, use_plugins: bool = True):
         """
         Args:
             parser: Java 파서 인스턴스 (None이면 기본 생성)
+            use_plugins: 플러그인 시스템 사용 여부 (기본 True)
         """
         self.parser = parser or JavaParser()
+        self.use_plugins = use_plugins
     
     def merge(
         self,
         class_skeleton: str,
-        method_translations: List[MethodTranslation]
+        method_translations: List[MethodTranslation],
+        plugin_names: Optional[List[str]] = None
     ) -> MergeResult:
         """클래스 스켈레톤과 메소드들을 병합.
         
@@ -32,13 +36,15 @@ class TranslationMerger:
         2. 각 method_translation에서:
            - 추가 import 수집
            - 지정된 메소드 블럭 추출
-        3. import 중복 제거 및 정렬
-        4. class 본문에 메소드들 삽입
-        5. 최종 코드 조립
+        3. 플러그인 적용 (중복 main 제거, public→private, 어노테이션 추가)
+        4. import 중복 제거 및 정렬
+        5. class 본문에 메소드들 삽입
+        6. 최종 코드 조립
         
         Args:
             class_skeleton: LLM이 생성한 클래스 스켈레톤
             method_translations: 메소드 변환 결과 리스트
+            plugin_names: 적용할 플러그인 이름 리스트 (None이면 전체 적용)
             
         Returns:
             MergeResult 객체
@@ -71,16 +77,30 @@ class TranslationMerger:
             else:
                 warnings.append(f"메소드 '{translation.name}'을(를) 찾을 수 없습니다.")
         
-        # 3. import 중복 제거 및 정렬
+        # 3. PRE_MERGE 플러그인 적용 (메소드 단위)
+        if self.use_plugins:
+            pre_plugins = load_plugins_by_phase(PluginPhase.PRE_MERGE, plugin_names)
+            for plugin in pre_plugins:
+                extracted_methods = plugin.process_all(extracted_methods)
+            # 플러그인 적용 후 method_names 갱신
+            method_names = [m.name for m in extracted_methods]
+        
+        # 4. import 중복 제거 및 정렬
         unique_imports = self.parser.deduplicate_imports(all_imports)
         
-        # 4. 최종 코드 조립
+        # 5. 최종 코드 조립
         merged_code = self._assemble_code(
             class_skeleton,
             package_decl,
             unique_imports,
             extracted_methods
         )
+        
+        # 6. POST_MERGE 플러그인 후처리 (코드 단위)
+        if self.use_plugins:
+            post_plugins = load_plugins_by_phase(PluginPhase.POST_MERGE, plugin_names)
+            for plugin in post_plugins:
+                merged_code = plugin.process_code(merged_code)
         
         return MergeResult(
             merged_code=merged_code,

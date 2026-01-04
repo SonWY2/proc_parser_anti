@@ -39,6 +39,15 @@ public void processData() {
 from .types import MethodTranslation, ExtractedMethod, MergeResult
 from .java_parser import JavaParser
 from .merger import TranslationMerger
+from .plugins import (
+    MergePlugin,
+    PluginPhase,
+    PluginTarget,
+    register_plugin,
+    load_plugins,
+    load_plugins_by_phase,
+    list_plugins,
+)
 
 
 __all__ = [
@@ -52,4 +61,14 @@ __all__ = [
     "MethodTranslation",
     "ExtractedMethod",
     "MergeResult",
+    
+    # 플러그인 시스템
+    "MergePlugin",
+    "PluginPhase",
+    "PluginTarget",
+    "register_plugin",
+    "load_plugins",
+    "load_plugins_by_phase",
+    "list_plugins",
 ]
+
