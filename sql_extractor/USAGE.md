@@ -383,6 +383,97 @@ for block in sql_blocks:
 
 ---
 
+## 10. 호스트 변수 블랙리스트 설정
+
+호스트 변수 추출 시 시간 포맷(`:MI`, `:SS`) 등이 잘못 추출되는 것을 방지하기 위해 블랙리스트를 설정할 수 있습니다.
+
+### 기본 블랙리스트
+
+기본적으로 다음 키워드들은 호스트 변수로 인식되지 않습니다:
+
+| 카테고리 | 키워드 예시 | 설명 |
+|---------|-----------|------|
+| 시간 포맷 | `HH`, `HH12`, `HH24`, `MI`, `SS` | Oracle/DB2 시간 형식 |
+| 날짜 포맷 | `DD`, `MM`, `YY`, `YYYY`, `MON` | Oracle/DB2 날짜 형식 |
+| 기타 포맷 | `TZH`, `TZM`, `AM`, `PM` | 타임존, 오전/오후 |
+
+### Config를 통한 블랙리스트 설정
+
+```python
+from sql_extractor import SQLExtractorConfig
+from sql_extractor.pyparsing_parser import PyparsingProCParser
+
+# Config로 블랙리스트 설정
+config = SQLExtractorConfig(
+    # 커스텀 블랙리스트 (사용자 정의)
+    CUSTOM_HOST_VAR_BLACKLIST={'MY_CONSTANT', 'STATUS_ACTIVE', 'TYPE_NORMAL'},
+    
+    # DB2 특수 레지스터 블랙리스트 활성화
+    USE_DB2_SPECIAL_REGISTERS_BLACKLIST=True,
+    
+    # 단일 문자 상수 (Y, N) 블랙리스트 활성화
+    USE_SINGLE_CHAR_BLACKLIST=True,
+    
+    # 문자열 리터럴 내 호스트 변수 무시 (기본: True)
+    IGNORE_VARS_IN_STRING_LITERALS=True,
+)
+
+# Config를 파서에 전달
+parser = PyparsingProCParser(config=config)
+
+sql = "SELECT * FROM users WHERE status = :ACTIVE AND type = :user_type"
+vars = parser.extract_all_host_variables(sql)
+print(vars)  # [':user_type'] - :ACTIVE는 제외됨
+```
+
+### DBMS 방언별 자동 블랙리스트
+
+```python
+# DB2 방언 설정 시 DB2 특수 레지스터 자동 블랙리스트
+config = SQLExtractorConfig(DBMS_DIALECT='db2')
+
+# PostgreSQL 방언 설정 시 타입명 자동 블랙리스트
+config = SQLExtractorConfig(DBMS_DIALECT='postgresql')
+```
+
+### 런타임에 동적으로 블랙리스트 관리
+
+```python
+from sql_extractor.pyparsing_parser import get_sql_parser
+
+parser = get_sql_parser()
+
+# 블랙리스트에 키워드 추가
+parser.add_to_blacklist({'MY_KEYWORD', 'ANOTHER_CONSTANT'})
+
+# 블랙리스트에서 키워드 제거 (기본 키워드도 제거 가능)
+parser.remove_from_blacklist({'HH'})
+
+# 현재 블랙리스트 확인
+print(parser.get_blacklist())
+```
+
+### 사용 예제: 시간 포맷 오인 방지
+
+```python
+from sql_extractor.pyparsing_parser import get_sql_parser
+
+parser = get_sql_parser()
+
+# HH12:MI:SS 형태의 시간 포맷이 있는 SQL
+sql = "EXEC SQL SELECT name, TO_CHAR(created_at, 'HH24:MI:SS') INTO :out_name FROM users WHERE id = :in_id"
+
+# 블랙리스트 덕분에 :MI, :SS는 추출되지 않음
+all_vars = parser.extract_all_host_variables(sql)
+print(all_vars)  # [':out_name', ':in_id']
+
+input_vars, output_vars = parser.classify_host_variables(sql, 'select')
+print(f"입력: {input_vars}")   # [':in_id']
+print(f"출력: {output_vars}")  # [':out_name']
+```
+
+---
+
 ## 출력 포맷
 
 ### 1. 변환된 코드 (주석 삽입)

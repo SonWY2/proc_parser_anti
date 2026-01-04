@@ -9,9 +9,10 @@ pyparsing이 없는 환경에서는 정규식 기반 fallback을 사용합니다
 
 import re
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Set
 
 from .types import SqlType, HostVariable, HostVariableType, VariableDirection
+from .config import SQLExtractorConfig, DEFAULT_TIME_FORMAT_BLACKLIST
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +34,28 @@ class PyparsingProCParser:
     
     pyparsing을 사용하여 Pro*C SQL 구문을 파싱합니다.
     pyparsing이 없는 환경에서는 정규식 fallback을 사용합니다.
+    
+    Args:
+        config: SQLExtractorConfig 인스턴스 (블랙리스트 설정 포함)
+    
+    Example:
+        # 기본 사용
+        parser = PyparsingProCParser()
+        
+        # 커스텀 블랙리스트와 함께 사용
+        config = SQLExtractorConfig(
+            CUSTOM_HOST_VAR_BLACKLIST={'MY_KEYWORD', 'ANOTHER'}
+        )
+        parser = PyparsingProCParser(config=config)
     """
     
-    def __init__(self):
-        """파서 초기화 및 문법 설정"""
+    def __init__(self, config: SQLExtractorConfig = None):
+        """파서 초기화 및 문법 설정
+        
+        Args:
+            config: SQL 추출기 설정 (None이면 기본값 사용)
+        """
+        self.config = config or SQLExtractorConfig()
         self.has_pyparsing = HAS_PYPARSING
         
         if self.has_pyparsing:
@@ -49,8 +68,14 @@ class PyparsingProCParser:
         """정규식 패턴 설정"""
         # 호스트 변수 패턴
         self.host_var_pattern = re.compile(
-            r':[\w$#@]+(?:\[[\w\d]+\])?(?:\.[\w$#@]+)?(?::[\w$#@]+)?'
+            r':([\w$#@]+)(?:\[[\w\d]+\])?(?:\.[\w$#@]+)?(?::[\w$#@]+)?'
         )
+        
+        # 호스트 변수 블랙리스트 (config에서 가져옴)
+        self._host_var_blacklist: Set[str] = self.config.get_combined_blacklist()
+        
+        # 문자열 리터럴 패턴 (시간 포맷 등을 찾기 위함)
+        self.string_literal_pattern = re.compile(r"'[^']*'")
         
         # SQL 키워드 패턴
         self.sql_patterns = {
@@ -513,8 +538,93 @@ class PyparsingProCParser:
         
         return None
     
+    def _mask_string_literals(self, sql: str) -> tuple[str, dict]:
+        """문자열 리터럴을 플레이스홀더로 치환하여 보호
+        
+        Args:
+            sql: SQL 문자열
+            
+        Returns:
+            (마스킹된 SQL, 플레이스홀더-원본 매핑)
+        """
+        placeholders = {}
+        counter = [0]
+        
+        def replace_match(match):
+            placeholder = f"__STRING_LITERAL_{counter[0]}__"
+            placeholders[placeholder] = match.group(0)
+            counter[0] += 1
+            return placeholder
+        
+        masked_sql = self.string_literal_pattern.sub(replace_match, sql)
+        return masked_sql, placeholders
+    
+    def _is_blacklisted_keyword(self, var_name: str) -> bool:
+        """블랙리스트 키워드인지 확인
+        
+        Args:
+            var_name: 변수명 (콜론 제외)
+            
+        Returns:
+            블랙리스트에 있으면 True
+        """
+        return var_name.upper() in self._host_var_blacklist
+    
+    def add_to_blacklist(self, keywords: set) -> None:
+        """블랙리스트에 키워드 추가
+        
+        Args:
+            keywords: 추가할 키워드 집합
+            
+        Example:
+            parser.add_to_blacklist({'MY_CONSTANT', 'ANOTHER_KEYWORD'})
+        """
+        self._host_var_blacklist.update(kw.upper() for kw in keywords)
+    
+    def remove_from_blacklist(self, keywords: set) -> None:
+        """블랙리스트에서 키워드 제거
+        
+        Args:
+            keywords: 제거할 키워드 집합
+        """
+        for kw in keywords:
+            self._host_var_blacklist.discard(kw.upper())
+    
+    def get_blacklist(self) -> set:
+        """현재 블랙리스트 반환
+        
+        Returns:
+            블랙리스트 키워드 집합 (복사본)
+        """
+        return self._host_var_blacklist.copy()
+    
+    def _is_in_time_format_context(self, sql: str, match_start: int, match_end: int) -> bool:
+        """매칭된 위치가 시간 포맷 컨텍스트 안에 있는지 확인
+        
+        예: 'HH12:MI:SS' 안의 :MI, :SS는 호스트 변수가 아님
+        
+        Args:
+            sql: 원본 SQL 문자열
+            match_start: 매칭 시작 위치
+            match_end: 매칭 끝 위치
+            
+        Returns:
+            시간 포맷 컨텍스트 안에 있으면 True
+        """
+        # 매칭 위치 주변의 작은따옴표 확인
+        before = sql[:match_start]
+        after = sql[match_end:]
+        
+        # 앞쪽의 열린 따옴표 수 계산
+        open_quotes = before.count("'") % 2
+        
+        # 홀수개면 문자열 리터럴 안에 있음
+        return open_quotes == 1
+
     def extract_all_host_variables(self, sql: str) -> List[str]:
         """SQL 문자열에서 모든 호스트 변수 추출
+        
+        블랙리스트 키워드(시간/날짜 포맷 등)와 문자열 리터럴 내부는 제외됩니다.
         
         Args:
             sql: SQL 문자열
@@ -522,13 +632,30 @@ class PyparsingProCParser:
         Returns:
             호스트 변수 리스트 (예: [':var1', ':var2:ind', ':arr[0]'])
         """
-        candidates = self.host_var_pattern.findall(sql)
-        
-        # 각 후보를 검증
         validated = []
-        for candidate in candidates:
-            if self.parse_host_variable(candidate):
-                validated.append(candidate)
+        
+        # 정규식으로 모든 :변수명 패턴 찾기
+        for match in re.finditer(r':([\w$#@]+(?:\[[\w\d]+\])?(?:\.[\w$#@]+)?(?::[\w$#@]+)?)', sql):
+            full_match = match.group(0)  # :변수명 전체
+            var_name = match.group(1)    # 변수명 (콜론 제외)
+            
+            # 첫 번째 변수명 부분만 추출 (콜론, 점, 대괄호 전까지)
+            first_part = re.match(r'^([\w$#@]+)', var_name)
+            if first_part:
+                first_name = first_part.group(1)
+                
+                # 1. 블랙리스트 키워드 제외
+                if self._is_blacklisted_keyword(first_name):
+                    continue
+                
+                # 2. 문자열 리터럴 안에 있는지 확인
+                if self.config.IGNORE_VARS_IN_STRING_LITERALS:
+                    if self._is_in_time_format_context(sql, match.start(), match.end()):
+                        continue
+            
+            # 3. parse_host_variable로 구조 검증
+            if self.parse_host_variable(full_match):
+                validated.append(full_match)
         
         return validated
     
