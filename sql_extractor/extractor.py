@@ -81,13 +81,17 @@ class SQLExtractor:
         self.sql_type_registry = SQLTypeRegistry()
         self.sql_type_registry.load_defaults()
         
-        self.host_var_registry = HostVariableRegistry()
+        # config를 전달하여 PARSER_MODE 설정 적용
+        self.host_var_registry = HostVariableRegistry(config=self.config)
         self.host_var_registry.load_defaults()
         
+        # 파서 모드 로깅
+        parser_mode = self.config.PARSER_MODE
         logger.info(
             f"SQLExtractor initialized: "
             f"{self.sql_type_registry.rule_count} SQL type rules, "
-            f"{self.host_var_registry.rule_count} host variable rules"
+            f"{self.host_var_registry.rule_count} host variable rules, "
+            f"parser_mode={parser_mode}"
         )
         
         # MyBatis 변환 관련 컴포넌트 (지연 초기화)
@@ -219,18 +223,77 @@ class SQLExtractor:
         return self.tree_sitter_extractor.extract_sql_blocks(code, functions)
     
     def _extract_with_regex(self, code: str) -> List[SQLBlock]:
-        """정규식으로 SQL 추출 (fallback)"""
-        blocks = []
-        matches = re.finditer(r"^[\s]*?EXEC[\s\S]*?;", code, re.MULTILINE)
+        """정규식으로 SQL 추출 (fallback)
         
-        for match in matches:
-            start_line = code[:match.start()].count('\n') + 1
-            end_line = code[:match.end()].count('\n') + 1
+        개선: 주석 내 EXEC SQL 제외, 문자열 내 세미콜론 고려
+        """
+        import re
+        
+        blocks = []
+        
+        # C 주석 영역 찾기
+        comment_ranges = []
+        for match in re.finditer(r'/\*[\s\S]*?\*/', code):
+            comment_ranges.append((match.start(), match.end()))
+        for match in re.finditer(r'//[^\n]*', code):
+            comment_ranges.append((match.start(), match.end()))
+        
+        def is_in_comment(pos):
+            for start, end in comment_ranges:
+                if start <= pos < end:
+                    return True
+            return False
+        
+        def find_sql_end(start_pos):
+            """문자열 리터럴을 고려하여 세미콜론 찾기"""
+            in_string = False
+            quote_char = None
+            i = start_pos
+            
+            while i < len(code):
+                char = code[i]
+                
+                if char in ("'", '"'):
+                    if not in_string:
+                        in_string = True
+                        quote_char = char
+                    elif char == quote_char:
+                        if i > 0 and code[i-1] != '\\':
+                            if i + 1 < len(code) and code[i+1] == char:
+                                i += 1
+                            else:
+                                in_string = False
+                
+                if char == ';' and not in_string:
+                    return i + 1
+                
+                i += 1
+            return -1
+        
+        # EXEC SQL 시작점 찾기
+        for match in re.finditer(r'EXEC\s+SQL\b', code, re.IGNORECASE):
+            start_pos = match.start()
+            
+            # 주석 내에 있으면 스킵
+            if is_in_comment(start_pos):
+                continue
+            
+            # 세미콜론까지 찾기
+            end_pos = find_sql_end(start_pos)
+            if end_pos == -1:
+                continue
+            
+            text = code[start_pos:end_pos]
+            if not text.strip():
+                continue
+            
+            start_line = code[:start_pos].count('\n') + 1
+            end_line = code[:end_pos].count('\n') + 1
             
             blocks.append(SQLBlock(
-                text=match.group(0),
-                start_byte=match.start(),
-                end_byte=match.end(),
+                text=text,
+                start_byte=start_pos,
+                end_byte=end_pos,
                 start_line=start_line,
                 end_line=end_line,
                 containing_function=None

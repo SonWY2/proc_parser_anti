@@ -10,7 +10,6 @@ PREPARE -> EXECUTE (-> DEALLOCATE)
 import re
 from typing import List, Dict, Optional, Any
 from ..interfaces import SQLRelationshipPlugin
-from ..sql_converter import SQLConverter
 
 
 class DynamicSQLRelationshipPlugin(SQLRelationshipPlugin):
@@ -27,6 +26,8 @@ class DynamicSQLRelationshipPlugin(SQLRelationshipPlugin):
     """
     
     def __init__(self):
+        # Lazy import to avoid circular dependency
+        from ..sql_converter import SQLConverter
         self.sql_converter = SQLConverter()
 
     def can_handle(self, sql_elements: List[Dict]) -> bool:

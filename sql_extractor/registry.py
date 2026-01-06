@@ -129,18 +129,73 @@ class HostVariableRegistry:
     """호스트 변수 규칙 레지스트리
     
     호스트 변수 추출 규칙을 관리합니다.
-    규칙 순서가 중요합니다 (복잡한 패턴이 먼저 검사되어야 함).
+    config.PARSER_MODE에 따라 정규식 또는 pyparsing을 사용합니다.
+    
+    Args:
+        config: SQLExtractorConfig 인스턴스 (선택사항)
     
     Example:
+        # 기본 사용 (auto 모드)
         registry = HostVariableRegistry()
         registry.load_defaults()
+        
+        # pyparsing 강제 사용
+        config = SQLExtractorConfig(PARSER_MODE="pyparsing")
+        registry = HostVariableRegistry(config=config)
         
         variables = registry.extract_all(":var1, :arr[i]:ind")
         # [{'type': 'basic', 'var_name': 'var1', ...}, ...]
     """
     
-    def __init__(self):
+    def __init__(self, config: 'SQLExtractorConfig' = None):
+        from .config import SQLExtractorConfig
+        
         self._rules: List[HostVariableRule] = []
+        self._config = config or SQLExtractorConfig()
+        
+        # pyparsing 파서 (지연 초기화)
+        self._pyparsing_parser = None
+        self._use_pyparsing: Optional[bool] = None
+    
+    def _init_parser(self) -> None:
+        """파서 초기화 (지연 로딩)"""
+        if self._use_pyparsing is not None:
+            return  # 이미 초기화됨
+        
+        parser_mode = self._config.PARSER_MODE.lower()
+        
+        if parser_mode == "regex":
+            self._use_pyparsing = False
+            logger.info("HostVariableRegistry: regex 모드 사용")
+        elif parser_mode == "pyparsing":
+            try:
+                from .pyparsing_parser import PyparsingProCParser, HAS_PYPARSING
+                if not HAS_PYPARSING:
+                    raise ImportError("pyparsing library not installed")
+                self._pyparsing_parser = PyparsingProCParser(config=self._config)
+                self._use_pyparsing = True
+                logger.info("HostVariableRegistry: pyparsing 모드 사용")
+            except ImportError as e:
+                raise RuntimeError(f"pyparsing 모드가 요청되었으나 사용 불가: {e}")
+        else:  # auto
+            try:
+                from .pyparsing_parser import PyparsingProCParser, HAS_PYPARSING
+                if HAS_PYPARSING:
+                    self._pyparsing_parser = PyparsingProCParser(config=self._config)
+                    self._use_pyparsing = True
+                    logger.info("HostVariableRegistry: pyparsing 자동 감지됨, pyparsing 모드 사용")
+                else:
+                    self._use_pyparsing = False
+                    logger.info("HostVariableRegistry: pyparsing 미설치, regex 모드로 fallback")
+            except ImportError:
+                self._use_pyparsing = False
+                logger.info("HostVariableRegistry: pyparsing 모듈 로드 실패, regex 모드로 fallback")
+    
+    @property
+    def use_pyparsing(self) -> bool:
+        """현재 pyparsing 사용 여부"""
+        self._init_parser()
+        return self._use_pyparsing
     
     def register(self, rule: HostVariableRule) -> None:
         """규칙 등록
@@ -173,8 +228,8 @@ class HostVariableRegistry:
     def extract_all(self, sql_text: str) -> List[Dict[str, Any]]:
         """SQL에서 모든 호스트 변수 추출
         
-        각 규칙을 순서대로 적용하여 모든 호스트 변수를 추출합니다.
-        중복/겹치는 매칭은 제거됩니다.
+        config.PARSER_MODE에 따라 pyparsing 또는 정규식을 사용합니다.
+        pyparsing 모드에서는 블랙리스트/문자열 리터럴 필터링이 더 정확합니다.
         
         Args:
             sql_text: SQL 텍스트
@@ -182,6 +237,34 @@ class HostVariableRegistry:
         Returns:
             호스트 변수 정보 딕셔너리 목록
         """
+        self._init_parser()
+        
+        # pyparsing 모드
+        if self._use_pyparsing and self._pyparsing_parser:
+            return self._extract_with_pyparsing(sql_text)
+        
+        # regex 모드
+        return self._extract_with_regex(sql_text)
+    
+    def _extract_with_pyparsing(self, sql_text: str) -> List[Dict[str, Any]]:
+        """pyparsing 기반 호스트 변수 추출"""
+        raw_vars = self._pyparsing_parser.extract_all_host_variables(sql_text)
+        
+        result = []
+        for raw in raw_vars:
+            parsed = self._pyparsing_parser.parse_host_variable(raw)
+            if parsed:
+                parsed['raw'] = raw
+                # 위치 정보 추가
+                start = sql_text.find(raw)
+                parsed['start'] = start
+                parsed['end'] = start + len(raw) if start >= 0 else 0
+                result.append(parsed)
+        
+        return result
+    
+    def _extract_with_regex(self, sql_text: str) -> List[Dict[str, Any]]:
+        """정규식 기반 호스트 변수 추출 (기존 규칙 사용)"""
         all_matches = []
         
         for rule in self._rules:

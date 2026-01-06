@@ -1,0 +1,8 @@
+# sql_extractor 모듈 의존성
+
+# C/Pro*C 파싱용 tree-sitter
+tree-sitter>=0.20.0
+tree-sitter-c>=0.20.0
+
+# SQL 파싱 (pyparsing 기반 파서)
+pyparsing>=3.0.0

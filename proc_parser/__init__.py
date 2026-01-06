@@ -36,6 +36,7 @@ from .patterns import (
     PATTERN_COMMENT_SINGLE,
     PATTERN_COMMENT_MULTI,
     PATTERN_ARRAY_DML,
+    PATTERN_DECLARE_SECTION,
 )
 
 # 플러그인 re-export
@@ -71,6 +72,7 @@ __all__ = [
     "PATTERN_COMMENT_SINGLE",
     "PATTERN_COMMENT_MULTI",
     "PATTERN_ARRAY_DML",
+    "PATTERN_DECLARE_SECTION",
     
     # 플러그인
     "NamingConventionPlugin",

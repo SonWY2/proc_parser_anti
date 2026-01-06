@@ -474,6 +474,90 @@ print(f"출력: {output_vars}")  # [':out_name']
 
 ---
 
+## 11. 파싱 모드 설정 (PARSER_MODE)
+
+호스트 변수 추출 시 사용하는 파서를 선택할 수 있습니다.
+
+### 파싱 모드 옵션
+
+| 모드 | 설명 |
+|------|------|
+| `auto` (기본) | pyparsing 라이브러리가 설치되어 있으면 pyparsing 사용, 없으면 regex 사용 |
+| `pyparsing` | pyparsing 강제 사용 (미설치 시 에러 발생) |
+| `regex` | 정규식만 사용 (pyparsing 무시) |
+
+### 사용법
+
+```python
+from sql_extractor import SQLExtractor, SQLExtractorConfig
+
+# 1. 기본값 (auto): pyparsing 있으면 사용, 없으면 regex
+extractor = SQLExtractor()
+print(extractor.host_var_registry.use_pyparsing)  # True 또는 False
+
+# 2. pyparsing 강제 사용 (없으면 RuntimeError 발생)
+config = SQLExtractorConfig(PARSER_MODE="pyparsing")
+extractor = SQLExtractor(config=config)
+
+# 3. 정규식만 사용 (pyparsing 무시)
+config = SQLExtractorConfig(PARSER_MODE="regex")
+extractor = SQLExtractor(config=config)
+```
+
+### pyparsing vs regex 비교
+
+| 항목 | pyparsing | regex |
+|------|-----------|-------|
+| 정확도 | ✅ 높음 (문법 기반) | ⚠️ 보통 (패턴 기반) |
+| 블랙리스트 처리 | ✅ 정밀 (문자열 리터럴 인식) | ⚠️ 기본 (위치 기반) |
+| 성능 | ⚠️ 약간 느림 | ✅ 빠름 |
+| 의존성 | pyparsing 라이브러리 필요 | 없음 |
+| 확장성 | ✅ 문법 규칙 추가 용이 | ⚠️ 정규식 패턴 추가 |
+
+### pyparsing 설치
+
+pyparsing 모드를 사용하려면 라이브러리를 설치해야 합니다:
+
+```bash
+pip install pyparsing
+```
+
+### 모드 확인
+
+```python
+from sql_extractor import SQLExtractor, SQLExtractorConfig
+
+extractor = SQLExtractor()
+
+# 현재 파서 모드 확인
+print(f"설정된 모드: {extractor.config.PARSER_MODE}")
+print(f"pyparsing 사용 여부: {extractor.host_var_registry.use_pyparsing}")
+```
+
+### HostVariableRegistry 직접 사용
+
+```python
+from sql_extractor import SQLExtractorConfig
+from sql_extractor.registry import HostVariableRegistry
+
+# pyparsing 모드로 직접 생성
+config = SQLExtractorConfig(PARSER_MODE="auto")
+registry = HostVariableRegistry(config=config)
+registry.load_defaults()
+
+# 호스트 변수 추출 (pyparsing 또는 regex 자동 선택)
+sql = "SELECT name, age INTO :out_name, :out_age FROM users WHERE id = :in_id"
+vars = registry.extract_all(sql)
+print([v['raw'] for v in vars])  # [':out_name', ':out_age', ':in_id']
+
+# 입출력 분류
+input_vars, output_vars = registry.classify_by_direction(sql, 'select')
+print(f"입력: {[v['raw'] for v in input_vars]}")   # [':in_id']
+print(f"출력: {[v['raw'] for v in output_vars]}")  # [':out_name', ':out_age']
+```
+
+---
+
 ## 출력 포맷
 
 ### 1. 변환된 코드 (주석 삽입)

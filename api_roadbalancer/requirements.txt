@@ -1,0 +1,10 @@
+# api_roadbalancer 모듈 의존성
+
+# HTTP 요청/헬스체크
+requests>=2.28.0
+
+# 설정 파일 로딩
+PyYAML>=6.0
+
+# 테스트용 (선택적)
+# pytest>=7.0.0

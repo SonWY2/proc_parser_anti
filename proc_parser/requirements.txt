@@ -1,0 +1,7 @@
+# proc_parser (Pro*C 파서) 모듈 의존성
+
+# C/Pro*C 파싱용 tree-sitter
+tree-sitter>=0.20.0
+
+# tree-sitter C 언어 바인딩
+tree-sitter-c>=0.20.0

@@ -34,12 +34,23 @@ class ProCParser:
             ArrayDMLRelationshipPlugin()
         ]
 
-    def parse_file(self, file_path):
+    def parse_file(self, file_path, external_macros: dict = None):
         """
         단일 파일을 파싱하는 메인 메서드입니다.
+        
+        Args:
+            file_path: 파싱할 Pro*C 파일 경로
+            external_macros: 외부에서 주입할 매크로 딕셔너리 (예: {"MAX_SIZE": "100"})
+                             파일 내 매크로보다 우선순위가 낮음 (파일 매크로가 덮어씀)
+        
+        Returns:
+            파싱된 요소 목록
         """
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             content = f.read()
+        
+        # 외부 매크로로 매크로 테이블 초기화
+        macro_table = dict(external_macros) if external_macros else {}
             
         elements = []
         
@@ -78,16 +89,23 @@ class ProCParser:
             
         # 매크로
         for match in PATTERN_MACRO.finditer(content):
+            macro_name = match.group(1)
+            macro_value = match.group(2)
+            
             elements.append({
                 "type": "macro",
-                "name": match.group(1),
-                "value": match.group(2),
+                "name": macro_name,
+                "value": macro_value,
                 "line_start": content.count('\n', 0, match.start()) + 1,
                 "line_end": content.count('\n', 0, match.end()) + 1,
                 "raw_content": match.group(0),
                 "function": None
             })
             mark_covered(match.start(), match.end())
+            
+            # 매크로 테이블에 추가 (파일 매크로가 외부 매크로를 덮어씀)
+            if macro_value is not None:
+                macro_table[macro_name] = macro_value.strip()
 
         # SQL 블록
         sql_id_counter = 1
@@ -165,6 +183,13 @@ class ProCParser:
         # 시작 라인 기준 정렬
         elements.sort(key=lambda x: x['line_start'])
         
+        # DECLARE SECTION 범위 추출
+        declare_sections = []
+        for match in PATTERN_DECLARE_SECTION.finditer(content):
+            start_line = content.count('\n', 0, match.start()) + 1
+            end_line = content.count('\n', 0, match.end()) + 1
+            declare_sections.append((start_line, end_line))
+        
         # 스코프 해결
         for el in elements:
             if el['type'] == 'function': continue 
@@ -174,6 +199,54 @@ class ProCParser:
                 if func['line_start'] <= el['line_start'] and func['line_end'] >= el['line_end']:
                     el['function'] = func['name']
                     break
+        
+        # 변수 스코프 분류
+        for el in elements:
+            if el['type'] != 'variable':
+                continue
+            
+            # 스코프 분류 우선순위:
+            # 1. declare_section: DECLARE SECTION 내부
+            # 2. static: storage_class가 static인 경우
+            # 3. global: 함수 외부에 선언된 경우
+            # 4. local: 함수 내부에 선언된 경우
+            
+            is_in_declare_section = any(
+                start <= el['line_start'] <= end 
+                for start, end in declare_sections
+            )
+            
+            if is_in_declare_section:
+                el['scope'] = 'declare_section'
+            elif el.get('storage_class') == 'static':
+                if el.get('function'):
+                    el['scope'] = 'static_local'
+                else:
+                    el['scope'] = 'static'
+            elif el.get('function') is None:
+                el['scope'] = 'global'
+            else:
+                el['scope'] = 'local'
+        
+        # 배열 크기 매크로 치환
+        for el in elements:
+            if el['type'] != 'variable':
+                continue
+            
+            array_sizes = el.get('array_sizes', [])
+            if not array_sizes:
+                el['resolved_array_sizes'] = []
+                continue
+            
+            resolved = []
+            for size in array_sizes:
+                if size is None:
+                    resolved.append(None)
+                elif size in macro_table:
+                    resolved.append(macro_table[size])
+                else:
+                    resolved.append(size)  # 숫자 리터럴이거나 정의되지 않은 매크로
+            el['resolved_array_sizes'] = resolved
         
         # 3.5. SQL 관계 추출
         # SQL 요소에 대해 관계 플러그인 실행
