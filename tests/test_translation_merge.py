@@ -174,7 +174,8 @@ class TestTranslationMerger:
     
     @pytest.fixture
     def merger(self):
-        return TranslationMerger()
+        # 기존 테스트는 플러그인 비활성화 상태로 실행
+        return TranslationMerger(use_plugins=False)
     
     def test_merge_basic(self, merger):
         """기본 병합 테스트."""
@@ -375,3 +376,221 @@ public void processMain() {
         
         # 경고 없음
         assert len(result.warnings) == 0
+
+
+class TestPluginSystem:
+    """플러그인 시스템 테스트."""
+    
+    def test_list_plugins(self):
+        """등록된 플러그인 목록 조회 테스트."""
+        from translation_merge import list_plugins
+        
+        plugins = list_plugins()
+        assert "bxmcategory" in plugins
+        assert "main_deduplicator" in plugins
+        assert "visibility" in plugins
+    
+    def test_load_plugins_priority_order(self):
+        """플러그인이 priority 순서대로 로드되는지 테스트."""
+        from translation_merge import load_plugins
+        
+        plugins = load_plugins()
+        priorities = [p.priority for p in plugins]
+        assert priorities == sorted(priorities)
+    
+    def test_bxmcategory_annotation_added(self):
+        """@bxmcategory 어노테이션 추가 테스트."""
+        merger = TranslationMerger()
+        
+        skeleton = """package com.example;
+
+public class MyProgram {
+}
+"""
+        translations = [
+            MethodTranslation(
+                name="processData",
+                llm_response="""
+public void processData() {
+    int x = 1;
+}
+"""
+            ),
+        ]
+        
+        result = merger.merge(skeleton, translations)
+        assert "@bxmcategory" in result.merged_code
+    
+    def test_bxmcategory_not_duplicated(self):
+        """이미 @bxmcategory가 있으면 중복 추가 안됨 테스트."""
+        merger = TranslationMerger()
+        
+        skeleton = """package com.example;
+
+public class MyProgram {
+}
+"""
+        translations = [
+            MethodTranslation(
+                name="processData",
+                llm_response="""
+@bxmcategory
+public void processData() {
+    int x = 1;
+}
+"""
+            ),
+        ]
+        
+        result = merger.merge(skeleton, translations)
+        count = result.merged_code.count("@bxmcategory")
+        assert count == 1
+    
+    def test_main_deduplicator_keeps_last(self):
+        """중복 main 함수 중 마지막만 유지 테스트."""
+        merger = TranslationMerger()
+        
+        skeleton = """package com.example;
+
+public class MyProgram {
+}
+"""
+        translations = [
+            MethodTranslation(
+                name="processMain",
+                llm_response="""
+public void processMain() {
+    System.out.println("first main");
+}
+"""
+            ),
+            MethodTranslation(
+                name="helperMethod",
+                llm_response="""
+public void helperMethod() {
+    int x = 1;
+}
+"""
+            ),
+            MethodTranslation(
+                name="runMain",
+                llm_response="""
+public void runMain() {
+    System.out.println("second main");
+}
+"""
+            ),
+        ]
+        
+        result = merger.merge(skeleton, translations)
+        
+        # 첫 번째 main 함수는 제거됨
+        assert "first main" not in result.merged_code
+        # 마지막 main 함수만 유지
+        assert "second main" in result.merged_code
+        # helperMethod는 유지
+        assert "helperMethod" in result.merged_code or "private void helperMethod" in result.merged_code
+    
+    def test_visibility_public_to_private(self):
+        """public → private 변환 테스트 (main 제외)."""
+        merger = TranslationMerger()
+        
+        skeleton = """package com.example;
+
+public class MyProgram {
+}
+"""
+        translations = [
+            MethodTranslation(
+                name="helperMethod",
+                llm_response="""
+public void helperMethod() {
+    int x = 1;
+}
+"""
+            ),
+            MethodTranslation(
+                name="processMain",
+                llm_response="""
+public void processMain() {
+    System.out.println("main");
+}
+"""
+            ),
+        ]
+        
+        result = merger.merge(skeleton, translations)
+        
+        # helper는 private로 변환
+        assert "private void helperMethod" in result.merged_code
+        # main은 public 유지
+        assert "public void processMain" in result.merged_code
+    
+    def test_plugins_disabled(self):
+        """플러그인 비활성화 테스트."""
+        merger = TranslationMerger(use_plugins=False)
+        
+        skeleton = """package com.example;
+
+public class MyProgram {
+}
+"""
+        translations = [
+            MethodTranslation(
+                name="helperMethod",
+                llm_response="""
+public void helperMethod() {
+    int x = 1;
+}
+"""
+            ),
+        ]
+        
+        result = merger.merge(skeleton, translations)
+        
+        # 플러그인 비활성화 시 public 유지, 어노테이션 없음
+        assert "public void helperMethod" in result.merged_code
+        assert "@bxmcategory" not in result.merged_code
+    
+    def test_main_deduplicator_with_skeleton_main(self):
+        """스켈레톤에 main 함수가 있는 경우 중복 제거 테스트."""
+        merger = TranslationMerger()
+        
+        # 스켈레톤에 이미 main 메소드가 있음
+        skeleton = """package com.example;
+
+public class MyProgram {
+    
+    public void skeletonMain() {
+        System.out.println("skeleton main");
+    }
+}
+"""
+        translations = [
+            MethodTranslation(
+                name="helperMethod",
+                llm_response="""
+public void helperMethod() {
+    int x = 1;
+}
+"""
+            ),
+            MethodTranslation(
+                name="newMain",
+                llm_response="""
+public void newMain() {
+    System.out.println("new main from translation");
+}
+"""
+            ),
+        ]
+        
+        result = merger.merge(skeleton, translations)
+        
+        # 스켈레톤의 main 함수는 제거되고, 마지막 main (newMain)만 유지
+        assert "skeleton main" not in result.merged_code
+        assert "new main from translation" in result.merged_code
+        # helperMethod는 유지
+        assert "helperMethod" in result.merged_code
+
+

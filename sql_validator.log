@@ -1,0 +1,32 @@
+2025-12-25 22:11:14 | DEBUG | StaticAnalyzer 초기화됨
+2025-12-25 22:11:14 | DEBUG | DiffHighlighter: ignore_whitespace=True, ignore_case=False
+2025-12-25 22:11:14 | DEBUG | LLMClient 초기화: endpoint=
+2025-12-25 22:11:14 | INFO | SQLValidatorApp 시작됨
+2025-12-25 22:11:27 | DEBUG | StaticAnalyzer 초기화됨
+2025-12-25 22:11:27 | DEBUG | DiffHighlighter: ignore_whitespace=True, ignore_case=False
+2025-12-25 22:11:27 | DEBUG | LLMClient 초기화: endpoint=
+2025-12-25 22:11:27 | INFO | SQLValidatorApp 시작됨
+2025-12-25 22:13:05 | DEBUG | StaticAnalyzer 초기화됨
+2025-12-25 22:13:05 | DEBUG | DiffHighlighter: ignore_whitespace=True, ignore_case=False
+2025-12-25 22:13:05 | DEBUG | LLMClient 초기화: endpoint=
+2025-12-25 22:13:05 | INFO | SQLValidatorApp 시작됨
+2025-12-25 22:13:15 | DEBUG | Diff 계산 완료: 7 블록
+2025-12-25 22:13:15 | INFO | 분석 완료: 5 통과, 0 실패, 1 경고
+2025-12-25 22:15:49 | DEBUG | StaticAnalyzer 초기화됨
+2025-12-25 22:15:49 | DEBUG | DiffHighlighter: ignore_whitespace=True, ignore_case=False
+2025-12-25 22:15:49 | DEBUG | LLMClient 초기화: endpoint=
+2025-12-25 22:15:49 | INFO | SQLValidatorApp 시작됨
+2025-12-25 22:15:58 | DEBUG | Diff 계산 완료: 4 블록
+2025-12-25 22:15:58 | INFO | 분석 완료: 5 통과, 0 실패, 1 경고
+2025-12-25 22:16:03 | DEBUG | Diff 계산 완료: 6 블록
+2025-12-25 22:16:03 | INFO | 분석 완료: 5 통과, 0 실패, 0 경고
+2025-12-25 22:16:06 | DEBUG | Diff 계산 완료: 4 블록
+2025-12-25 22:16:06 | INFO | 분석 완료: 5 통과, 0 실패, 0 경고
+2025-12-25 22:16:07 | DEBUG | Diff 계산 완료: 6 블록
+2025-12-25 22:16:07 | INFO | 분석 완료: 5 통과, 0 실패, 0 경고
+2025-12-25 22:16:07 | DEBUG | Diff 계산 완료: 4 블록
+2025-12-25 22:16:07 | INFO | 분석 완료: 5 통과, 0 실패, 0 경고
+2025-12-25 22:16:09 | DEBUG | Diff 계산 완료: 3 블록
+2025-12-25 22:16:09 | INFO | 분석 완료: 5 통과, 0 실패, 0 경고
+2025-12-25 22:16:14 | DEBUG | Diff 계산 완료: 4 블록
+2025-12-25 22:16:14 | INFO | 분석 완료: 5 통과, 0 실패, 1 경고
