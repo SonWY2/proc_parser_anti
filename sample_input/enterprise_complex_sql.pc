@@ -1,0 +1,800 @@
+/*******************************************************************************
+ * 파일명: enterprise_complex_sql.pc
+ * 설명: 엔터프라이즈급 복잡도의 Pro*C SQL 예제
+ *       - 금융 거래 정산 및 리스크 분석 시스템
+ *       - 재귀 CTE, MODEL 절, PIVOT, 계층 쿼리
+ *       - 정규식, 복잡한 상관 서브쿼리, 분석 함수
+ * 작성일: 2026-01-09
+ ******************************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+EXEC SQL INCLUDE sqlca;
+EXEC SQL INCLUDE oraca;
+
+EXEC SQL BEGIN DECLARE SECTION;
+    /* 입력 파라미터 */
+    char p_base_date[11];
+    char p_from_branch[10];
+    char p_to_branch[10];
+    char p_currency[4];
+    int p_risk_threshold;
+    double p_variance_limit;
+    
+    /* 결과 구조체 */
+    typedef struct {
+        char settlement_id[30];
+        char entity_path[500];
+        int hierarchy_level;
+        double original_amount;
+        double converted_amount;
+        double risk_score;
+        double anomaly_index;
+        char alert_code[20];
+    } result_t;
+    
+    result_t result;
+    int fetch_count;
+    
+EXEC SQL END DECLARE SECTION;
+
+int main(void)
+{
+    strcpy(p_base_date, "2025-12-31");
+    strcpy(p_from_branch, "BR001");
+    strcpy(p_to_branch, "BR999");
+    strcpy(p_currency, "KRW");
+    p_risk_threshold = 75;
+    p_variance_limit = 2.5;
+    
+    EXEC SQL CONNECT scott IDENTIFIED BY tiger;
+    
+    /*==========================================================================
+     * 복잡한 엔터프라이즈급 SQL 시작 (200줄 이상)
+     * - 금융 거래 정산, 리스크 분석, 이상 탐지
+     *==========================================================================*/
+    
+    EXEC SQL DECLARE main_cursor CURSOR FOR
+    WITH RECURSIVE
+    /*----------------------------------------------------------------------
+     * [CTE 1] 재귀 CTE: 조직 계층 구조 전개 (무한 루프 방지)
+     *----------------------------------------------------------------------*/
+    org_hierarchy (
+        entity_id, 
+        entity_name, 
+        parent_id, 
+        entity_type, 
+        path, 
+        depth,
+        root_id,
+        is_leaf,
+        sort_path
+    ) AS (
+        -- 앵커 멤버: 최상위 법인
+        SELECT 
+            e.entity_id,
+            e.entity_name,
+            e.parent_entity_id,
+            e.entity_type,
+            CAST(e.entity_name AS VARCHAR2(4000)) AS path,
+            1 AS depth,
+            e.entity_id AS root_id,
+            CASE 
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM entities e2 
+                    WHERE e2.parent_entity_id = e.entity_id
+                      AND e2.active_flag = 'Y'
+                ) THEN 'Y' ELSE 'N' 
+            END AS is_leaf,
+            LPAD(e.entity_id, 10, '0') AS sort_path
+        FROM entities e
+        WHERE e.parent_entity_id IS NULL
+          AND e.active_flag = 'Y'
+          AND e.entity_type IN ('CORP', 'HOLDING')
+        
+        UNION ALL
+        
+        -- 재귀 멤버: 하위 조직 전개
+        SELECT 
+            c.entity_id,
+            c.entity_name,
+            c.parent_entity_id,
+            c.entity_type,
+            oh.path || ' > ' || c.entity_name,
+            oh.depth + 1,
+            oh.root_id,
+            CASE 
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM entities e3 
+                    WHERE e3.parent_entity_id = c.entity_id
+                      AND e3.active_flag = 'Y'
+                ) THEN 'Y' ELSE 'N' 
+            END,
+            oh.sort_path || LPAD(c.entity_id, 10, '0')
+        FROM entities c
+        INNER JOIN org_hierarchy oh ON c.parent_entity_id = oh.entity_id
+        WHERE c.active_flag = 'Y'
+          AND oh.depth < 10  -- 무한 루프 방지
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 2] 거래 원장 정규화 및 환율 적용
+     *----------------------------------------------------------------------*/
+    normalized_transactions AS (
+        SELECT 
+            t.txn_id,
+            t.txn_date,
+            t.txn_type,
+            t.debit_entity_id,
+            t.credit_entity_id,
+            t.original_currency,
+            t.original_amount,
+            t.settlement_status,
+            t.value_date,
+            t.booking_date,
+            -- 다중 통화 변환 (삼각환율 적용)
+            CASE 
+                WHEN t.original_currency = :p_currency THEN 
+                    t.original_amount
+                WHEN t.original_currency = 'USD' THEN 
+                    t.original_amount * (
+                        SELECT fx.rate FROM fx_rates fx 
+                        WHERE fx.from_ccy = 'USD' 
+                          AND fx.to_ccy = :p_currency
+                          AND fx.rate_date = (
+                              SELECT MAX(fx2.rate_date) 
+                              FROM fx_rates fx2 
+                              WHERE fx2.from_ccy = fx.from_ccy 
+                                AND fx2.to_ccy = fx.to_ccy
+                                AND fx2.rate_date <= t.txn_date
+                          )
+                    )
+                ELSE 
+                    -- 삼각환율: 원통화 → USD → 목표통화
+                    t.original_amount 
+                    * (
+                        SELECT fx3.rate FROM fx_rates fx3
+                        WHERE fx3.from_ccy = t.original_currency
+                          AND fx3.to_ccy = 'USD'
+                          AND fx3.rate_date = (
+                              SELECT MAX(r.rate_date) FROM fx_rates r
+                              WHERE r.from_ccy = fx3.from_ccy
+                                AND r.to_ccy = fx3.to_ccy
+                                AND r.rate_date <= t.txn_date
+                          )
+                    )
+                    * (
+                        SELECT fx4.rate FROM fx_rates fx4
+                        WHERE fx4.from_ccy = 'USD'
+                          AND fx4.to_ccy = :p_currency
+                          AND fx4.rate_date = (
+                              SELECT MAX(r2.rate_date) FROM fx_rates r2
+                              WHERE r2.from_ccy = fx4.from_ccy
+                                AND r2.to_ccy = fx4.to_ccy
+                                AND r2.rate_date <= t.txn_date
+                          )
+                    )
+            END AS converted_amount,
+            -- 정규식으로 거래 참조번호 파싱
+            REGEXP_SUBSTR(t.reference_no, '^([A-Z]{2})([0-9]{8})([A-Z]{3})([0-9]+)$', 1, 1, NULL, 1) AS ref_country,
+            REGEXP_SUBSTR(t.reference_no, '^([A-Z]{2})([0-9]{8})([A-Z]{3})([0-9]+)$', 1, 1, NULL, 2) AS ref_date,
+            REGEXP_SUBSTR(t.reference_no, '^([A-Z]{2})([0-9]{8})([A-Z]{3})([0-9]+)$', 1, 1, NULL, 3) AS ref_type,
+            REGEXP_SUBSTR(t.reference_no, '^([A-Z]{2})([0-9]{8})([A-Z]{3})([0-9]+)$', 1, 1, NULL, 4) AS ref_seq,
+            -- 거래 속성 플래그 추출
+            CASE WHEN REGEXP_LIKE(t.txn_memo, '(긴급|URGENT|HIGH.?PRIORITY)', 'i') THEN 'Y' ELSE 'N' END AS is_urgent,
+            CASE WHEN REGEXP_LIKE(t.txn_memo, '(수동|MANUAL|OVERRIDE)', 'i') THEN 'Y' ELSE 'N' END AS is_manual,
+            CASE WHEN REGEXP_LIKE(t.txn_memo, '(취소|REVERSE|CANCEL)', 'i') THEN 'Y' ELSE 'N' END AS is_reversal,
+            -- 영업일 계산 (공휴일 제외)
+            (
+                SELECT COUNT(*) 
+                FROM business_days bd 
+                WHERE bd.calendar_date BETWEEN t.booking_date AND t.value_date
+                  AND bd.is_business_day = 'Y'
+                  AND bd.country_code = SUBSTR(t.booking_branch, 1, 2)
+            ) AS settlement_days,
+            t.booking_branch,
+            t.counter_branch
+        FROM transactions t
+        WHERE t.txn_date BETWEEN ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), -12) 
+                             AND TO_DATE(:p_base_date, 'YYYY-MM-DD')
+          AND t.booking_branch BETWEEN :p_from_branch AND :p_to_branch
+          AND t.settlement_status NOT IN ('VOID', 'REJECTED')
+          AND t.original_amount <> 0
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 3] 상대방별 거래 집계 및 네트워크 분석
+     *----------------------------------------------------------------------*/
+    counterparty_network AS (
+        SELECT 
+            nt.debit_entity_id AS from_entity,
+            nt.credit_entity_id AS to_entity,
+            COUNT(*) AS txn_count,
+            SUM(nt.converted_amount) AS total_amount,
+            AVG(nt.converted_amount) AS avg_amount,
+            STDDEV(nt.converted_amount) AS stddev_amount,
+            MIN(nt.txn_date) AS first_txn_date,
+            MAX(nt.txn_date) AS last_txn_date,
+            COUNT(DISTINCT nt.txn_type) AS txn_type_diversity,
+            -- 네트워크 중심성 계산 (PageRank 유사)
+            SUM(nt.converted_amount) / NULLIF(
+                SUM(SUM(nt.converted_amount)) OVER (PARTITION BY nt.debit_entity_id), 0
+            ) AS outflow_concentration,
+            SUM(nt.converted_amount) / NULLIF(
+                SUM(SUM(nt.converted_amount)) OVER (PARTITION BY nt.credit_entity_id), 0
+            ) AS inflow_concentration,
+            -- 순환 거래 탐지
+            CASE WHEN EXISTS (
+                SELECT 1 FROM normalized_transactions nt2
+                WHERE nt2.debit_entity_id = nt.credit_entity_id
+                  AND nt2.credit_entity_id = nt.debit_entity_id
+                  AND nt2.txn_date BETWEEN nt.txn_date - 7 AND nt.txn_date + 7
+                  AND ABS(nt2.converted_amount - nt.converted_amount) / 
+                      NULLIF(nt.converted_amount, 0) < 0.05
+            ) THEN 'Y' ELSE 'N' END AS circular_flag
+        FROM normalized_transactions nt
+        GROUP BY 
+            nt.debit_entity_id, 
+            nt.credit_entity_id
+        HAVING COUNT(*) >= 3
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 4] 시계열 분석: 이동평균, 변동성, 추세
+     *----------------------------------------------------------------------*/
+    time_series_analysis AS (
+        SELECT 
+            nt.debit_entity_id AS entity_id,
+            TRUNC(nt.txn_date, 'MM') AS period_month,
+            SUM(nt.converted_amount) AS period_amount,
+            COUNT(*) AS period_count,
+            -- 3개월 이동평균
+            AVG(SUM(nt.converted_amount)) OVER (
+                PARTITION BY nt.debit_entity_id 
+                ORDER BY TRUNC(nt.txn_date, 'MM')
+                ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+            ) AS ma_3m,
+            -- 6개월 이동평균
+            AVG(SUM(nt.converted_amount)) OVER (
+                PARTITION BY nt.debit_entity_id 
+                ORDER BY TRUNC(nt.txn_date, 'MM')
+                ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
+            ) AS ma_6m,
+            -- 변동성 (6개월 표준편차 / 평균)
+            STDDEV(SUM(nt.converted_amount)) OVER (
+                PARTITION BY nt.debit_entity_id 
+                ORDER BY TRUNC(nt.txn_date, 'MM')
+                ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
+            ) / NULLIF(
+                AVG(SUM(nt.converted_amount)) OVER (
+                    PARTITION BY nt.debit_entity_id 
+                    ORDER BY TRUNC(nt.txn_date, 'MM')
+                    ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
+                ), 0
+            ) AS volatility_6m,
+            -- 선형 추세 (REGR 함수)
+            REGR_SLOPE(
+                SUM(nt.converted_amount),
+                MONTHS_BETWEEN(TRUNC(nt.txn_date, 'MM'), TO_DATE('2020-01-01', 'YYYY-MM-DD'))
+            ) OVER (
+                PARTITION BY nt.debit_entity_id
+            ) AS trend_slope,
+            REGR_R2(
+                SUM(nt.converted_amount),
+                MONTHS_BETWEEN(TRUNC(nt.txn_date, 'MM'), TO_DATE('2020-01-01', 'YYYY-MM-DD'))
+            ) OVER (
+                PARTITION BY nt.debit_entity_id
+            ) AS trend_r2,
+            -- 계절성 지수 (해당 분기 / 연평균)
+            SUM(nt.converted_amount) / NULLIF(
+                AVG(SUM(nt.converted_amount)) OVER (
+                    PARTITION BY nt.debit_entity_id, TO_CHAR(nt.txn_date, 'YYYY')
+                ), 0
+            ) AS seasonal_index,
+            -- 분위수 기반 이상치 판단
+            NTILE(100) OVER (
+                PARTITION BY nt.debit_entity_id
+                ORDER BY SUM(nt.converted_amount)
+            ) AS percentile_rank
+        FROM normalized_transactions nt
+        GROUP BY nt.debit_entity_id, TRUNC(nt.txn_date, 'MM')
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 5] 리스크 스코어링 (다중 요소 가중 합계)
+     *----------------------------------------------------------------------*/
+    risk_scoring AS (
+        SELECT 
+            cn.from_entity AS entity_id,
+            -- 거래량 리스크 (큰 거래)
+            CASE 
+                WHEN cn.avg_amount > (
+                    SELECT PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY cn2.avg_amount)
+                    FROM counterparty_network cn2
+                ) THEN 30
+                WHEN cn.avg_amount > (
+                    SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY cn2.avg_amount)
+                    FROM counterparty_network cn2
+                ) THEN 20
+                WHEN cn.avg_amount > (
+                    SELECT PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY cn2.avg_amount)
+                    FROM counterparty_network cn2
+                ) THEN 10
+                ELSE 0
+            END AS volume_risk,
+            -- 변동성 리스크
+            CASE 
+                WHEN cn.stddev_amount / NULLIF(cn.avg_amount, 0) > :p_variance_limit THEN 25
+                WHEN cn.stddev_amount / NULLIF(cn.avg_amount, 0) > :p_variance_limit * 0.7 THEN 15
+                WHEN cn.stddev_amount / NULLIF(cn.avg_amount, 0) > :p_variance_limit * 0.4 THEN 5
+                ELSE 0
+            END AS volatility_risk,
+            -- 집중도 리스크 (특정 상대방 편중)
+            CASE 
+                WHEN cn.outflow_concentration > 0.5 THEN 20
+                WHEN cn.outflow_concentration > 0.3 THEN 12
+                WHEN cn.outflow_concentration > 0.2 THEN 6
+                ELSE 0
+            END AS concentration_risk,
+            -- 순환거래 리스크
+            CASE WHEN cn.circular_flag = 'Y' THEN 15 ELSE 0 END AS circular_risk,
+            -- 거래 빈도 이상 리스크
+            CASE 
+                WHEN cn.txn_count > (
+                    SELECT AVG(cn3.txn_count) + 3 * STDDEV(cn3.txn_count)
+                    FROM counterparty_network cn3
+                ) THEN 10
+                ELSE 0
+            END AS frequency_risk,
+            cn.total_amount,
+            cn.txn_count
+        FROM counterparty_network cn
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 6] MODEL 절: 예측 및 시뮬레이션
+     *----------------------------------------------------------------------*/
+    forecast_model AS (
+        SELECT entity_id, period_month, period_amount, 
+               forecast_amount, lower_bound, upper_bound
+        FROM (
+            SELECT 
+                entity_id, 
+                period_month, 
+                period_amount,
+                ma_3m,
+                ma_6m,
+                volatility_6m,
+                trend_slope
+            FROM time_series_analysis
+            WHERE period_month >= ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), -6)
+        )
+        MODEL
+            PARTITION BY (entity_id)
+            DIMENSION BY (period_month)
+            MEASURES (
+                period_amount, 
+                ma_3m, 
+                ma_6m, 
+                volatility_6m, 
+                trend_slope,
+                CAST(NULL AS NUMBER) AS forecast_amount,
+                CAST(NULL AS NUMBER) AS lower_bound,
+                CAST(NULL AS NUMBER) AS upper_bound
+            )
+            RULES AUTOMATIC ORDER (
+                -- 다음 3개월 예측
+                forecast_amount[
+                    FOR period_month FROM ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), 1)
+                                      TO   ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), 3)
+                                      INCREMENT NUMTOYMINTERVAL(1, 'MONTH')
+                ] = ma_3m[CV() - NUMTOYMINTERVAL(1, 'MONTH')] 
+                    * (1 + trend_slope[CV() - NUMTOYMINTERVAL(1, 'MONTH')] / 100),
+                -- 신뢰구간 하한
+                lower_bound[
+                    FOR period_month FROM ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), 1)
+                                      TO   ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), 3)
+                                      INCREMENT NUMTOYMINTERVAL(1, 'MONTH')
+                ] = forecast_amount[CV()] 
+                    * (1 - 1.96 * NVL(volatility_6m[CV() - NUMTOYMINTERVAL(1, 'MONTH')], 0.1)),
+                -- 신뢰구간 상한
+                upper_bound[
+                    FOR period_month FROM ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), 1)
+                                      TO   ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), 3)
+                                      INCREMENT NUMTOYMINTERVAL(1, 'MONTH')
+                ] = forecast_amount[CV()] 
+                    * (1 + 1.96 * NVL(volatility_6m[CV() - NUMTOYMINTERVAL(1, 'MONTH')], 0.1))
+            )
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 7] PIVOT: 월별 거래 유형별 매트릭스
+     *----------------------------------------------------------------------*/
+    monthly_pivot AS (
+        SELECT *
+        FROM (
+            SELECT 
+                nt.debit_entity_id AS entity_id,
+                TO_CHAR(nt.txn_date, 'YYYY-MM') AS txn_month,
+                nt.txn_type,
+                nt.converted_amount
+            FROM normalized_transactions nt
+            WHERE nt.txn_date >= ADD_MONTHS(TO_DATE(:p_base_date, 'YYYY-MM-DD'), -12)
+        )
+        PIVOT (
+            SUM(converted_amount) AS amt,
+            COUNT(*) AS cnt
+            FOR txn_type IN (
+                'PAYMENT' AS pay,
+                'TRANSFER' AS xfer,
+                'FEE' AS fee,
+                'INTEREST' AS int,
+                'DIVIDEND' AS div,
+                'SETTLEMENT' AS stl,
+                'REFUND' AS ref,
+                'ADJUSTMENT' AS adj
+            )
+        )
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 8] 계층 쿼리: CONNECT BY를 사용한 거래 체인 추적
+     *----------------------------------------------------------------------*/
+    transaction_chain AS (
+        SELECT 
+            txn_id,
+            original_txn_id,
+            txn_type,
+            converted_amount,
+            LEVEL AS chain_depth,
+            SYS_CONNECT_BY_PATH(txn_id, ' -> ') AS chain_path,
+            CONNECT_BY_ROOT txn_id AS root_txn_id,
+            CONNECT_BY_ISLEAF AS is_terminal,
+            CONNECT_BY_ISCYCLE AS has_cycle,
+            PRIOR txn_id AS parent_txn_id,
+            PRIOR converted_amount AS parent_amount
+        FROM normalized_transactions
+        WHERE is_reversal = 'N'
+        CONNECT BY NOCYCLE 
+            PRIOR txn_id = original_txn_id
+            AND PRIOR debit_entity_id = credit_entity_id
+            AND LEVEL <= 10  -- 최대 깊이 제한
+        START WITH original_txn_id IS NULL
+            AND txn_type IN ('PAYMENT', 'TRANSFER')
+            AND converted_amount > 1000000
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 9] 이상 탐지: Z-Score 및 IQR 기반
+     *----------------------------------------------------------------------*/
+    anomaly_detection AS (
+        SELECT 
+            nt.txn_id,
+            nt.debit_entity_id,
+            nt.converted_amount,
+            nt.txn_date,
+            -- Z-Score 계산
+            (nt.converted_amount - AVG(nt.converted_amount) OVER w_entity) 
+                / NULLIF(STDDEV(nt.converted_amount) OVER w_entity, 0) AS z_score,
+            -- Modified Z-Score (MAD 기반)
+            0.6745 * (nt.converted_amount - MEDIAN(nt.converted_amount) OVER w_entity)
+                / NULLIF(
+                    MEDIAN(ABS(nt.converted_amount - MEDIAN(nt.converted_amount) OVER w_entity)) 
+                        OVER w_entity, 0
+                ) AS modified_z_score,
+            -- IQR 기반 이상치
+            CASE 
+                WHEN nt.converted_amount < 
+                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY nt.converted_amount) 
+                        OVER (PARTITION BY nt.debit_entity_id)
+                    - 1.5 * (
+                        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY nt.converted_amount) 
+                            OVER (PARTITION BY nt.debit_entity_id)
+                        - PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY nt.converted_amount) 
+                            OVER (PARTITION BY nt.debit_entity_id)
+                    )
+                THEN 'LOW_OUTLIER'
+                WHEN nt.converted_amount > 
+                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY nt.converted_amount) 
+                        OVER (PARTITION BY nt.debit_entity_id)
+                    + 1.5 * (
+                        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY nt.converted_amount) 
+                            OVER (PARTITION BY nt.debit_entity_id)
+                        - PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY nt.converted_amount) 
+                            OVER (PARTITION BY nt.debit_entity_id)
+                    )
+                THEN 'HIGH_OUTLIER'
+                ELSE 'NORMAL'
+            END AS iqr_status,
+            -- 시간 기반 이상 (비정규 시간 거래)
+            CASE 
+                WHEN TO_CHAR(nt.txn_date, 'DY', 'NLS_DATE_LANGUAGE=AMERICAN') IN ('SAT', 'SUN') 
+                    THEN 'WEEKEND'
+                WHEN TO_NUMBER(TO_CHAR(nt.txn_date, 'HH24')) NOT BETWEEN 9 AND 18 
+                    THEN 'OFFHOURS'
+                WHEN EXISTS (
+                    SELECT 1 FROM holidays h 
+                    WHERE h.holiday_date = TRUNC(nt.txn_date)
+                      AND h.country_code = SUBSTR(nt.booking_branch, 1, 2)
+                ) THEN 'HOLIDAY'
+                ELSE 'NORMAL'
+            END AS time_anomaly,
+            -- 속도 이상 (단시간 다량 거래)
+            COUNT(*) OVER (
+                PARTITION BY nt.debit_entity_id
+                ORDER BY nt.txn_date
+                RANGE BETWEEN INTERVAL '1' HOUR PRECEDING AND CURRENT ROW
+            ) AS txn_velocity_1h,
+            -- 금액 급변
+            nt.converted_amount / NULLIF(
+                LAG(nt.converted_amount, 1) OVER (
+                    PARTITION BY nt.debit_entity_id 
+                    ORDER BY nt.txn_date
+                ), 0
+            ) AS amount_change_ratio
+        FROM normalized_transactions nt
+        WINDOW w_entity AS (PARTITION BY nt.debit_entity_id)
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 10] 규정 준수 체크 (다중 조건 검증)
+     *----------------------------------------------------------------------*/
+    compliance_checks AS (
+        SELECT 
+            nt.txn_id,
+            nt.debit_entity_id,
+            nt.credit_entity_id,
+            nt.converted_amount,
+            -- AML 한도 체크
+            CASE 
+                WHEN nt.converted_amount >= 10000000 
+                     AND NOT EXISTS (
+                         SELECT 1 FROM aml_reports ar 
+                         WHERE ar.txn_id = nt.txn_id
+                     )
+                THEN 'AML_REPORT_MISSING'
+                ELSE NULL
+            END AS aml_check,
+            -- 승인 한도 체크
+            CASE 
+                WHEN nt.converted_amount > (
+                    SELECT NVL(al.single_txn_limit, 0) 
+                    FROM approval_limits al
+                    INNER JOIN user_roles ur ON al.role_id = ur.role_id
+                    WHERE ur.user_id = (
+                        SELECT created_by FROM transactions t2 WHERE t2.txn_id = nt.txn_id
+                    )
+                    AND ROWNUM = 1
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM approvals ap 
+                    WHERE ap.txn_id = nt.txn_id 
+                      AND ap.approval_status = 'APPROVED'
+                )
+                THEN 'APPROVAL_MISSING'
+                ELSE NULL
+            END AS approval_check,
+            -- 제재 대상 체크
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM sanctions_list sl
+                    WHERE (sl.entity_id = nt.debit_entity_id OR sl.entity_id = nt.credit_entity_id)
+                      AND sl.effective_date <= nt.txn_date
+                      AND (sl.expiry_date IS NULL OR sl.expiry_date > nt.txn_date)
+                )
+                THEN 'SANCTIONS_HIT'
+                ELSE NULL
+            END AS sanctions_check,
+            -- 거래 한도 초과 (일별/월별)
+            CASE 
+                WHEN (
+                    SELECT SUM(nt2.converted_amount) 
+                    FROM normalized_transactions nt2
+                    WHERE nt2.debit_entity_id = nt.debit_entity_id
+                      AND TRUNC(nt2.txn_date) = TRUNC(nt.txn_date)
+                ) > (
+                    SELECT el.daily_limit FROM entity_limits el 
+                    WHERE el.entity_id = nt.debit_entity_id
+                )
+                THEN 'DAILY_LIMIT_EXCEEDED'
+                WHEN (
+                    SELECT SUM(nt3.converted_amount) 
+                    FROM normalized_transactions nt3
+                    WHERE nt3.debit_entity_id = nt.debit_entity_id
+                      AND TRUNC(nt3.txn_date, 'MM') = TRUNC(nt.txn_date, 'MM')
+                ) > (
+                    SELECT el2.monthly_limit FROM entity_limits el2 
+                    WHERE el2.entity_id = nt.debit_entity_id
+                )
+                THEN 'MONTHLY_LIMIT_EXCEEDED'
+                ELSE NULL
+            END AS limit_check,
+            -- 중복 거래 체크
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM normalized_transactions nt4
+                    WHERE nt4.txn_id <> nt.txn_id
+                      AND nt4.debit_entity_id = nt.debit_entity_id
+                      AND nt4.credit_entity_id = nt.credit_entity_id
+                      AND ABS(nt4.converted_amount - nt.converted_amount) < 1
+                      AND ABS(nt4.txn_date - nt.txn_date) < 1/1440  -- 1분 이내
+                )
+                THEN 'POTENTIAL_DUPLICATE'
+                ELSE NULL
+            END AS duplicate_check
+        FROM normalized_transactions nt
+    ),
+    
+    /*----------------------------------------------------------------------
+     * [CTE 11] 최종 리스크 점수 통합
+     *----------------------------------------------------------------------*/
+    final_risk_aggregation AS (
+        SELECT 
+            oh.entity_id,
+            oh.entity_name,
+            oh.path AS entity_path,
+            oh.depth AS hierarchy_level,
+            oh.entity_type,
+            oh.root_id,
+            -- 기본 리스크 점수
+            NVL(rs.volume_risk, 0) + NVL(rs.volatility_risk, 0) 
+                + NVL(rs.concentration_risk, 0) + NVL(rs.circular_risk, 0) 
+                + NVL(rs.frequency_risk, 0) AS base_risk_score,
+            -- 이상 탐지 추가 점수
+            NVL((
+                SELECT SUM(
+                    CASE 
+                        WHEN ad.z_score > 3 OR ad.z_score < -3 THEN 15
+                        WHEN ad.modified_z_score > 3.5 THEN 10
+                        WHEN ad.iqr_status <> 'NORMAL' THEN 8
+                        WHEN ad.time_anomaly <> 'NORMAL' THEN 5
+                        WHEN ad.txn_velocity_1h > 10 THEN 12
+                        WHEN ad.amount_change_ratio > 10 OR ad.amount_change_ratio < 0.1 THEN 7
+                        ELSE 0
+                    END
+                )
+                FROM anomaly_detection ad
+                WHERE ad.debit_entity_id = oh.entity_id
+            ), 0) AS anomaly_risk_score,
+            -- 규정 위반 추가 점수
+            NVL((
+                SELECT SUM(
+                    CASE 
+                        WHEN cc.sanctions_check IS NOT NULL THEN 50
+                        WHEN cc.aml_check IS NOT NULL THEN 30
+                        WHEN cc.approval_check IS NOT NULL THEN 20
+                        WHEN cc.limit_check IS NOT NULL THEN 15
+                        WHEN cc.duplicate_check IS NOT NULL THEN 10
+                        ELSE 0
+                    END
+                )
+                FROM compliance_checks cc
+                WHERE cc.debit_entity_id = oh.entity_id
+            ), 0) AS compliance_risk_score,
+            -- 예측 대비 실제 편차
+            NVL((
+                SELECT AVG(ABS(tsa.period_amount - fm.forecast_amount) 
+                    / NULLIF(fm.forecast_amount, 0) * 100)
+                FROM time_series_analysis tsa
+                LEFT JOIN forecast_model fm 
+                    ON tsa.entity_id = fm.entity_id 
+                    AND tsa.period_month = fm.period_month
+                WHERE tsa.entity_id = oh.entity_id
+                  AND fm.forecast_amount IS NOT NULL
+            ), 0) AS forecast_deviation_pct,
+            -- 거래량/금액 요약
+            NVL(rs.total_amount, 0) AS total_transaction_amount,
+            NVL(rs.txn_count, 0) AS total_transaction_count,
+            -- 거래 체인 복잡도
+            NVL((
+                SELECT MAX(tc.chain_depth)
+                FROM transaction_chain tc
+                INNER JOIN normalized_transactions nt ON tc.txn_id = nt.txn_id
+                WHERE nt.debit_entity_id = oh.entity_id
+            ), 0) AS max_chain_depth,
+            -- PIVOT 데이터에서 거래 패턴
+            NVL(mp.pay_amt, 0) AS payment_total,
+            NVL(mp.xfer_amt, 0) AS transfer_total,
+            NVL(mp.stl_amt, 0) AS settlement_total
+        FROM org_hierarchy oh
+        LEFT JOIN risk_scoring rs ON oh.entity_id = rs.entity_id
+        LEFT JOIN monthly_pivot mp ON oh.entity_id = mp.entity_id
+        WHERE oh.is_leaf = 'Y'  -- 말단 엔티티만
+    )
+    /*==========================================================================
+     * 최종 SELECT: 리스크 등급 분류 및 알림 코드 생성
+     *==========================================================================*/
+    SELECT 
+        fra.entity_id || '-' || TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') AS settlement_id,
+        fra.entity_path,
+        fra.hierarchy_level,
+        fra.total_transaction_amount AS original_amount,
+        fra.total_transaction_amount * (1 - fra.forecast_deviation_pct / 100) AS converted_amount,
+        -- 최종 리스크 점수 (0-100 정규화)
+        LEAST(100, GREATEST(0, 
+            fra.base_risk_score 
+            + fra.anomaly_risk_score 
+            + fra.compliance_risk_score
+            + CASE WHEN fra.forecast_deviation_pct > 50 THEN 20 ELSE 0 END
+            + CASE WHEN fra.max_chain_depth > 5 THEN 15 ELSE 0 END
+        )) AS risk_score,
+        -- 이상 지수 (복합 계산)
+        ROUND(
+            POWER(
+                (fra.anomaly_risk_score / NULLIF(fra.base_risk_score + fra.anomaly_risk_score, 0))
+                * (fra.compliance_risk_score + 1)
+                * LOG(10, fra.total_transaction_count + 1)
+                * (1 + fra.forecast_deviation_pct / 100),
+                0.5
+            ),
+            4
+        ) AS anomaly_index,
+        -- 알림 코드 생성 (다중 조건 조합)
+        CASE 
+            WHEN fra.compliance_risk_score >= 50 THEN 'ALERT_CRITICAL'
+            WHEN fra.base_risk_score + fra.anomaly_risk_score >= :p_risk_threshold THEN 
+                CASE 
+                    WHEN fra.anomaly_risk_score > fra.base_risk_score THEN 'ALERT_ANOMALY'
+                    WHEN fra.forecast_deviation_pct > 30 THEN 'ALERT_FORECAST'
+                    ELSE 'ALERT_HIGH'
+                END
+            WHEN fra.base_risk_score + fra.anomaly_risk_score >= :p_risk_threshold * 0.7 THEN 'ALERT_MEDIUM'
+            WHEN fra.max_chain_depth > 5 OR fra.forecast_deviation_pct > 50 THEN 'ALERT_REVIEW'
+            ELSE 'NORMAL'
+        END AS alert_code
+    FROM final_risk_aggregation fra
+    WHERE fra.base_risk_score + fra.anomaly_risk_score + fra.compliance_risk_score > 0
+      OR fra.total_transaction_amount > 0
+    ORDER BY 
+        CASE 
+            WHEN fra.compliance_risk_score >= 50 THEN 1
+            WHEN fra.base_risk_score + fra.anomaly_risk_score >= :p_risk_threshold THEN 2
+            ELSE 3
+        END,
+        fra.base_risk_score + fra.anomaly_risk_score + fra.compliance_risk_score DESC,
+        fra.total_transaction_amount DESC;
+    
+    /*==========================================================================
+     * 커서 실행 및 결과 처리
+     *==========================================================================*/
+    
+    EXEC SQL OPEN main_cursor;
+    
+    fetch_count = 0;
+    while (1) {
+        EXEC SQL FETCH main_cursor INTO
+            :result.settlement_id,
+            :result.entity_path,
+            :result.hierarchy_level,
+            :result.original_amount,
+            :result.converted_amount,
+            :result.risk_score,
+            :result.anomaly_index,
+            :result.alert_code;
+        
+        if (sqlca.sqlcode == 1403) break;
+        if (sqlca.sqlcode != 0) {
+            printf("오류: %s\n", sqlca.sqlerrm.sqlerrmc);
+            break;
+        }
+        
+        fetch_count++;
+        
+        if (result.risk_score >= p_risk_threshold) {
+            printf("[%s] 리스크 점수: %.2f, 알림: %s\n",
+                   result.settlement_id,
+                   result.risk_score,
+                   result.alert_code);
+        }
+    }
+    
+    EXEC SQL CLOSE main_cursor;
+    
+    printf("\n총 %d건 처리 완료\n", fetch_count);
+    
+    EXEC SQL COMMIT WORK RELEASE;
+    
+    return 0;
+}
