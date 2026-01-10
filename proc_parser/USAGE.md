@@ -56,12 +56,30 @@ python main.py <input_dir> <output_dir>
 
 ## SQL 관계 플러그인
 
-SQL 요소 간의 논리적 관계를 감지합니다:
+SQL 요소 간의 논리적 관계를 감지합니다. **sql_extractor.plugins**에서 제공됩니다:
 
 - **CursorRelationshipPlugin**: DECLARE → OPEN → FETCH → CLOSE 커서 패턴
 - **DynamicSQLRelationshipPlugin**: PREPARE → EXECUTE 동적 SQL 패턴
 - **TransactionRelationshipPlugin**: SQL문 → COMMIT/ROLLBACK 트랜잭션 경계
 - **ArrayDMLRelationshipPlugin**: FOR 절 배열 DML 패턴
+
+## 플러그인 딕셔너리 구조
+
+ProCParser는 플러그인을 카테고리별 딕셔너리로 관리합니다:
+
+```python
+parser = ProCParser()
+print(parser.plugins.keys())
+# ['naming', 'code_element', 'sql_relationship', 'element_enricher', 'sql_transform']
+```
+
+| 카테고리 | 플러그인 | 위치 |
+|---------|---------|------|
+| `naming` | SnakeToCamelPlugin | proc_parser |
+| `code_element` | BamCallPlugin | proc_parser |
+| `sql_relationship` | Cursor, DynamicSQL, Transaction, ArrayDML | sql_extractor |
+| `element_enricher` | DocstringEnricherPlugin | proc_parser |
+| `sql_transform` | CommentRemovalPlugin | sql_extractor |
 
 ## 커스텀 플러그인 작성
 
@@ -124,3 +142,141 @@ class MyRelationshipPlugin(SQLRelationshipPlugin):
 ```json
 {"type": "sql", "sql_id": "sql_001", "sql_type": "SELECT", "normalized_sql": "SELECT * FROM users WHERE id = ?", "input_host_vars": [":user_id"], "output_host_vars": [":name", ":email"], "function": "get_user", "line_start": 45, "line_end": 48}
 ```
+
+---
+
+## Header Parser 모듈
+
+C 헤더 파일을 파싱하여 구조체/STP 정보를 추출합니다.
+
+### 기본 사용법
+
+```python
+from header_parser import HeaderParser
+
+parser = HeaderParser(
+    external_macros={"MAX_SIZE": 30},      # 매크로 값 주입
+    count_field_mapping={"outrec1": "total"}  # count 필드 수동 매핑
+)
+
+# 파일에서 파싱
+db_vars_info = parser.parse_file("sample.h")
+
+# 또는 내용 직접 파싱
+db_vars_info = parser.parse(header_content)
+```
+
+### 출력 구조
+
+```python
+{
+    "spaa010p_inrec1": {
+        "rfrnStrtDate": {
+            "dtype": "String",
+            "size": 9,
+            "decimal": 0,
+            "name": "rfrn_strt_date",
+            "description": "조회시작일자"
+        },
+        # ...
+    }
+}
+```
+
+---
+
+## OMM Generator 모듈
+
+db_vars_info를 OMM 파일로 변환합니다.
+
+```python
+from omm_generator import OMMGenerator
+
+generator = OMMGenerator(
+    base_package="com.example.dao.dto",
+    output_dir="./output/omm"
+)
+
+# 단일 생성
+content = generator.generate(db_vars_info["spaa010p_inrec1"], "spaa010p_inrec1")
+
+# 파일로 저장
+generator.write(content, "spaa010p_inrec1")
+
+# 전체 저장
+generator.write_all(db_vars_info)
+```
+
+### 출력 포맷
+
+```
+OMM com.example.dao.dto.Spaa010pInrec1
+< logicalName= "Spaa010pInrec1" description="Spaa010pInrec1" >
+{
+    String rfrnStrtDate < length = 9 description = "조회시작일자" > ;
+    BigDecimal aNxtSqno < length = 11 description = "다음일련번호" > ;
+}
+```
+
+---
+
+## DBIO Generator 모듈
+
+SQL 정보를 MyBatis XML로 변환합니다.
+
+```python
+from dbio_generator import DBIOGenerator
+
+generator = DBIOGenerator(
+    base_package="com.example.dao",
+    datasource="MainDS",
+    output_dir="./output/dbio"
+)
+
+sql_calls = [
+    {
+        "name": "selectAcntId",
+        "sql_type": "select",
+        "parsed_sql": "SELECT ACNT_ID FROM ...",
+        "input_vars": ["acntNoCryp"],
+        "output_vars": ["acntId"]
+    }
+]
+
+id_to_path_map = {
+    "selectAcntIdIn": "com.example.dto.SelectAcntIdIn",
+    "selectAcntIdOut": "com.example.dto.SelectAcntIdOut"
+}
+
+content = generator.generate(sql_calls, id_to_path_map, "SPAA0010Dao")
+generator.write(content, "SPAA0010Dao")
+```
+
+---
+
+## 공통 설정 (shared_config)
+
+타입 매핑을 중앙에서 관리합니다. 새 타입 추가 시 해당 파일만 수정:
+
+| 파일 | 내용 |
+|------|------|
+| `shared_config/type_mappings.py` | C→Java, STP 타입 매핑 |
+| `shared_config/sql_mappings.py` | SQL→MyBatis 태그 매핑 |
+| `shared_config/naming_rules.py` | 네이밍 규칙, count 패턴 |
+| `shared_config/logger.py` | Loguru 기반 로깅 설정 |
+
+### 타입 매핑 수정 예시
+
+```python
+# shared_config/type_mappings.py
+
+C_TO_JAVA_TYPE_MAP = {
+    "int": ("Integer", "INTEGER"),
+    "char": ("String", "VARCHAR"),
+    "long": ("BigDecimal", "NUMERIC"),
+    "double": ("BigDecimal", "DECIMAL"),
+    # 새 타입 추가
+    "my_type": ("MyJavaType", "MY_JDBC_TYPE"),
+}
+```
+

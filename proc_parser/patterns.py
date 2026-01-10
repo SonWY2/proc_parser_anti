@@ -21,13 +21,14 @@ PATTERN_SQL = re.compile(r'EXEC\s+SQL\s+(.*?);', re.DOTALL | re.IGNORECASE)
 # 캡처: BAMCALL(...) 내부의 인자
 PATTERN_BAMCALL = re.compile(r'BAMCALL\s*\((.*?)\);', re.DOTALL)
 
-# SQL 내의 호스트 변수: :var
+# SQL 내의 호스트 변수: :var 또는 :struct.member
 # 엣지 케이스 처리:
 # 1. 문자열 내부 매칭을 피하기 위한 부정형 후방 탐색 (단순화된 확인)
 # 2. 콜론 뒤에 유효한 식별자 확인
+# 3. 구조체 멤버 접근 지원 (예: :result.field_name)
 # 참고: 전체 문맥 인식 파서가 더 좋지만, 정규식으로 근사할 수 있습니다.
 # 여기서는 더 간단한 정규식을 사용하고 변환기 로직에서 다듬을 것입니다.
-PATTERN_HOST_VAR = re.compile(r':([a-zA-Z_]\w*)')
+PATTERN_HOST_VAR = re.compile(r':([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)')
 
 # 주석
 PATTERN_COMMENT_SINGLE = re.compile(r'//.*')

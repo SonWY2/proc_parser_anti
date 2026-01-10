@@ -7,7 +7,7 @@ SQL 문 -> COMMIT/ROLLBACK
 
 import re
 from typing import List, Dict, Optional
-from ..interfaces import SQLRelationshipPlugin
+from .base import SQLRelationshipPlugin
 
 
 class TransactionRelationshipPlugin(SQLRelationshipPlugin):

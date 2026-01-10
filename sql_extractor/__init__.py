@@ -89,6 +89,9 @@ from .transform_plugins import (
     DB2ToMySQLPlugin,
 )
 
+# proc_parser 호환 어댑터
+from .proc_parser_adapter import ProcParserSQLAdapter, get_proc_parser_adapter
+
 __all__ = [
     # 메인 클래스
     "SQLExtractor",
@@ -162,5 +165,9 @@ __all__ = [
     "DB2PaginationPlugin",
     "OracleToMySQLPlugin",
     "DB2ToMySQLPlugin",
+    
+    # proc_parser 호환 어댑터
+    "ProcParserSQLAdapter",
+    "get_proc_parser_adapter",
 ]
 

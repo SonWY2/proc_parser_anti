@@ -796,3 +796,101 @@ class MyPlugin(SQLTransformPlugin):
 
 pipeline.register(MyPlugin())
 ```
+
+---
+
+## SQL Relationship Plugins (sql_extractor.plugins)
+
+SQL 요소 간의 논리적 관계를 감지하는 플러그인입니다. **proc_parser에서도 사용됩니다.**
+
+### 사용법
+
+```python
+from sql_extractor.plugins import (
+    CursorRelationshipPlugin,
+    DynamicSQLRelationshipPlugin, 
+    TransactionRelationshipPlugin,
+    ArrayDMLRelationshipPlugin
+)
+
+# 플러그인 초기화
+cursor_plugin = CursorRelationshipPlugin()
+dynamic_plugin = DynamicSQLRelationshipPlugin()
+txn_plugin = TransactionRelationshipPlugin()
+array_plugin = ArrayDMLRelationshipPlugin()
+
+# SQL 요소에서 관계 추출
+sql_elements = [...]  # parse_file()에서 가져온 SQL 요소
+all_elements = [...]  # 전체 파싱 요소
+
+if cursor_plugin.can_handle(sql_elements):
+    relationships = cursor_plugin.extract_relationships(sql_elements, all_elements)
+    for rel in relationships:
+        print(f"{rel['relationship_type']}: {rel['sql_ids']}")
+```
+
+### 지원 플러그인
+
+| 플러그인 | 감지 패턴 | 메타데이터 |
+|---------|---------|----------|
+| `CursorRelationshipPlugin` | DECLARE → OPEN → FETCH → CLOSE | cursor_name, cursor_query, is_loop_based |
+| `DynamicSQLRelationshipPlugin` | PREPARE → EXECUTE → DEALLOCATE | statement_name, sql_source, reconstructed_sql |
+| `TransactionRelationshipPlugin` | SQL → COMMIT/ROLLBACK | is_commit, has_rollback, statement_count |
+| `ArrayDMLRelationshipPlugin` | FOR :size INSERT/UPDATE/DELETE | array_size_var, array_host_vars, dml_type |
+
+### 출력 형식
+
+```python
+{
+    'relationship_id': 'cursor_emp_cur_001',
+    'relationship_type': 'CURSOR',
+    'sql_ids': ['sql_001', 'sql_002', 'sql_003', 'sql_004'],
+    'metadata': {
+        'cursor_name': 'emp_cur',
+        'cursor_query': 'SELECT name, salary FROM employees WHERE dept = :dept_id',
+        'merged_sql': 'SELECT name, salary INTO :emp_name, :emp_salary FROM employees...',
+        'is_loop_based': True,
+        'all_input_vars': [':dept_id'],
+        'all_output_vars': [':emp_name', ':emp_salary'],
+        'total_fetches': 1
+    }
+}
+```
+
+---
+
+## Comment Removal Plugin
+
+SQL 정규화 시 주석을 제거하는 플러그인입니다.
+
+### 사용법
+
+```python
+from sql_extractor.transform_plugins import CommentRemovalPlugin, TransformPipeline
+
+pipeline = TransformPipeline()
+pipeline.register(CommentRemovalPlugin())
+
+result = pipeline.transform(
+    sql="SELECT * /* 주석 */ FROM users -- 라인 주석",
+    sql_type="select",
+    metadata={}
+)
+print(result.sql)  # SELECT * FROM users
+```
+
+### Oracle 힌트 보존
+
+기본적으로 Oracle 힌트 주석 (`/*+ ... */`)은 보존됩니다:
+
+```python
+# 힌트 보존 (기본)
+plugin = CommentRemovalPlugin(preserve_hints=True)
+
+# 힌트도 제거
+plugin = CommentRemovalPlugin(preserve_hints=False)
+# 또는
+from sql_extractor.transform_plugins import AggressiveCommentRemovalPlugin
+plugin = AggressiveCommentRemovalPlugin()
+```
+

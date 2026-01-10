@@ -1,0 +1,11 @@
+OMM sp.spa.frgn.dao.dto.SPAAE1012DaoIn
+< logicalName= "해외불공정모니터링 조치다중 Dao In" description="해외불공정모니터링 조치다중 Dao In"
+>
+{
+	String trdgDate < length = 8 description = "거래의 발생기준의 일자" > ;
+	BigDecimal prdtId < length = 19 description = "모든 상품에 대한 통합된 Product 상품ID" > ;
+	String bncd < length = 5 description = "지점의 지점 코드" > ;
+	BigDecimal acntId < length = 19 description = "마스터의 Account의 Unuque ID " > ;
+	String acntNo < length = 20 description = "고객에게 부여하는 계좌번호" > ;
+	String acntName < length = 90 description = "계좌 보유자의 고객명 또는 법인명           " > ;
+}

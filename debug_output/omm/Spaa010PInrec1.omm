@@ -1,0 +1,17 @@
+OMM sp.spa.frgn.dao.dto.Spaa010PInrec1
+< logicalName= "Spaa010PInrec1" description="Spaa010PInrec1"
+>
+{
+	String rfrnStrtDate < length = 9 description = "조회시작일자" > ;
+	String rfrnEndDate < length = 9 description = "조회종료일자" > ;
+	String shrtIscd < length = 7 description = "단축종목코드" > ;
+	String acntNo < length = 21 description = "계좌번호" > ;
+	String prftCntrEntyCode < length = 6 description = "실적점코드" > ;
+	String actnRsltCode < length = 9 description = "조치결과코드" > ;
+	String unfrEtraTypeCode < length = 6 description = "불공정적출유형코드" > ;
+	String aBrnhPrceYn < length = 9 description = "지점처리여부" > ;
+	String itIsusYn < length = 9 description = "IT종목여부" > ;
+	String isusShcd < length = 13 description = "종목단축코드" > ;
+	BigDecimal aNxtSqno < length = 9 description = "다음일련번호" > ;
+	String aHdofPrceYn < length = 9 description = "본사처리여부" > ;
+}

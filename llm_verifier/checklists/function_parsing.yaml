@@ -1,0 +1,36 @@
+name: Function Parsing Verification
+description: Pro*C 함수 파싱 결과 검증
+
+static_checks:
+  - id: required_fields
+    description: 모든 함수에 name, line_start, line_end 필드 존재
+    severity: error
+    
+  - id: line_range_valid
+    description: 모든 함수의 line_start <= line_end
+    severity: error
+
+llm_checks:
+  - id: all_functions_found
+    question: "원본 코드의 모든 함수가 추출되었나요?"
+    severity: error
+    
+  - id: signature_accurate
+    question: "함수 시그니처(반환타입, 파라미터)가 정확하게 파싱되었나요?"
+    severity: warning
+    
+  - id: body_complete
+    question: "함수 본문이 완전히 포함되었나요? (중괄호 매칭)"
+    severity: error
+    
+  - id: nested_functions
+    question: "중첩된 함수 정의가 올바르게 처리되었나요?"
+    severity: info
+    
+  - id: under_decomposition
+    question: "여러 함수가 하나로 합쳐져 있진 않나요?"
+    severity: error
+    
+  - id: over_decomposition
+    question: "하나의 함수가 여러 개로 분리되진 않았나요?"
+    severity: error

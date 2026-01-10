@@ -7,7 +7,7 @@ FOR :array_size INSERT/UPDATE/DELETE ...
 
 import re
 from typing import List, Dict, Optional
-from ..interfaces import SQLRelationshipPlugin
+from .base import SQLRelationshipPlugin
 
 
 class ArrayDMLRelationshipPlugin(SQLRelationshipPlugin):

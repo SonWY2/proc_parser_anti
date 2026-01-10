@@ -7,6 +7,7 @@ MyBatis향 SQL 변환을 위한 플러그인 시스템입니다.
 - SQLTransformPlugin: 변환 플러그인 기본 클래스
 - TransformPipeline: 플러그인 파이프라인 실행기
 - PaginationPlugin: 페이징 SQL 변환
+- CommentRemovalPlugin: 주석 제거
 """
 
 from .base import SQLTransformPlugin, TransformPipeline, TransformResult
@@ -22,6 +23,10 @@ from .dialect import (
     OracleToMySQLPlugin,
     DB2ToMySQLPlugin,
     MySQLToOraclePlugin,
+)
+from .comment_removal import (
+    CommentRemovalPlugin,
+    AggressiveCommentRemovalPlugin,
 )
 
 __all__ = [
@@ -42,4 +47,9 @@ __all__ = [
     "OracleToMySQLPlugin",
     "DB2ToMySQLPlugin",
     "MySQLToOraclePlugin",
+    
+    # 주석 제거 플러그인
+    "CommentRemovalPlugin",
+    "AggressiveCommentRemovalPlugin",
 ]
+

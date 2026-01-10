@@ -1,0 +1,36 @@
+name: Translation Merge Verification
+description: Java 코드 병합 결과 검증
+
+static_checks:
+  - id: java_class_exists
+    description: Java 클래스 정의 존재
+    severity: error
+    
+  - id: package_exists
+    description: 패키지 선언 존재
+    severity: warning
+
+llm_checks:
+  - id: all_methods_merged
+    question: "모든 메소드가 클래스에 병합되었나요?"
+    severity: error
+    
+  - id: import_statements
+    question: "필요한 import 문이 모두 포함되어 있나요?"
+    severity: warning
+    
+  - id: method_order
+    question: "메소드 호출 순서가 원본 Pro*C 실행 흐름과 일치하나요?"
+    severity: info
+    
+  - id: main_method
+    question: "main 메소드가 올바르게 생성되었나요?"
+    severity: warning
+    
+  - id: syntax_valid
+    question: "Java 구문 오류가 없나요? (괄호, 세미콜론 등)"
+    severity: error
+    
+  - id: duplicate_methods
+    question: "중복된 메소드 정의가 없나요?"
+    severity: error

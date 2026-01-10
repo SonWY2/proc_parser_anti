@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sp.spa.cbc.dao.SPAAcntInfoDao">
+<!--Generated 2024. 10. 24. 10:07:45-->
+<select id="selectAcntId" resultType="java.lang.String">&#13;
+SELECT ACNT_ID as acntId               
+FROM SID.IDO_A_UUA_ACNT
+WHERE TRIM(ACNT_NO_CRYP) = #{acntNoCryp, jdbcType=VARCHAR}&#13;
+</select>
+<select id="selectAcntNoCryp" resultType="java.lang.String">&#13;
+SELECT ACNT_NO_CRYP as acntNoCryp 
+FROM SID.IDO_A_UUA_ACNT  
+WHERE  ACNT_ID =  #{acntId, jdbcType=NUMERIC} &#13;
+</select>
+<select id="selectAcntOwnrId" resultType="java.lang.String">&#13;
+
+SELECT ACNT_OWNR_ID AS acntOwnrId
+  FROM SID.IDO_A_UUA_ACNT
+ WHERE ACNT_ID = #{acntId}&#13;
+</select>
+<select id="selectTrstBuyAcntId" resultType="java.lang.String">&#13;
+SELECT DISTINCT T2.TRST_BUY_ACNT_ID AS trstBuyAcntId    
+  FROM SID.IDO_A_AKB_ENTRS_ACCT T1
+ INNER JOIN SID.IDO_A_AKA_TRST_FUND T2
+    ON T1.TRST_FUND_PRDT_ID = T2.TRST_FUND_PRDT_ID
+ WHERE T1.TRST_MNGT_ACNT_ID = #{acntId}    &#13;
+</select>
+</mapper>

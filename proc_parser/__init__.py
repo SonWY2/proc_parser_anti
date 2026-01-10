@@ -39,16 +39,27 @@ from .patterns import (
     PATTERN_DECLARE_SECTION,
 )
 
-# 플러그인 re-export
+# Pro*C 전용 플러그인 re-export
 from .plugins import (
     NamingConventionPlugin,
     SnakeToCamelPlugin,
     BamCallPlugin,
-    CursorRelationshipPlugin,
-    DynamicSQLRelationshipPlugin,
-    TransactionRelationshipPlugin,
-    ArrayDMLRelationshipPlugin,
+    DocstringEnricherPlugin,
 )
+
+# SQL 관계 플러그인 (sql_extractor에서 import)
+try:
+    from sql_extractor.plugins import (
+        CursorRelationshipPlugin,
+        DynamicSQLRelationshipPlugin,
+        TransactionRelationshipPlugin,
+        ArrayDMLRelationshipPlugin,
+    )
+except ImportError:
+    CursorRelationshipPlugin = None
+    DynamicSQLRelationshipPlugin = None
+    TransactionRelationshipPlugin = None
+    ArrayDMLRelationshipPlugin = None
 
 __all__ = [
     # 메인 클래스
@@ -74,12 +85,16 @@ __all__ = [
     "PATTERN_ARRAY_DML",
     "PATTERN_DECLARE_SECTION",
     
-    # 플러그인
+    # Pro*C 전용 플러그인
     "NamingConventionPlugin",
     "SnakeToCamelPlugin",
     "BamCallPlugin",
+    "DocstringEnricherPlugin",
+    
+    # SQL 관계 플러그인 (sql_extractor에서)
     "CursorRelationshipPlugin",
     "DynamicSQLRelationshipPlugin",
     "TransactionRelationshipPlugin",
     "ArrayDMLRelationshipPlugin",
 ]
+

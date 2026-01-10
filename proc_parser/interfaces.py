@@ -57,6 +57,19 @@ class ParserPlugin(ABC):
         line_end = content.count('\n', 0, end_index) + 1
         
         return line_start, line_end
+    
+    def get_marker(self, element: Dict) -> Optional[str]:
+        """
+        디버그 파일 생성 시 사용할 마커 주석을 반환합니다.
+        
+        Args:
+            element: parse() 메서드가 반환한 요소 딕셔너리
+            
+        Returns:
+            주석 문자열 (예: "/* @BAMCALL_EXTRACTED: args */")
+            None을 반환하면 디버그 파일에서 이 요소를 마커로 치환하지 않습니다.
+        """
+        return None  # 기본값: 마커 생성 안함
 
 
 class SQLRelationshipPlugin(ABC):
@@ -117,3 +130,41 @@ class SQLRelationshipPlugin(ABC):
             포맷된 관계 ID (예: "cursor_emp_cursor_001")
         """
         return f"{relationship_type.lower()}_{identifier}_{counter:03d}"
+
+
+class ElementEnricherPlugin(ABC):
+    """
+    추출된 요소를 후처리하여 추가 정보를 삽입하는 플러그인 기본 클래스입니다.
+    
+    이 플러그인은 파싱이 완료된 후 실행되며, 개별 요소에 메타데이터를 추가하거나
+    요소의 내용을 보강하는 데 사용됩니다.
+    """
+    
+    @abstractmethod
+    def can_handle(self, element: Dict) -> bool:
+        """
+        이 플러그인이 주어진 요소를 처리할 수 있는지 확인합니다.
+        
+        Args:
+            element: 파서에서 추출한 요소 딕셔너리
+            
+        Returns:
+            처리할 수 있으면 True
+        """
+        pass
+    
+    @abstractmethod
+    def enrich(self, element: Dict, all_elements: List[Dict], content: str) -> Dict:
+        """
+        요소에 추가 정보를 삽입합니다.
+        
+        Args:
+            element: 보강할 요소 딕셔너리
+            all_elements: 모든 추출된 요소 목록 (참조용)
+            content: 원본 파일 내용
+            
+        Returns:
+            보강된 요소 딕셔너리 (원본을 수정하거나 새 객체 반환)
+        """
+        pass
+
