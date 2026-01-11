@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="sp.spa.cbc.dao.SPAAcntInfoDao">
-<!--Generated 2026. 01. 10. 11:57:43-->
+<!--Generated 2026. 01. 11. 21:12:31-->
 <select id="selectAcntId" parameterType="sp.spa.cbc.dao.dto.SelectAcntIdIn" resultType="java.lang.String">&#13;
 SELECT ACNT_ID as acntId FROM SID.IDO_A_UUA_ACNT WHERE TRIM(ACNT_NO_CRYP) = #{acntNoCryp, jdbcType=VARCHAR}&#13;
 </select>

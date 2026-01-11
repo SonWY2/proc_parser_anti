@@ -1,0 +1,2009 @@
+{
+  "source_file": "sample_input/enterprise_complex_sql.pc",
+  "metadata": {},
+  "nodes": {
+    "proc_var_SQL": {
+      "id": "proc_var_SQL",
+      "name": "SQL",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "EXEC",
+        "array_size": null,
+        "line_start": 17,
+        "line_end": 17,
+        "function": null,
+        "raw_content": "EXEC SQL"
+      }
+    },
+    "proc_var_sqlca": {
+      "id": "proc_var_sqlca",
+      "name": "sqlca",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "INCLUDE",
+        "array_size": null,
+        "line_start": 16,
+        "line_end": 16,
+        "function": null,
+        "raw_content": "INCLUDE sqlca;"
+      }
+    },
+    "proc_var_oraca": {
+      "id": "proc_var_oraca",
+      "name": "oraca",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "INCLUDE",
+        "array_size": null,
+        "line_start": 17,
+        "line_end": 17,
+        "function": null,
+        "raw_content": "INCLUDE oraca;"
+      }
+    },
+    "proc_var_p_base_date": {
+      "id": "proc_var_p_base_date",
+      "name": "p_base_date",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "char",
+        "array_size": null,
+        "line_start": 23,
+        "line_end": 23,
+        "function": null,
+        "raw_content": "char p_base_date[11];"
+      }
+    },
+    "proc_var_p_from_branch": {
+      "id": "proc_var_p_from_branch",
+      "name": "p_from_branch",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "char",
+        "array_size": null,
+        "line_start": 24,
+        "line_end": 24,
+        "function": null,
+        "raw_content": "char p_from_branch[10];"
+      }
+    },
+    "proc_var_p_to_branch": {
+      "id": "proc_var_p_to_branch",
+      "name": "p_to_branch",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "char",
+        "array_size": null,
+        "line_start": 25,
+        "line_end": 25,
+        "function": null,
+        "raw_content": "char p_to_branch[10];"
+      }
+    },
+    "proc_var_p_currency": {
+      "id": "proc_var_p_currency",
+      "name": "p_currency",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "char",
+        "array_size": null,
+        "line_start": 26,
+        "line_end": 26,
+        "function": null,
+        "raw_content": "char p_currency[4];"
+      }
+    },
+    "proc_var_p_risk_threshold": {
+      "id": "proc_var_p_risk_threshold",
+      "name": "p_risk_threshold",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "int",
+        "array_size": null,
+        "line_start": 30,
+        "line_end": 30,
+        "function": null,
+        "raw_content": "int p_risk_threshold;"
+      }
+    },
+    "proc_var_p_variance_limit": {
+      "id": "proc_var_p_variance_limit",
+      "name": "p_variance_limit",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "double",
+        "array_size": null,
+        "line_start": 31,
+        "line_end": 31,
+        "function": null,
+        "raw_content": "double p_variance_limit;"
+      }
+    },
+    "proc_var_result": {
+      "id": "proc_var_result",
+      "name": "result",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "result_t",
+        "array_size": null,
+        "line_start": 45,
+        "line_end": 45,
+        "function": null,
+        "raw_content": "result_t result;"
+      }
+    },
+    "proc_var_fetch_count": {
+      "id": "proc_var_fetch_count",
+      "name": "fetch_count",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "int",
+        "array_size": null,
+        "line_start": 46,
+        "line_end": 46,
+        "function": null,
+        "raw_content": "int fetch_count;"
+      }
+    },
+    "sql_host_in_sql_004_p_currency": {
+      "id": "sql_host_in_sql_004_p_currency",
+      "name": "p_currency",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_004",
+        "sql_type": "DECLARE",
+        "function": "declare_main_cursor",
+        "original_var": ":p_currency"
+      }
+    },
+    "sql_host_in_sql_004_p_base_date": {
+      "id": "sql_host_in_sql_004_p_base_date",
+      "name": "p_base_date",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_004",
+        "sql_type": "DECLARE",
+        "function": "declare_main_cursor",
+        "original_var": ":p_base_date"
+      }
+    },
+    "sql_host_in_sql_004_p_from_branch": {
+      "id": "sql_host_in_sql_004_p_from_branch",
+      "name": "p_from_branch",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_004",
+        "sql_type": "DECLARE",
+        "function": "declare_main_cursor",
+        "original_var": ":p_from_branch"
+      }
+    },
+    "sql_host_in_sql_004_p_to_branch": {
+      "id": "sql_host_in_sql_004_p_to_branch",
+      "name": "p_to_branch",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_004",
+        "sql_type": "DECLARE",
+        "function": "declare_main_cursor",
+        "original_var": ":p_to_branch"
+      }
+    },
+    "sql_host_in_sql_004_p_variance_limit": {
+      "id": "sql_host_in_sql_004_p_variance_limit",
+      "name": "p_variance_limit",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_004",
+        "sql_type": "DECLARE",
+        "function": "declare_main_cursor",
+        "original_var": ":p_variance_limit"
+      }
+    },
+    "sql_host_in_sql_004_p_risk_threshold": {
+      "id": "sql_host_in_sql_004_p_risk_threshold",
+      "name": "p_risk_threshold",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_004",
+        "sql_type": "DECLARE",
+        "function": "declare_main_cursor",
+        "original_var": ":p_risk_threshold"
+      }
+    },
+    "sql_host_out_sql_006_result.settlement_id": {
+      "id": "sql_host_out_sql_006_result.settlement_id",
+      "name": "result.settlement_id",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.settlement_id"
+      }
+    },
+    "sql_host_out_sql_006_result.entity_path": {
+      "id": "sql_host_out_sql_006_result.entity_path",
+      "name": "result.entity_path",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.entity_path"
+      }
+    },
+    "sql_host_out_sql_006_result.hierarchy_level": {
+      "id": "sql_host_out_sql_006_result.hierarchy_level",
+      "name": "result.hierarchy_level",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.hierarchy_level"
+      }
+    },
+    "sql_host_out_sql_006_result.original_amount": {
+      "id": "sql_host_out_sql_006_result.original_amount",
+      "name": "result.original_amount",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.original_amount"
+      }
+    },
+    "sql_host_out_sql_006_result.converted_amount": {
+      "id": "sql_host_out_sql_006_result.converted_amount",
+      "name": "result.converted_amount",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.converted_amount"
+      }
+    },
+    "sql_host_out_sql_006_result.risk_score": {
+      "id": "sql_host_out_sql_006_result.risk_score",
+      "name": "result.risk_score",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.risk_score"
+      }
+    },
+    "sql_host_out_sql_006_result.anomaly_index": {
+      "id": "sql_host_out_sql_006_result.anomaly_index",
+      "name": "result.anomaly_index",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.anomaly_index"
+      }
+    },
+    "sql_host_out_sql_006_result.alert_code": {
+      "id": "sql_host_out_sql_006_result.alert_code",
+      "name": "result.alert_code",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_006",
+        "sql_type": "FETCH",
+        "function": "process_results",
+        "original_var": ":result.alert_code"
+      }
+    },
+    "proc_var_is_valid": {
+      "id": "proc_var_is_valid",
+      "name": "is_valid",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "int",
+        "array_size": null,
+        "line_start": 943,
+        "line_end": 943,
+        "function": "validate_input_params",
+        "raw_content": "int is_valid = 1;"
+      }
+    },
+    "proc_var_log_timestamp": {
+      "id": "proc_var_log_timestamp",
+      "name": "log_timestamp",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "char",
+        "array_size": null,
+        "line_start": 1006,
+        "line_end": 1006,
+        "function": "log_execution_start",
+        "raw_content": "char log_timestamp[30];"
+      }
+    },
+    "proc_var_log_user": {
+      "id": "proc_var_log_user",
+      "name": "log_user",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "char",
+        "array_size": null,
+        "line_start": 1007,
+        "line_end": 1007,
+        "function": "log_execution_start",
+        "raw_content": "char log_user[50];"
+      }
+    },
+    "sql_host_out_sql_012_log_timestamp": {
+      "id": "sql_host_out_sql_012_log_timestamp",
+      "name": "log_timestamp",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_012",
+        "sql_type": "SELECT",
+        "function": "log_execution_start",
+        "original_var": ":log_timestamp"
+      }
+    },
+    "sql_host_out_sql_012_log_user": {
+      "id": "sql_host_out_sql_012_log_user",
+      "name": "log_user",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "output",
+        "sql_id": "sql_012",
+        "sql_type": "SELECT",
+        "function": "log_execution_start",
+        "original_var": ":log_user"
+      }
+    },
+    "sql_host_in_sql_013_log_user": {
+      "id": "sql_host_in_sql_013_log_user",
+      "name": "log_user",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_013",
+        "sql_type": "INSERT",
+        "function": "log_execution_start",
+        "original_var": ":log_user"
+      }
+    },
+    "sql_host_in_sql_013_p_base_date": {
+      "id": "sql_host_in_sql_013_p_base_date",
+      "name": "p_base_date",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_013",
+        "sql_type": "INSERT",
+        "function": "log_execution_start",
+        "original_var": ":p_base_date"
+      }
+    },
+    "sql_host_in_sql_013_p_from_branch": {
+      "id": "sql_host_in_sql_013_p_from_branch",
+      "name": "p_from_branch",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_013",
+        "sql_type": "INSERT",
+        "function": "log_execution_start",
+        "original_var": ":p_from_branch"
+      }
+    },
+    "sql_host_in_sql_013_p_to_branch": {
+      "id": "sql_host_in_sql_013_p_to_branch",
+      "name": "p_to_branch",
+      "node_type": "sql_host_var",
+      "source_module": "proc_parser",
+      "metadata": {
+        "direction": "input",
+        "sql_id": "sql_013",
+        "sql_type": "INSERT",
+        "function": "log_execution_start",
+        "original_var": ":p_to_branch"
+      }
+    },
+    "proc_var_result_count": {
+      "id": "proc_var_result_count",
+      "name": "result_count",
+      "node_type": "proc_variable",
+      "source_module": "proc_parser",
+      "metadata": {
+        "data_type": "int",
+        "array_size": null,
+        "line_start": 1038,
+        "line_end": 1038,
+        "function": "main",
+        "raw_content": "int result_count;"
+      }
+    },
+    "struct_field_spaa010p_inrec1_rfrnStrtDate": {
+      "id": "struct_field_spaa010p_inrec1_rfrnStrtDate",
+      "name": "rfrnStrtDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "rfrn_strt_date",
+        "org_name": "rfrn_strt_date",
+        "description": "조회시작일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_rfrnEndDate": {
+      "id": "struct_field_spaa010p_inrec1_rfrnEndDate",
+      "name": "rfrnEndDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "rfrn_end_date",
+        "org_name": "rfrn_end_date",
+        "description": "조회종료일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_shrtIscd": {
+      "id": "struct_field_spaa010p_inrec1_shrtIscd",
+      "name": "shrtIscd",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 7,
+        "original_name": "shrt_iscd",
+        "org_name": "shrt_iscd",
+        "description": "단축종목코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_acntNo": {
+      "id": "struct_field_spaa010p_inrec1_acntNo",
+      "name": "acntNo",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 21,
+        "original_name": "acnt_no",
+        "org_name": "acnt_no",
+        "description": "계좌번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_prftCntrEntyCode": {
+      "id": "struct_field_spaa010p_inrec1_prftCntrEntyCode",
+      "name": "prftCntrEntyCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 6,
+        "original_name": "prft_cntr_enty_code",
+        "org_name": "prft_cntr_enty_code",
+        "description": "실적점코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_actnRsltCode": {
+      "id": "struct_field_spaa010p_inrec1_actnRsltCode",
+      "name": "actnRsltCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "actn_rslt_code",
+        "org_name": "actn_rslt_code",
+        "description": "조치결과코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_unfrEtraTypeCode": {
+      "id": "struct_field_spaa010p_inrec1_unfrEtraTypeCode",
+      "name": "unfrEtraTypeCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 6,
+        "original_name": "unfr_etra_type_code",
+        "org_name": "unfr_etra_type_code",
+        "description": "불공정적출유형코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_aBrnhPrceYn": {
+      "id": "struct_field_spaa010p_inrec1_aBrnhPrceYn",
+      "name": "aBrnhPrceYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "a_brnh_prce_yn",
+        "org_name": "a_brnh_prce_yn",
+        "description": "지점처리여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_itIsusYn": {
+      "id": "struct_field_spaa010p_inrec1_itIsusYn",
+      "name": "itIsusYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "it_isus_yn",
+        "org_name": "it_isus_yn",
+        "description": "IT종목여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_isusShcd": {
+      "id": "struct_field_spaa010p_inrec1_isusShcd",
+      "name": "isusShcd",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 13,
+        "original_name": "isus_shcd",
+        "org_name": "isus_shcd",
+        "description": "종목단축코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_aNxtSqno": {
+      "id": "struct_field_spaa010p_inrec1_aNxtSqno",
+      "name": "aNxtSqno",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "a_nxt_sqno",
+        "org_name": "a_nxt_sqno",
+        "description": "다음일련번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_inrec1_aHdofPrceYn": {
+      "id": "struct_field_spaa010p_inrec1_aHdofPrceYn",
+      "name": "aHdofPrceYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_inrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "a_hdof_prce_yn",
+        "org_name": "a_hdof_prce_yn",
+        "description": "본사처리여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_in_t_inrec1": {
+      "id": "struct_field_spaa010p_in_t_inrec1",
+      "name": "inrec1",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_in_t",
+        "dtype": "Spaa010pInrec1",
+        "size": 9,
+        "original_name": "inrec1",
+        "org_name": "inrec1",
+        "description": "InRec1",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec3_aCont": {
+      "id": "struct_field_spaa010p_outrec3_aCont",
+      "name": "aCont",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec3",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "a_cont",
+        "org_name": "a_cont",
+        "description": "건수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec2_aNxtSqno": {
+      "id": "struct_field_spaa010p_outrec2_aNxtSqno",
+      "name": "aNxtSqno",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec2",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "a_nxt_sqno",
+        "org_name": "a_nxt_sqno",
+        "description": "다음일련번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_infmDate": {
+      "id": "struct_field_spaa010p_outrec1_infmDate",
+      "name": "infmDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "infm_date",
+        "org_name": "infm_date",
+        "description": "통보일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_prftCntrEntyName": {
+      "id": "struct_field_spaa010p_outrec1_prftCntrEntyName",
+      "name": "prftCntrEntyName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 61,
+        "original_name": "prft_cntr_enty_name",
+        "org_name": "prft_cntr_enty_name",
+        "description": "실적점명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_mnggBrnhEntyName": {
+      "id": "struct_field_spaa010p_outrec1_mnggBrnhEntyName",
+      "name": "mnggBrnhEntyName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 91,
+        "original_name": "mngg_brnh_enty_name",
+        "org_name": "mngg_brnh_enty_name",
+        "description": "관리점명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_acntId": {
+      "id": "struct_field_spaa010p_outrec1_acntId",
+      "name": "acntId",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "acnt_id",
+        "org_name": "acnt_id",
+        "description": "계좌ID",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_acntNo": {
+      "id": "struct_field_spaa010p_outrec1_acntNo",
+      "name": "acntNo",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 21,
+        "original_name": "acnt_no",
+        "org_name": "acnt_no",
+        "description": "계좌번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_crflAcntYn": {
+      "id": "struct_field_spaa010p_outrec1_crflAcntYn",
+      "name": "crflAcntYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "crfl_acnt_yn",
+        "org_name": "crfl_acnt_yn",
+        "description": "요주의계좌여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_otcpPmntYn": {
+      "id": "struct_field_spaa010p_outrec1_otcpPmntYn",
+      "name": "otcpPmntYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "otcp_pmnt_yn",
+        "org_name": "otcp_pmnt_yn",
+        "description": "타사납입여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_acntName": {
+      "id": "struct_field_spaa010p_outrec1_acntName",
+      "name": "acntName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 91,
+        "original_name": "acnt_name",
+        "org_name": "acnt_name",
+        "description": "계좌명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_rrnoCryp": {
+      "id": "struct_field_spaa010p_outrec1_rrnoCryp",
+      "name": "rrnoCryp",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 65,
+        "original_name": "rrno_cryp",
+        "org_name": "rrno_cryp",
+        "description": "주민등록번호암호문",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_empyName": {
+      "id": "struct_field_spaa010p_outrec1_empyName",
+      "name": "empyName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 31,
+        "original_name": "empy_name",
+        "org_name": "empy_name",
+        "description": "사원명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_acntMngrEmpyNo": {
+      "id": "struct_field_spaa010p_outrec1_acntMngrEmpyNo",
+      "name": "acntMngrEmpyNo",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 17,
+        "original_name": "acnt_mngr_empy_no",
+        "org_name": "acnt_mngr_empy_no",
+        "description": "계좌관리자사원번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_unfrEtraTypeCode": {
+      "id": "struct_field_spaa010p_outrec1_unfrEtraTypeCode",
+      "name": "unfrEtraTypeCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 6,
+        "original_name": "unfr_etra_type_code",
+        "org_name": "unfr_etra_type_code",
+        "description": "불공정적출유형코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_actnDmndAcntEtraTypeName": {
+      "id": "struct_field_spaa010p_outrec1_actnDmndAcntEtraTypeName",
+      "name": "actnDmndAcntEtraTypeName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 61,
+        "original_name": "actn_dmnd_acnt_etra_type_name",
+        "org_name": "actn_dmnd_acnt_etra_type_name",
+        "description": "조치요구계좌적출유형명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_ttddRptSectCode": {
+      "id": "struct_field_spaa010p_outrec1_ttddRptSectCode",
+      "name": "ttddRptSectCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "ttdd_rpt_sect_code",
+        "org_name": "ttdd_rpt_sect_code",
+        "description": "당일반복구분코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_ofrgSectName": {
+      "id": "struct_field_spaa010p_outrec1_ofrgSectName",
+      "name": "ofrgSectName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 26,
+        "original_name": "ofrg_sect_name",
+        "org_name": "ofrg_sect_name",
+        "description": "모집구분명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_infmYn": {
+      "id": "struct_field_spaa010p_outrec1_infmYn",
+      "name": "infmYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "infm_yn",
+        "org_name": "infm_yn",
+        "description": "통보여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_pastEtraCont": {
+      "id": "struct_field_spaa010p_outrec1_pastEtraCont",
+      "name": "pastEtraCont",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "past_etra_cont",
+        "org_name": "past_etra_cont",
+        "description": "과거적출건수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_rsltCont": {
+      "id": "struct_field_spaa010p_outrec1_rsltCont",
+      "name": "rsltCont",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "rslt_cont",
+        "org_name": "rslt_cont",
+        "description": "결과건수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_strtDate": {
+      "id": "struct_field_spaa010p_outrec1_strtDate",
+      "name": "strtDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "strt_date",
+        "org_name": "strt_date",
+        "description": "시작일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_endDate": {
+      "id": "struct_field_spaa010p_outrec1_endDate",
+      "name": "endDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "end_date",
+        "org_name": "end_date",
+        "description": "종료일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_mnggBrnhEntyCode": {
+      "id": "struct_field_spaa010p_outrec1_mnggBrnhEntyCode",
+      "name": "mnggBrnhEntyCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 6,
+        "original_name": "mngg_brnh_enty_code",
+        "org_name": "mngg_brnh_enty_code",
+        "description": "관리점코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_prftCntrEntyCode": {
+      "id": "struct_field_spaa010p_outrec1_prftCntrEntyCode",
+      "name": "prftCntrEntyCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 6,
+        "original_name": "prft_cntr_enty_code",
+        "org_name": "prft_cntr_enty_code",
+        "description": "실적점코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_unfrDetlEtraTypeCode": {
+      "id": "struct_field_spaa010p_outrec1_unfrDetlEtraTypeCode",
+      "name": "unfrDetlEtraTypeCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 4,
+        "original_name": "unfr_detl_etra_type_code",
+        "org_name": "unfr_detl_etra_type_code",
+        "description": "불공정세부적출유형코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_iscd": {
+      "id": "struct_field_spaa010p_outrec1_iscd",
+      "name": "iscd",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 13,
+        "original_name": "iscd",
+        "org_name": "iscd",
+        "description": "종목코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_isusName": {
+      "id": "struct_field_spaa010p_outrec1_isusName",
+      "name": "isusName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 151,
+        "original_name": "isus_name",
+        "org_name": "isus_name",
+        "description": "종목명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_unusIsusYn": {
+      "id": "struct_field_spaa010p_outrec1_unusIsusYn",
+      "name": "unusIsusYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "unus_isus_yn",
+        "org_name": "unus_isus_yn",
+        "description": "특이종목여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_dmCont": {
+      "id": "struct_field_spaa010p_outrec1_dmCont",
+      "name": "dmCont",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "dm_cont",
+        "org_name": "dm_cont",
+        "description": "DM건수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_actnRsltCode": {
+      "id": "struct_field_spaa010p_outrec1_actnRsltCode",
+      "name": "actnRsltCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "actn_rslt_code",
+        "org_name": "actn_rslt_code",
+        "description": "조치결과코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_mngnPerdCode": {
+      "id": "struct_field_spaa010p_outrec1_mngnPerdCode",
+      "name": "mngnPerdCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "mngn_perd_code",
+        "org_name": "mngn_perd_code",
+        "description": "관리기간코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_lastPrceDate": {
+      "id": "struct_field_spaa010p_outrec1_lastPrceDate",
+      "name": "lastPrceDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "last_prce_date",
+        "org_name": "last_prce_date",
+        "description": "최종처리일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_frstPrceDate": {
+      "id": "struct_field_spaa010p_outrec1_frstPrceDate",
+      "name": "frstPrceDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "frst_prce_date",
+        "org_name": "frst_prce_date",
+        "description": "최초처리일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_actnDate": {
+      "id": "struct_field_spaa010p_outrec1_actnDate",
+      "name": "actnDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "actn_date",
+        "org_name": "actn_date",
+        "description": "조치일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_oflnOrdrCont": {
+      "id": "struct_field_spaa010p_outrec1_oflnOrdrCont",
+      "name": "oflnOrdrCont",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "ofln_ordr_cont",
+        "org_name": "ofln_ordr_cont",
+        "description": "오프라인주문건수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_oflnCtraAmnt": {
+      "id": "struct_field_spaa010p_outrec1_oflnCtraAmnt",
+      "name": "oflnCtraAmnt",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "ofln_ctra_amnt",
+        "org_name": "ofln_ctra_amnt",
+        "description": "오프라인체결금액",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_unActnAcmlCont": {
+      "id": "struct_field_spaa010p_outrec1_unActnAcmlCont",
+      "name": "unActnAcmlCont",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "un_actn_acml_cont",
+        "org_name": "un_actn_acml_cont",
+        "description": "미조치누적건수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_pairRate": {
+      "id": "struct_field_spaa010p_outrec1_pairRate",
+      "name": "pairRate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "pair_rate",
+        "org_name": "pair_rate",
+        "description": "PAIR비율",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_pastActnDate": {
+      "id": "struct_field_spaa010p_outrec1_pastActnDate",
+      "name": "pastActnDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "past_actn_date",
+        "org_name": "past_actn_date",
+        "description": "과거조치일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_pastActnStepCode": {
+      "id": "struct_field_spaa010p_outrec1_pastActnStepCode",
+      "name": "pastActnStepCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "past_actn_step_code",
+        "org_name": "past_actn_step_code",
+        "description": "과거조치단계코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_trstPrdtTypeName": {
+      "id": "struct_field_spaa010p_outrec1_trstPrdtTypeName",
+      "name": "trstPrdtTypeName",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 61,
+        "original_name": "trst_prdt_type_name",
+        "org_name": "trst_prdt_type_name",
+        "description": "신탁상품유형명",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_pastActnAcntId": {
+      "id": "struct_field_spaa010p_outrec1_pastActnAcntId",
+      "name": "pastActnAcntId",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "past_actn_acnt_id",
+        "org_name": "past_actn_acnt_id",
+        "description": "과거조치계좌ID",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_pastBrnhActnStepCode": {
+      "id": "struct_field_spaa010p_outrec1_pastBrnhActnStepCode",
+      "name": "pastBrnhActnStepCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "past_brnh_actn_step_code",
+        "org_name": "past_brnh_actn_step_code",
+        "description": "과거지점조치단계코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_etraActnCtnt": {
+      "id": "struct_field_spaa010p_outrec1_etraActnCtnt",
+      "name": "etraActnCtnt",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 31,
+        "original_name": "etra_actn_ctnt",
+        "org_name": "etra_actn_ctnt",
+        "description": "적출조치내용",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_gropSqno": {
+      "id": "struct_field_spaa010p_outrec1_gropSqno",
+      "name": "gropSqno",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "Integer",
+        "size": 9,
+        "original_name": "grop_sqno",
+        "org_name": "grop_sqno",
+        "description": "그룹일련번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_pastPrvnActnDmndCont": {
+      "id": "struct_field_spaa010p_outrec1_pastPrvnActnDmndCont",
+      "name": "pastPrvnActnDmndCont",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "past_prvn_actn_dmnd_cont",
+        "org_name": "past_prvn_actn_dmnd_cont",
+        "description": "과거예방조치요구건수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_prceRjctResnCtnt": {
+      "id": "struct_field_spaa010p_outrec1_prceRjctResnCtnt",
+      "name": "prceRjctResnCtnt",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 151,
+        "original_name": "prce_rjct_resn_ctnt",
+        "org_name": "prce_rjct_resn_ctnt",
+        "description": "처리거부사유내용",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_plrlStdgAgntYn": {
+      "id": "struct_field_spaa010p_outrec1_plrlStdgAgntYn",
+      "name": "plrlStdgAgntYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "plrl_stdg_agnt_yn",
+        "org_name": "plrl_stdg_agnt_yn",
+        "description": "복수상임대리인여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_rprgRgsnYn": {
+      "id": "struct_field_spaa010p_outrec1_rprgRgsnYn",
+      "name": "rprgRgsnYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "rprg_rgsn_yn",
+        "org_name": "rprg_rgsn_yn",
+        "description": "보고등록여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_etraCnt": {
+      "id": "struct_field_spaa010p_outrec1_etraCnt",
+      "name": "etraCnt",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "Integer",
+        "size": 9,
+        "original_name": "etra_cnt",
+        "org_name": "etra_cnt",
+        "description": "적출횟수",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_etcPrceDate": {
+      "id": "struct_field_spaa010p_outrec1_etcPrceDate",
+      "name": "etcPrceDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "etc_prce_date",
+        "org_name": "etc_prce_date",
+        "description": "기타처리일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_adrvAppnSectCode": {
+      "id": "struct_field_spaa010p_outrec1_adrvAppnSectCode",
+      "name": "adrvAppnSectCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "adrv_appn_sect_code",
+        "org_name": "adrv_appn_sect_code",
+        "description": "감리지정구분코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_etraDate": {
+      "id": "struct_field_spaa010p_outrec1_etraDate",
+      "name": "etraDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "etra_date",
+        "org_name": "etra_date",
+        "description": "적출일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_acntHoldYn": {
+      "id": "struct_field_spaa010p_outrec1_acntHoldYn",
+      "name": "acntHoldYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "acnt_hold_yn",
+        "org_name": "acnt_hold_yn",
+        "description": "계좌보유여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_tmprAcntNo": {
+      "id": "struct_field_spaa010p_outrec1_tmprAcntNo",
+      "name": "tmprAcntNo",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 21,
+        "original_name": "tmpr_acnt_no",
+        "org_name": "tmpr_acnt_no",
+        "description": "임시계좌번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_aSeqNo": {
+      "id": "struct_field_spaa010p_outrec1_aSeqNo",
+      "name": "aSeqNo",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "BigDecimal",
+        "size": 9,
+        "original_name": "a_seq_no",
+        "org_name": "a_seq_no",
+        "description": "일련번호",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_trdgDate": {
+      "id": "struct_field_spaa010p_outrec1_trdgDate",
+      "name": "trdgDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "trdg_date",
+        "org_name": "trdg_date",
+        "description": "거래일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_fkrqStnrSectCode": {
+      "id": "struct_field_spaa010p_outrec1_fkrqStnrSectCode",
+      "name": "fkrqStnrSectCode",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "fkrq_stnr_sect_code",
+        "org_name": "fkrq_stnr_sect_code",
+        "description": "허수기준구분코드",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_smprYn": {
+      "id": "struct_field_spaa010p_outrec1_smprYn",
+      "name": "smprYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "smpr_yn",
+        "org_name": "smpr_yn",
+        "description": "동일인여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_otcpAcntOpngDate": {
+      "id": "struct_field_spaa010p_outrec1_otcpAcntOpngDate",
+      "name": "otcpAcntOpngDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "otcp_acnt_opng_date",
+        "org_name": "otcp_acnt_opng_date",
+        "description": "타사계좌개설일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_acntActnDate": {
+      "id": "struct_field_spaa010p_outrec1_acntActnDate",
+      "name": "acntActnDate",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "acnt_actn_date",
+        "org_name": "acnt_actn_date",
+        "description": "계좌조치일자",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_ctxtCtnt": {
+      "id": "struct_field_spaa010p_outrec1_ctxtCtnt",
+      "name": "ctxtCtnt",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 51,
+        "original_name": "ctxt_ctnt",
+        "org_name": "ctxt_ctnt",
+        "description": "등록사유내용",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_mntnYn": {
+      "id": "struct_field_spaa010p_outrec1_mntnYn",
+      "name": "mntnYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "mntn_yn",
+        "org_name": "mntn_yn",
+        "description": "모니터링여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_clprCncrFocsDlngYn": {
+      "id": "struct_field_spaa010p_outrec1_clprCncrFocsDlngYn",
+      "name": "clprCncrFocsDlngYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "clpr_cncr_focs_dlng_yn",
+        "org_name": "clpr_cncr_focs_dlng_yn",
+        "description": "종가관여집중매매여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_outrec1_aOdnrMntnTrpnYn": {
+      "id": "struct_field_spaa010p_outrec1_aOdnrMntnTrpnYn",
+      "name": "aOdnrMntnTrpnYn",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_outrec1",
+        "dtype": "String",
+        "size": 9,
+        "original_name": "a_odnr_mntn_trpn_yn",
+        "org_name": "a_odnr_mntn_trpn_yn",
+        "description": "상시모니터링대상자여부",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_out_t_outrec1Count": {
+      "id": "struct_field_spaa010p_out_t_outrec1Count",
+      "name": "outrec1Count",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_out_t",
+        "dtype": "Integer",
+        "size": 9,
+        "original_name": "outrec1_count",
+        "org_name": "outrec1_count",
+        "description": "OutRec1_count",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_out_t_outrec1": {
+      "id": "struct_field_spaa010p_out_t_outrec1",
+      "name": "outrec1",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_out_t",
+        "dtype": "Spaa010pOutrec1",
+        "size": 30,
+        "original_name": "outrec1",
+        "org_name": "outrec1",
+        "description": "OutRec1",
+        "arraySize": 30,
+        "arrayReference": "outrec1Count"
+      }
+    },
+    "struct_field_spaa010p_out_t_outrec2": {
+      "id": "struct_field_spaa010p_out_t_outrec2",
+      "name": "outrec2",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_out_t",
+        "dtype": "Spaa010pOutrec2",
+        "size": 9,
+        "original_name": "outrec2",
+        "org_name": "outrec2",
+        "description": "OutRec2",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "struct_field_spaa010p_out_t_outrec3": {
+      "id": "struct_field_spaa010p_out_t_outrec3",
+      "name": "outrec3",
+      "node_type": "struct_field",
+      "source_module": "header_parser",
+      "metadata": {
+        "struct_name": "spaa010p_out_t",
+        "dtype": "Spaa010pOutrec3",
+        "size": 19,
+        "original_name": "outrec3",
+        "org_name": "outrec3",
+        "description": "OutRec3",
+        "arraySize": null,
+        "arrayReference": null
+      }
+    },
+    "mybatis_param_SPAAcntInfoDao_selectAcntId_acntNoCryp": {
+      "id": "mybatis_param_SPAAcntInfoDao_selectAcntId_acntNoCryp",
+      "name": "acntNoCryp",
+      "node_type": "mybatis_param",
+      "source_module": "dbio_generator",
+      "metadata": {
+        "dao_name": "SPAAcntInfoDao",
+        "sql_name": "selectAcntId",
+        "direction": "input",
+        "mybatis_format": "#{acntNoCryp}"
+      }
+    },
+    "mybatis_param_SPAAcntInfoDao_selectAcntId_acntId": {
+      "id": "mybatis_param_SPAAcntInfoDao_selectAcntId_acntId",
+      "name": "acntId",
+      "node_type": "mybatis_param",
+      "source_module": "dbio_generator",
+      "metadata": {
+        "dao_name": "SPAAcntInfoDao",
+        "sql_name": "selectAcntId",
+        "direction": "output"
+      }
+    },
+    "mybatis_param_SPAAcntInfoDao_selectAcntNoCryp_acntId": {
+      "id": "mybatis_param_SPAAcntInfoDao_selectAcntNoCryp_acntId",
+      "name": "acntId",
+      "node_type": "mybatis_param",
+      "source_module": "dbio_generator",
+      "metadata": {
+        "dao_name": "SPAAcntInfoDao",
+        "sql_name": "selectAcntNoCryp",
+        "direction": "input",
+        "mybatis_format": "#{acntId}"
+      }
+    },
+    "mybatis_param_SPAAcntInfoDao_selectAcntNoCryp_acntNoCryp": {
+      "id": "mybatis_param_SPAAcntInfoDao_selectAcntNoCryp_acntNoCryp",
+      "name": "acntNoCryp",
+      "node_type": "mybatis_param",
+      "source_module": "dbio_generator",
+      "metadata": {
+        "dao_name": "SPAAcntInfoDao",
+        "sql_name": "selectAcntNoCryp",
+        "direction": "output"
+      }
+    }
+  },
+  "links": [
+    {
+      "source_id": "proc_var_p_currency",
+      "target_id": "sql_host_in_sql_004_p_currency",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_base_date",
+      "target_id": "sql_host_in_sql_004_p_base_date",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_from_branch",
+      "target_id": "sql_host_in_sql_004_p_from_branch",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_to_branch",
+      "target_id": "sql_host_in_sql_004_p_to_branch",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_variance_limit",
+      "target_id": "sql_host_in_sql_004_p_variance_limit",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_risk_threshold",
+      "target_id": "sql_host_in_sql_004_p_risk_threshold",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.settlement_id",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.entity_path",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.hierarchy_level",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.original_amount",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.converted_amount",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.risk_score",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.anomaly_index",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_result",
+      "target_id": "sql_host_out_sql_006_result.alert_code",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_log_timestamp",
+      "target_id": "sql_host_out_sql_012_log_timestamp",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_log_user",
+      "target_id": "sql_host_out_sql_012_log_user",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_log_user",
+      "target_id": "sql_host_in_sql_013_log_user",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_base_date",
+      "target_id": "sql_host_in_sql_013_p_base_date",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_from_branch",
+      "target_id": "sql_host_in_sql_013_p_from_branch",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    },
+    {
+      "source_id": "proc_var_p_to_branch",
+      "target_id": "sql_host_in_sql_013_p_to_branch",
+      "link_type": "used_in",
+      "confidence": 1.0,
+      "transformations": [],
+      "metadata": {}
+    }
+  ],
+  "summary": {
+    "total_nodes": 121,
+    "total_links": 20,
+    "nodes_by_type": {
+      "proc_variable": 15,
+      "sql_host_var": 20,
+      "struct_field": 82,
+      "mybatis_param": 4
+    },
+    "links_by_type": {
+      "used_in": 20
+    }
+  }
+}
