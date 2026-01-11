@@ -18,3 +18,4 @@ proc_parser.legacy/plugins/docstring_enricher.py
 proc_parser.legacy/plugins/dynamic_sql_relationship.py
 proc_parser.legacy/plugins/naming_convention.py
 proc_parser.legacy/plugins/transaction_relationship.py
+.db.env

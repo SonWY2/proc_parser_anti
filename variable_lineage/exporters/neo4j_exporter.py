@@ -11,10 +11,51 @@ Neo4j 드라이버를 통해 직접 export합니다.
 - java_variable → JavaVariable
 - omm_field → OMMField
 - mybatis_param → DBIOQuery 관계
+
+연결 설정:
+    .db.env 파일에 Neo4j 연결 정보를 설정하면 자동 연결됩니다.
+    NEO4J_URI=bolt://localhost:7687
+    NEO4J_USER=neo4j
+    NEO4J_PASSWORD=password
+    NEO4J_DATABASE=neo4j
 """
 
+import os
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from ..types import LineageGraph, LineageNode, LineageLink, NodeType, LinkType
+
+
+def load_db_env(env_file: str = None) -> Dict[str, str]:
+    """
+    .db.env 파일에서 Neo4j 연결 정보 로드
+    
+    Args:
+        env_file: .db.env 파일 경로 (기본: 프로젝트 루트)
+        
+    Returns:
+        환경 변수 딕셔너리
+    """
+    if env_file is None:
+        # 프로젝트 루트에서 .db.env 찾기
+        current = Path(__file__).parent
+        for _ in range(5):  # 최대 5단계 상위까지 검색
+            env_path = current / '.db.env'
+            if env_path.exists():
+                env_file = str(env_path)
+                break
+            current = current.parent
+    
+    config = {}
+    if env_file and os.path.exists(env_file):
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    config[key.strip()] = value.strip()
+    
+    return config
 
 
 # NodeType → Neo4j Label 매핑
@@ -59,16 +100,18 @@ class Neo4jExporter:
     LineageGraph를 Neo4j로 export하는 클래스
     
     Usage:
+        # 1. Cypher 파일 생성
         exporter = Neo4jExporter()
-        
-        # Cypher 쿼리 생성
-        cypher = exporter.to_cypher(graph)
-        
-        # 파일로 저장
         exporter.save_cypher(graph, "output.cypher")
         
-        # Neo4j driver로 직접 export (선택)
-        exporter.export_to_driver(graph, driver)
+        # 2. 자동 연결 (.db.env 사용)
+        exporter = Neo4jExporter.from_env()
+        exporter.export_auto(graph)
+        
+        # 3. 직접 연결
+        exporter = Neo4jExporter()
+        exporter.connect("bolt://localhost:7687", "neo4j", "password")
+        exporter.export_auto(graph)
     """
     
     def __init__(self, program_name: str = "UnknownProgram"):
@@ -77,6 +120,210 @@ class Neo4jExporter:
             program_name: Program 노드 이름 (루트 노드)
         """
         self.program_name = program_name
+        self.driver = None
+        self.database = "neo4j"
+    
+    @classmethod
+    def from_env(cls, program_name: str = "UnknownProgram", env_file: str = None) -> 'Neo4jExporter':
+        """
+        .db.env 파일에서 설정을 로드하여 인스턴스 생성 및 연결
+        
+        Args:
+            program_name: Program 노드 이름
+            env_file: .db.env 파일 경로
+            
+        Returns:
+            연결된 Neo4jExporter 인스턴스
+        """
+        config = load_db_env(env_file)
+        exporter = cls(program_name)
+        
+        if config.get('NEO4J_URI'):
+            exporter.connect(
+                uri=config.get('NEO4J_URI', 'bolt://localhost:7687'),
+                user=config.get('NEO4J_USER', 'neo4j'),
+                password=config.get('NEO4J_PASSWORD', ''),
+                database=config.get('NEO4J_DATABASE', 'neo4j')
+            )
+        
+        return exporter
+    
+    def connect(self, uri: str, user: str, password: str, database: str = "neo4j") -> bool:
+        """
+        Neo4j 데이터베이스에 연결
+        
+        Args:
+            uri: Neo4j Bolt URI (e.g., bolt://localhost:7687)
+            user: 사용자명
+            password: 비밀번호
+            database: 데이터베이스명
+            
+        Returns:
+            연결 성공 여부
+        """
+        try:
+            from neo4j import GraphDatabase
+            self.driver = GraphDatabase.driver(uri, auth=(user, password))
+            self.database = database
+            # 연결 테스트
+            with self.driver.session(database=database) as session:
+                session.run("RETURN 1")
+            return True
+        except ImportError:
+            print("Warning: neo4j 패키지가 설치되지 않았습니다. pip install neo4j")
+            return False
+        except Exception as e:
+            print(f"Neo4j 연결 실패: {e}")
+            return False
+    
+    def is_connected(self) -> bool:
+        """연결 상태 확인"""
+        return self.driver is not None
+    
+    def close(self):
+        """연결 종료"""
+        if self.driver:
+            self.driver.close()
+            self.driver = None
+    
+    def create_indexes(self) -> int:
+        """
+        Neo4j에 인덱스 생성 (insert 성능 최적화)
+        
+        각 노드 타입의 id, name 필드에 인덱스를 생성합니다.
+        
+        Returns:
+            생성된 인덱스 수
+        """
+        if not self.is_connected():
+            raise RuntimeError("Neo4j에 연결되지 않았습니다.")
+        
+        indexes_created = 0
+        
+        # 노드 라벨별 인덱스 생성
+        index_statements = self.get_index_cypher()
+        
+        with self.driver.session(database=self.database) as session:
+            for stmt in index_statements:
+                try:
+                    session.run(stmt)
+                    indexes_created += 1
+                except Exception as e:
+                    # 이미 존재하는 인덱스는 무시
+                    if "already exists" not in str(e).lower():
+                        print(f"인덱스 생성 경고: {e}")
+        
+        return indexes_created
+    
+    @staticmethod
+    def get_index_cypher() -> List[str]:
+        """
+        인덱스 생성용 Cypher 문 반환
+        
+        Returns:
+            Cypher CREATE INDEX 문 리스트
+        """
+        statements = []
+        
+        # 모든 노드 라벨에 대해 id 인덱스 생성
+        for label in NODE_TYPE_TO_LABEL.values():
+            # id 필드 인덱스 (MERGE에서 사용)
+            statements.append(
+                f"CREATE INDEX idx_{label.lower()}_id IF NOT EXISTS FOR (n:{label}) ON (n.id)"
+            )
+            # name 필드 인덱스 (검색용)
+            statements.append(
+                f"CREATE INDEX idx_{label.lower()}_name IF NOT EXISTS FOR (n:{label}) ON (n.name)"
+            )
+        
+        # Program 노드 인덱스
+        statements.append(
+            "CREATE INDEX idx_program_name IF NOT EXISTS FOR (n:Program) ON (n.name)"
+        )
+        
+        # 복합 인덱스 (자주 조회되는 패턴)
+        statements.extend([
+            "CREATE INDEX idx_procvariable_datatype IF NOT EXISTS FOR (n:ProCVariable) ON (n.data_type)",
+            "CREATE INDEX idx_function_linestart IF NOT EXISTS FOR (n:Function) ON (n.line_start)",
+            "CREATE INDEX idx_headerfile_system IF NOT EXISTS FOR (n:HeaderFile) ON (n.is_system)",
+        ])
+        
+        return statements
+    
+    def create_constraints(self) -> int:
+        """
+        Neo4j에 유니크 제약조건 생성
+        
+        Returns:
+            생성된 제약조건 수
+        """
+        if not self.is_connected():
+            raise RuntimeError("Neo4j에 연결되지 않았습니다.")
+        
+        constraints_created = 0
+        constraint_statements = self.get_constraint_cypher()
+        
+        with self.driver.session(database=self.database) as session:
+            for stmt in constraint_statements:
+                try:
+                    session.run(stmt)
+                    constraints_created += 1
+                except Exception as e:
+                    if "already exists" not in str(e).lower():
+                        print(f"제약조건 생성 경고: {e}")
+        
+        return constraints_created
+    
+    @staticmethod
+    def get_constraint_cypher() -> List[str]:
+        """
+        유니크 제약조건 생성용 Cypher 문 반환
+        
+        Returns:
+            Cypher CREATE CONSTRAINT 문 리스트
+        """
+        statements = []
+        
+        # 각 노드 라벨에 대해 id 유니크 제약조건
+        for label in NODE_TYPE_TO_LABEL.values():
+            statements.append(
+                f"CREATE CONSTRAINT uniq_{label.lower()}_id IF NOT EXISTS FOR (n:{label}) REQUIRE n.id IS UNIQUE"
+            )
+        
+        # Program 노드 유니크 제약조건
+        statements.append(
+            "CREATE CONSTRAINT uniq_program_name IF NOT EXISTS FOR (n:Program) REQUIRE n.name IS UNIQUE"
+        )
+        
+        return statements
+    
+    def setup_schema(self) -> Dict[str, int]:
+        """
+        Neo4j 스키마 설정 (인덱스 + 제약조건)
+        
+        export 전에 한 번 호출하면 insert 성능이 크게 향상됩니다.
+        
+        Returns:
+            {'indexes': int, 'constraints': int}
+        """
+        return {
+            'indexes': self.create_indexes(),
+            'constraints': self.create_constraints()
+        }
+    
+    def export_auto(self, graph: LineageGraph) -> Dict[str, int]:
+        """
+        연결된 Neo4j에 자동 export
+        
+        Args:
+            graph: LineageGraph 객체
+            
+        Returns:
+            {'nodes_created': int, 'relationships_created': int}
+        """
+        if not self.is_connected():
+            raise RuntimeError("Neo4j에 연결되지 않았습니다. connect() 또는 from_env()를 사용하세요.")
+        return self.export_to_driver(graph, self.driver, self.database)
     
     def to_cypher(self, graph: LineageGraph, include_program: bool = True) -> str:
         """
