@@ -132,37 +132,72 @@ class ProCParser:
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             content = f.read()
         
-        # 외부 매크로로 매크로 테이블 초기화
+        # 기본 상태 초기화
         macro_table = dict(external_macros) if external_macros else {}
-            
         elements = []
-        
-        # Tree-sitter의 구문 오류를 방지하기 위해 Pro*C 구문을 공백으로 처리한
-        # C 파싱용 콘텐츠 버전을 생성합니다.
         c_parsing_content = list(content)
-        
-        # 알 수 없는 요소 감지를 위해 커버된 영역 추적
-        # Boolean 리스트, 커버된 경우 True
         covered_map = [False] * len(content)
         
-        def mark_covered(start, end):
-            for i in range(start, end):
-                covered_map[i] = True
-        
-        def blank_out(start, end):
-            for i in range(start, end):
-                if c_parsing_content[i] != '\n':
-                    c_parsing_content[i] = ' '
-            mark_covered(start, end)
-
-        # 행/열을 인덱스로 변환하는 헬퍼 (미리 계산)
+        # 행/열 인덱스 계산
         line_indices = [0]
         for i, char in enumerate(content):
             if char == '\n':
                 line_indices.append(i + 1)
-
-        # 1. Regex를 사용하여 Pro*C 특정 요소(SQL, 매크로 등) 추출
+                
+        # 1. Regex 요소 추출 (Include, Macro, 주석 등)
+        self._extract_regex_elements(content, elements, covered_map, macro_table)
         
+        # 2. SQL 요소 추출
+        self._extract_sql_elements(content, elements, covered_map, c_parsing_content, line_indices)
+        
+        # 3. 코드 요소 플러그인 (예: BAMCALL) - parse_file 원래 로직에서 바로 처리하던 것
+        self._extract_plugin_elements(content, elements, covered_map, c_parsing_content)
+        
+        # 4. 주석은 _extract_regex_elements에서 처리하거나 별도로 처리
+        # 기존 로직 순서를 맞추기 위해 여기서는 별도 메서드 호출이나 _extract_regex_elements에 통합
+        # 여기서는 기존 로직 순서(SQL -> Plugin -> Comment)를 따르기 위해 분리함
+        self._extract_comments(content, elements, covered_map)
+
+        # 5. Tree-sitter를 사용하여 C 요소 추출 및 보강
+        c_elements = self._parse_c_elements(c_parsing_content, content)
+        
+        # 6. 병합 및 스코프 해결
+        self._resolve_scopes_and_merge(elements, c_elements, content, macro_table)
+        
+        # 7. SQL 관계 추출
+        self._extract_sql_relationships(elements)
+        
+        # 8. 알 수 없는 요소 감지
+        self._collect_unparsed_segments(content, covered_map, line_indices, elements)
+        
+        # 요소 정렬
+        elements.sort(key=lambda x: x['line_start'])
+        
+        # 디버깅 파일 생성
+        if create_debug_file:
+            self._create_debug_file(content, elements, file_path, output_dir)
+        
+        sql_count = len([e for e in elements if e['type'] == 'sql'])
+        func_count = len([e for e in elements if e['type'] == 'function'])
+        logger.success(f"파일 파싱 완료: {file_path} (요소: {len(elements)}개, SQL: {sql_count}, 함수: {func_count})")
+        
+        return elements
+
+    def _mark_covered(self, covered_map, start, end):
+        """지정된 범위를 파싱 완료된 것으로 마킹"""
+        for i in range(start, end):
+            if i < len(covered_map):
+                covered_map[i] = True
+
+    def _blank_out(self, c_parsing_content, covered_map, start, end):
+        """지정된 범위를 공백으로 처리하고 마킹"""
+        for i in range(start, end):
+            if i < len(c_parsing_content) and c_parsing_content[i] != '\n':
+                c_parsing_content[i] = ' '
+        self._mark_covered(covered_map, start, end)
+
+    def _extract_regex_elements(self, content, elements, covered_map, macro_table):
+        """Include 및 Macro 추출"""
         # 인클루드
         for match in PATTERN_INCLUDE.finditer(content):
             elements.append({
@@ -172,9 +207,9 @@ class ProCParser:
                 "line_start": content.count('\n', 0, match.start()) + 1,
                 "line_end": content.count('\n', 0, match.end()) + 1,
                 "raw_content": match.group(0),
-                "function": None # 대개 전역
+                "function": None 
             })
-            mark_covered(match.start(), match.end())
+            self._mark_covered(covered_map, match.start(), match.end())
             
         # 매크로
         for match in PATTERN_MACRO.finditer(content):
@@ -190,34 +225,31 @@ class ProCParser:
                 "raw_content": match.group(0),
                 "function": None
             })
-            mark_covered(match.start(), match.end())
+            self._mark_covered(covered_map, match.start(), match.end())
             
-            # 매크로 테이블에 추가 (파일 매크로가 외부 매크로를 덮어씀)
             if macro_value is not None:
                 macro_table[macro_name] = macro_value.strip()
 
-        # SQL 블록
+    def _extract_sql_elements(self, content, elements, covered_map, c_parsing_content, line_indices):
+        """SQL 블록 추출 및 공백 처리"""
         if self.use_sql_extractor and self.sql_adapter:
-            # sql_extractor 사용 (고급 파싱)
             self.sql_adapter.reset_counter()
             sql_elements = self.sql_adapter.extract_sql_elements_as_dicts(content)
             
             for el in sql_elements:
-                el['function'] = None  # 스코프 해결 전
-                el['relationship'] = None  # 관계 플러그인이 채움
+                el['function'] = None
+                el['relationship'] = None
                 elements.append(el)
                 
-                # C 파서를 위해 SQL 공백 처리 (라인 기반)
                 start_line = el.get('line_start', 1) - 1
                 end_line = el.get('line_end', 1) - 1
                 if start_line < len(line_indices) and end_line < len(line_indices):
                     start_idx = line_indices[start_line] if start_line < len(line_indices) else 0
                     end_idx = line_indices[end_line + 1] if end_line + 1 < len(line_indices) else len(content)
-                    blank_out(start_idx, end_idx)
+                    self._blank_out(c_parsing_content, covered_map, start_idx, end_idx)
                 elif el.get('byte_start') is not None and el.get('byte_end') is not None:
-                    blank_out(el['byte_start'], el['byte_end'])
+                    self._blank_out(c_parsing_content, covered_map, el['byte_start'], el['byte_end'])
         else:
-            # 기존 정규식 기반 SQL 추출 (fallback)
             sql_id_counter = 1
             for match in PATTERN_SQL.finditer(content):
                 raw_sql = match.group(0)
@@ -236,16 +268,18 @@ class ProCParser:
                 elements.append(element)
                 sql_id_counter += 1
                 
-                blank_out(match.start(), match.end())
+                self._blank_out(c_parsing_content, covered_map, match.start(), match.end())
 
-        # 코드 요소 플러그인 (예: BAMCALL)
+    def _extract_plugin_elements(self, content, elements, covered_map, c_parsing_content):
+        """코드 요소 플러그인 처리"""
         for plugin in self.plugins["code_element"]:
             for match in plugin.pattern.finditer(content):
                 element = plugin.parse(match, content)
                 elements.append(element)
-                blank_out(match.start(), match.end())
+                self._blank_out(c_parsing_content, covered_map, match.start(), match.end())
 
-        # 주석
+    def _extract_comments(self, content, elements, covered_map):
+        """주석 추출"""
         for match in PATTERN_COMMENT_SINGLE.finditer(content):
             elements.append({
                 "type": "comment",
@@ -255,7 +289,7 @@ class ProCParser:
                 "raw_content": match.group(0),
                 "function": None
             })
-            mark_covered(match.start(), match.end())
+            self._mark_covered(covered_map, match.start(), match.end())
             
         for match in PATTERN_COMMENT_MULTI.finditer(content):
             elements.append({
@@ -266,13 +300,13 @@ class ProCParser:
                 "raw_content": match.group(0),
                 "function": None
             })
-            mark_covered(match.start(), match.end())
+            self._mark_covered(covered_map, match.start(), match.end())
 
-        # 2. Tree-sitter를 사용하여 C 요소 추출
+    def _parse_c_elements(self, c_parsing_content, content):
+        """Tree-sitter를 이용한 C 파싱 및 보강"""
         c_source = "".join(c_parsing_content)
         c_elements = self.c_parser.parse(c_source)
         
-        # 2.5. 요소 보강 플러그인 실행
         for plugin in self.plugins["element_enricher"]:
             for el in c_elements:
                 try:
@@ -280,49 +314,37 @@ class ProCParser:
                         plugin.enrich(el, c_elements, content)
                 except Exception as e:
                     logger.warning(f"Element enricher plugin {plugin.__class__.__name__} failed: {e}")
-        
-        def get_index(row, col):
-            if row >= len(line_indices): return len(content)
-            return line_indices[row] + col
+        return c_elements
 
-        # 3. 병합 및 스코프 해결
-        # 먼저 함수를 다른 C 요소와 분리
+    def _resolve_scopes_and_merge(self, elements, c_elements, content, macro_table):
+        """요소 병합, 함수 스코프 해결, 변수 처리"""
         functions = [e for e in c_elements if e['type'] == 'function']
-        
-        # 모든 C 요소를 메인 리스트에 추가
         elements.extend(c_elements)
-
-        # 시작 라인 기준 정렬
         elements.sort(key=lambda x: x['line_start'])
         
-        # DECLARE SECTION 범위 추출
+        # DECLARE SECTION 찾기
         declare_sections = []
         for match in PATTERN_DECLARE_SECTION.finditer(content):
             start_line = content.count('\n', 0, match.start()) + 1
             end_line = content.count('\n', 0, match.end()) + 1
             declare_sections.append((start_line, end_line))
         
-        # 스코프 해결
+        # 스코프 할당
         for el in elements:
-            if el['type'] == 'function': continue 
-            if el.get('function'): continue 
+            if el['type'] == 'function' or el.get('function'):
+                continue
             
             for func in functions:
                 if func['line_start'] <= el['line_start'] and func['line_end'] >= el['line_end']:
                     el['function'] = func['name']
                     break
         
-        # 변수 스코프 분류
+        # 변수 스코프 상세 분류 및 매크로 치환
         for el in elements:
             if el['type'] != 'variable':
                 continue
             
-            # 스코프 분류 우선순위:
-            # 1. declare_section: DECLARE SECTION 내부
-            # 2. static: storage_class가 static인 경우
-            # 3. global: 함수 외부에 선언된 경우
-            # 4. local: 함수 내부에 선언된 경우
-            
+            # 스코프 분류
             is_in_declare_section = any(
                 start <= el['line_start'] <= end 
                 for start, end in declare_sections
@@ -331,20 +353,13 @@ class ProCParser:
             if is_in_declare_section:
                 el['scope'] = 'declare_section'
             elif el.get('storage_class') == 'static':
-                if el.get('function'):
-                    el['scope'] = 'static_local'
-                else:
-                    el['scope'] = 'static'
+                el['scope'] = 'static_local' if el.get('function') else 'static'
             elif el.get('function') is None:
                 el['scope'] = 'global'
             else:
                 el['scope'] = 'local'
-        
-        # 배열 크기 매크로 치환
-        for el in elements:
-            if el['type'] != 'variable':
-                continue
             
+            # 배열 크기 매크로 치환
             array_sizes = el.get('array_sizes', [])
             if not array_sizes:
                 el['resolved_array_sizes'] = []
@@ -357,11 +372,11 @@ class ProCParser:
                 elif size in macro_table:
                     resolved.append(macro_table[size])
                 else:
-                    resolved.append(size)  # 숫자 리터럴이거나 정의되지 않은 매크로
+                    resolved.append(size)
             el['resolved_array_sizes'] = resolved
-        
-        # 3.5. SQL 관계 추출
-        # SQL 요소에 대해 관계 플러그인 실행
+
+    def _extract_sql_relationships(self, elements):
+        """SQL 요소 간의 관계 분석"""
         sql_elements = [e for e in elements if e['type'] == 'sql']
         all_relationships = []
         
@@ -371,10 +386,8 @@ class ProCParser:
                     rels = plugin.extract_relationships(sql_elements, elements)
                     all_relationships.extend(rels)
             except Exception as e:
-                # 오류를 로깅하지만 다른 플러그인으로 계속 진행
                 logger.warning(f"Relationship plugin {plugin.__class__.__name__} failed: {e}")
         
-        # 관계 정보를 SQL 요소에 다시 주입
         for rel in all_relationships:
             for i, sql_id in enumerate(rel['sql_ids']):
                 for el in sql_elements:
@@ -387,34 +400,33 @@ class ProCParser:
                             'metadata': rel.get('metadata', {})
                         }
                         break
+
+    def _collect_unparsed_segments(self, content, covered_map, line_indices, elements):
+        """파싱되지 않은 영역 감지"""
+        # C 파서가 처리한 영역 마킹
+        # 현재는 C 요소의 전체 라인을 커버된 것으로 처리
+        c_elements = [e for e in elements if e['type'] not in ('sql', 'macro', 'include', 'comment')]
         
-        # 4. 알 수 없는 요소 감지
         for el in c_elements:
             start_line = el['line_start'] - 1
             end_line = el['line_end'] - 1
             
-            start_idx = line_indices[start_line] if start_line < len(line_indices) else len(content)
-            
-            # 지금은 전체 라인을 커버된 것으로 표시.
             if start_line < len(line_indices):
                 s = line_indices[start_line]
                 e = line_indices[end_line+1] if end_line+1 < len(line_indices) else len(content)
-                mark_covered(s, e)
+                self._mark_covered(covered_map, s, e)
 
-        # 커버되지 않은 영역 찾기
         unknowns = []
         current_start = -1
         
         for i in range(len(content)):
             if not covered_map[i]:
                 char = content[i]
-                if not char.isspace(): # 공백 무시
+                if not char.isspace():
                     if current_start == -1:
                         current_start = i
             else:
                 if current_start != -1:
-                    # 알 수 없는 블록의 끝
-                    # 공백/세미콜론만 있는지 확인
                     raw = content[current_start:i]
                     if raw.strip() and raw.strip() != ';':
                         unknowns.append({
@@ -426,7 +438,6 @@ class ProCParser:
                         })
                     current_start = -1
         
-        # 후행 알 수 없는 요소 확인
         if current_start != -1:
             raw = content[current_start:]
             if raw.strip() and raw.strip() != ';':
@@ -438,7 +449,8 @@ class ProCParser:
                     "function": None
                 })
 
-        # 알 수 없는 요소에 대한 스코프 해결
+        # 알 수 없는 요소 스코프 해결
+        functions = [e for e in elements if e['type'] == 'function']
         for el in unknowns:
              for func in functions:
                 if func['line_start'] <= el['line_start'] and func['line_end'] >= el['line_end']:
@@ -446,17 +458,6 @@ class ProCParser:
                     break
         
         elements.extend(unknowns)
-        elements.sort(key=lambda x: x['line_start'])
-        
-        # 디버깅 파일 생성
-        if create_debug_file:
-            self._create_debug_file(content, elements, file_path, output_dir)
-        
-        sql_count = len([e for e in elements if e['type'] == 'sql'])
-        func_count = len([e for e in elements if e['type'] == 'function'])
-        logger.success(f"파일 파싱 완료: {file_path} (요소: {len(elements)}개, SQL: {sql_count}, 함수: {func_count})")
-        
-        return elements
     
     def _generate_sql_marker(self, sql_element: dict) -> str:
         """
