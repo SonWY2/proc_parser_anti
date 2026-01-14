@@ -27,6 +27,7 @@ from .c_parser import CParser
 from .sql_converter import SQLConverter
 from .file_handler import process_directory
 from .interfaces import ParserPlugin, SQLRelationshipPlugin
+from .unified_metadata_generator import UnifiedMetadataGenerator
 from .patterns import (
     PATTERN_INCLUDE,
     PATTERN_MACRO,
@@ -66,6 +67,7 @@ __all__ = [
     "ProCParser",
     "CParser",
     "SQLConverter",
+    "UnifiedMetadataGenerator",
     
     # 디렉토리 처리
     "process_directory",

@@ -55,21 +55,36 @@ class CParser:
                 current_function = func_name
         
         elif node_type == 'declaration':
-            # 변수 선언
-            var_info = self._get_variable_info(node)
-            if var_info and var_info.get('name'):
+            # Check if it's a function prototype first
+            proto_info = self._get_function_prototype_info(node)
+            if proto_info:
                 elements.append({
-                    "type": "variable",
-                    "name": var_info['name'],
-                    "data_type": var_info['data_type'],
-                    "array_sizes": var_info.get('array_sizes', []),
-                    "is_pointer": var_info.get('is_pointer', False),
-                    "storage_class": var_info.get('storage_class'),
+                    "type": "function_prototype",
+                    "name": proto_info['name'],
+                    "return_type": proto_info['return_type'],
+                    "parameters": proto_info.get('parameters', []),
+                    "storage_class": proto_info.get('storage_class'),
                     "line_start": node.start_point.row + 1,
                     "line_end": node.end_point.row + 1,
                     "raw_content": node.text.decode('utf8'),
                     "function": current_function
                 })
+            else:
+                # 변수 선언
+                var_info = self._get_variable_info(node)
+                if var_info and var_info.get('name'):
+                    elements.append({
+                        "type": "variable",
+                        "name": var_info['name'],
+                        "data_type": var_info['data_type'],
+                        "array_sizes": var_info.get('array_sizes', []),
+                        "is_pointer": var_info.get('is_pointer', False),
+                        "storage_class": var_info.get('storage_class'),
+                        "line_start": node.start_point.row + 1,
+                        "line_end": node.end_point.row + 1,
+                        "raw_content": node.text.decode('utf8'),
+                        "function": current_function
+                    })
 
         elif node_type == 'struct_specifier':
             struct_name = self._get_struct_name(node)
@@ -123,6 +138,8 @@ class CParser:
                 - data_type: 데이터 타입
                 - array_sizes: 다차원 배열 크기 리스트 (예: ["10", "20", "30"])
                 - is_pointer: 포인터 여부
+                - pointer_level: 포인터 깊이 (예: **ptr → 2)
+                - is_reference: C++ 레퍼런스 여부 (int &ref)
                 - storage_class: 저장 클래스 (static, extern 등)
         """
         type_node = node.child_by_field_name('type')
@@ -134,6 +151,8 @@ class CParser:
         var_type = type_node.text.decode('utf8')
         array_sizes = []
         is_pointer = False
+        pointer_level = 0
+        is_reference = False
         storage_class = None
         
         # storage_class 추출 (static, extern, register, auto)
@@ -143,9 +162,13 @@ class CParser:
                 break
         
         # 포인터, 배열, 초기화 처리 - 배열 크기도 수집
-        while declarator and declarator.type in ['pointer_declarator', 'array_declarator', 'init_declarator']:
+        while declarator and declarator.type in ['pointer_declarator', 'array_declarator', 'init_declarator', 'reference_declarator']:
             if declarator.type == 'pointer_declarator':
                 is_pointer = True
+                pointer_level += 1
+                declarator = declarator.child_by_field_name('declarator')
+            elif declarator.type == 'reference_declarator':
+                is_reference = True
                 declarator = declarator.child_by_field_name('declarator')
             elif declarator.type == 'array_declarator':
                 # 배열 크기 추출
@@ -165,6 +188,8 @@ class CParser:
                 'data_type': var_type,
                 'array_sizes': array_sizes[::-1],
                 'is_pointer': is_pointer,
+                'pointer_level': pointer_level,
+                'is_reference': is_reference,
                 'storage_class': storage_class
             }
         
@@ -175,6 +200,64 @@ class CParser:
         if name_node and name_node.type == 'type_identifier':
             return name_node.text.decode('utf8')
         return None
+
+    def _get_function_prototype_info(self, node):
+        """
+        함수 프로토타입(전방 선언)인지 확인하고 정보를 추출합니다.
+        
+        Returns:
+            dict: 함수 프로토타입 정보 또는 None (프로토타입이 아닌 경우)
+                - name: 함수 이름
+                - return_type: 반환 타입
+                - parameters: 파라미터 목록
+                - storage_class: 저장 클래스 (static, extern 등)
+        """
+        declarator = node.child_by_field_name('declarator')
+        if not declarator:
+            return None
+        
+        # pointer_declarator를 따라가기 (예: int *func())
+        while declarator and declarator.type == 'pointer_declarator':
+            declarator = declarator.child_by_field_name('declarator')
+        
+        # function_declarator가 아니면 함수 프로토타입이 아님
+        if not declarator or declarator.type != 'function_declarator':
+            return None
+        
+        # 함수 이름 추출
+        func_name = None
+        func_declarator = declarator.child_by_field_name('declarator')
+        if func_declarator and func_declarator.type == 'identifier':
+            func_name = func_declarator.text.decode('utf8')
+        
+        if not func_name:
+            return None
+        
+        # 반환 타입 추출
+        type_node = node.child_by_field_name('type')
+        return_type = type_node.text.decode('utf8') if type_node else None
+        
+        # 저장 클래스 추출
+        storage_class = None
+        for child in node.children:
+            if child.type == 'storage_class_specifier':
+                storage_class = child.text.decode('utf8')
+                break
+        
+        # 파라미터 추출
+        params = []
+        param_list = declarator.child_by_field_name('parameters')
+        if param_list:
+            for child in param_list.children:
+                if child.type == 'parameter_declaration':
+                    params.append(child.text.decode('utf8'))
+        
+        return {
+            'name': func_name,
+            'return_type': return_type,
+            'storage_class': storage_class,
+            'parameters': params
+        }
 
     def _get_function_call_info(self, node):
         # function: identifier

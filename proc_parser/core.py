@@ -147,6 +147,9 @@ class ProCParser:
         # 1. Regex 요소 추출 (Include, Macro, 주석 등)
         self._extract_regex_elements(content, elements, covered_map, macro_table)
         
+        # 1.5 기타 전처리기 지시문 (#ifndef, #ifdef, #endif 등)
+        self._extract_preprocessor_elements(content, elements, covered_map)
+        
         # 2. SQL 요소 추출
         self._extract_sql_elements(content, elements, covered_map, c_parsing_content, line_indices)
         
@@ -214,11 +217,13 @@ class ProCParser:
         # 매크로
         for match in PATTERN_MACRO.finditer(content):
             macro_name = match.group(1)
-            macro_value = match.group(2)
+            macro_params = match.group(2)  # 함수형 매크로의 파라미터 (예: "(A,B)")
+            macro_value = match.group(3)
             
             elements.append({
                 "type": "macro",
                 "name": macro_name,
+                "params": macro_params,  # 함수형 매크로 파라미터
                 "value": macro_value,
                 "line_start": content.count('\n', 0, match.start()) + 1,
                 "line_end": content.count('\n', 0, match.end()) + 1,
@@ -277,6 +282,20 @@ class ProCParser:
                 element = plugin.parse(match, content)
                 elements.append(element)
                 self._blank_out(c_parsing_content, covered_map, match.start(), match.end())
+
+    def _extract_preprocessor_elements(self, content, elements, covered_map):
+        """기타 전처리기 지시문 추출 (#ifndef, #ifdef, #endif 등)"""
+        for match in PATTERN_PREPROC_OTHER.finditer(content):
+            directive_type = match.group(2)  # ifndef, ifdef, endif, etc.
+            elements.append({
+                "type": "preprocessor",
+                "directive": directive_type,
+                "line_start": content.count('\n', 0, match.start()) + 1,
+                "line_end": content.count('\n', 0, match.end()) + 1,
+                "raw_content": match.group(1).strip(),
+                "function": None
+            })
+            self._mark_covered(covered_map, match.start(), match.end())
 
     def _extract_comments(self, content, elements, covered_map):
         """주석 추출"""

@@ -8,9 +8,10 @@ import re
 # 캡처: quote_type (< 또는 "), path, quote_type (> 또는 ")
 PATTERN_INCLUDE = re.compile(r'#include\s+([<"])(.*?)([>"])')
 
-# Macro: #define NAME VALUE
-# 캡처: name, value (옵션)
-PATTERN_MACRO = re.compile(r'#define\s+(\w+)(?:\s+(.*?))?$', re.MULTILINE)
+# Macro: #define NAME VALUE 또는 #define NAME(ARGS) VALUE
+# 함수형 매크로 (파라미터 포함) 및 단순 매크로 모두 지원
+# 캡처: name, params (옵션), value (옵션)
+PATTERN_MACRO = re.compile(r'#define\s+(\w+)(\([^)]*\))?(?:\s+(.*?))?$', re.MULTILINE)
 
 # SQL Block: EXEC SQL ... ;
 # 여러 줄에 걸쳐 매칭하기 위해 DOTALL 사용.
@@ -56,3 +57,9 @@ PATTERN_DECLARE_SECTION = re.compile(
     re.DOTALL | re.IGNORECASE
 )
 
+# 기타 전처리기 지시문 (#ifndef, #ifdef, #if, #elif, #else, #endif, #undef, #pragma)
+# #include와 #define은 별도 패턴으로 처리
+PATTERN_PREPROC_OTHER = re.compile(
+    r'^[ \t]*(#\s*(ifndef|ifdef|if|elif|else|endif|undef|pragma)\b[^\n]*)',
+    re.MULTILINE
+)

@@ -193,13 +193,14 @@ def visualize_parsing_stages(file_path, output_dir=None):
 
 if __name__ == "__main__":
     sample_file = os.path.join(project_root, 'tests', 'samples', 'sample.pc')
+    sample_file = r"D:\workspace\proc_parser_antigravity\proc_parser\sample_input\original_source.sqc"
+    # output_dir = os.path.dirname(sample_file) + ""
+    # if len(sys.argv) > 1:
+    #     sample_file = sys.argv[1]
     
-    if len(sys.argv) > 1:
-        sample_file = sys.argv[1]
-    
-    if not os.path.exists(sample_file):
-        print(f"파일을 찾을 수 없습니다: {sample_file}")
-        sys.exit(1)
+    # if not os.path.exists(sample_file):
+    #     print(f"파일을 찾을 수 없습니다: {sample_file}")
+    #     sys.exit(1)
     
     output_dir = None
     if len(sys.argv) > 2:
