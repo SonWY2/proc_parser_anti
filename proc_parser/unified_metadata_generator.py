@@ -45,13 +45,15 @@ except ImportError:
     from header_parser.macro_extractor import MacroExtractor
     from header_parser.stp_parser import STPParser
 
-# OMM/DBIO 생성기
+# OMM/DBIO/DAO 생성기
 try:
     from omm_generator import OMMGenerator
     from dbio_generator import DBIOGenerator
+    from dao_generator import DAOGenerator
 except ImportError:
     OMMGenerator = None
     DBIOGenerator = None
+    DAOGenerator = None
 
 # shared_config
 try:
@@ -130,14 +132,18 @@ class UnifiedMetadataGenerator:
         if generate_artifacts and OMMGenerator:
             self.omm_generator = OMMGenerator(base_package=f"{base_package}.dto")
             self.dbio_generator = DBIOGenerator(base_package=base_package)
+            self.dao_generator = DAOGenerator(base_package=base_package)
         else:
             self.omm_generator = None
             self.dbio_generator = None
+            self.dao_generator = None
         
         # 분석 중 방문한 헤더 추적 (순환 참조 방지)
         self._visited_headers: Set[str] = set()
         # 병합된 매크로 테이블
         self._macro_table: Dict[str, Any] = {}
+        # 헤더 파싱 결과 캐시 (경로 -> 파싱 결과)
+        self._header_cache: Dict[str, Dict] = {}
     
     def generate(self, source_file: str) -> Dict:
         """
@@ -314,7 +320,11 @@ class UnifiedMetadataGenerator:
         return result
     
     def _parse_header_content(self, header_path: str) -> Dict:
-        """헤더 파일 내용 파싱"""
+        """헤더 파일 내용 파싱 (캐시 지원)"""
+        # 캐시 확인
+        if header_path in self._header_cache:
+            return self._header_cache[header_path]
+        
         try:
             with open(header_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
@@ -339,12 +349,16 @@ class UnifiedMetadataGenerator:
                     'line_start': inc.line_number
                 })
             
-            return {
+            result = {
                 "macros": macros,
                 "stp_data": stp_data,
                 "db_vars_info": db_vars_info,
                 "includes": includes
             }
+            
+            # 캐시에 저장
+            self._header_cache[header_path] = result
+            return result
         except Exception as e:
             return {"error": str(e)}
     
@@ -442,6 +456,11 @@ class UnifiedMetadataGenerator:
                     sql['duplicate_group_id'] = group_id
                     sql['duplicate_count'] = len(group)
                     sql['call_sites'] = call_sites
+                
+                if self.generate_artifacts:
+                    # 중복된 SQL의 경우 동일한 SQL ID 공유 필요성 검토
+                    # 현재는 개별 SQL로 처리하되, 향후 개선 가능
+                    pass
             else:
                 # 중복이 아닌 경우
                 for sql in group:
@@ -543,7 +562,7 @@ class UnifiedMetadataGenerator:
         return result
     
     def _generate_artifacts(self, db_vars_info: Dict, sql_elements: List[Dict]) -> Dict:
-        """OMM/DBIO 아티팩트 생성"""
+        """OMM/DBIO/DAO 아티팩트 생성"""
         artifacts = {}
         
         # OMM 생성
@@ -561,10 +580,10 @@ class UnifiedMetadataGenerator:
                     omm_artifacts[struct_name] = {"error": str(e)}
             artifacts["omm"] = omm_artifacts
         
-        # DBIO 생성
-        if self.dbio_generator and sql_elements:
+        # DBIO (XML) & DAO (Java) 생성
+        if self.dbio_generator and self.dao_generator and sql_elements:
             try:
-                # SQL 요소를 DBIO 형식으로 변환
+                # SQL 요소를 변환
                 sql_calls = []
                 for i, sql in enumerate(sql_elements):
                     sql_calls.append({
@@ -575,13 +594,24 @@ class UnifiedMetadataGenerator:
                         "output_vars": sql.get('output_host_vars', [])
                     })
                 
-                content = self.dbio_generator.generate(sql_calls, {}, "GeneratedDao")
+                # DBIO 생성
+                dbio_content = self.dbio_generator.generate(sql_calls, {}, "GeneratedDao")
                 artifacts["dbio"] = {
-                    "content": content,
+                    "content": dbio_content,
                     "namespace": f"{self.base_package}.GeneratedDao"
                 }
+                
+                # DAO 생성
+                dao_content = self.dao_generator.generate(sql_calls, {}, "GeneratedDao")
+                artifacts["dao"] = {
+                    "content": dao_content,
+                    "interface_name": "GeneratedDao",
+                    "package": self.base_package
+                }
+                
             except Exception as e:
                 artifacts["dbio"] = {"error": str(e)}
+                artifacts["dao"] = {"error": str(e)}
         
         return artifacts
     

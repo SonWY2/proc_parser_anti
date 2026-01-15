@@ -86,79 +86,139 @@ def main():
     
     args = parser.parse_args()
     
-    # 소스 파일 존재 확인
+    # 소스 경로 존재 확인
     if not os.path.exists(args.source_file):
-        print(f"오류: 소스 파일을 찾을 수 없습니다: {args.source_file}")
+        print(f"오류: 경로를 찾을 수 없습니다: {args.source_file}")
         sys.exit(1)
     
     # include 경로 절대 경로 변환
     include_paths = [os.path.abspath(p) for p in args.include_paths]
     
-    # 소스 파일 디렉토리도 include 경로에 추가
-    source_dir = os.path.dirname(os.path.abspath(args.source_file))
-    if source_dir not in include_paths:
-        include_paths.insert(0, source_dir)
+    # 처리할 파일 목록 수집
+    targets = []
+    is_directory = os.path.isdir(args.source_file)
     
-    if args.verbose:
-        print(f"소스 파일: {args.source_file}")
-        print(f"출력 파일: {args.output}")
-        print(f"출력 포맷: {args.format}")
-        print(f"Include 경로: {include_paths}")
-        print(f"아티팩트 생성: {args.with_artifacts}")
-        print()
+    if is_directory:
+        # 디렉토리 모드: 재귀적으로 파일 검색
+        if args.verbose:
+            print(f"디렉토리 탐색 중: {args.source_file}")
+            
+        extensions = {'.pc', '.sqc', '.c'}
+        for root, _, files in os.walk(args.source_file):
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext in extensions:
+                    file_path = os.path.join(root, file)
+                    targets.append(file_path)
+        
+        if not targets:
+            print("오류: 지정된 디렉토리에서 처리할 소스 파일(.pc, .sqc, .c)을 찾을 수 없습니다.")
+            sys.exit(1)
+            
+        # 디렉토리 모드에서는 출력이 디렉토리여야 함
+        # 확장자가 없거나 디렉토리로 끝나면 디렉토리로 간주
+        output_dir = args.output
+        if os.path.splitext(output_dir)[1]:
+            # 사용자가 파일명을 입력했을 수 있음 -> 경고 후 부모 디렉토리 사용하거나 에러 처리
+            # 여기서는 명확성을 위해 에러 처리
+            print(f"오류: 입력이 디렉토리일 경우, 출력(-o)도 디렉토리여야 합니다: {output_dir}")
+            sys.exit(1)
+            
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            
+    else:
+        # 단일 파일 모드
+        targets.append(args.source_file)
+        
+        # 소스 파일 디렉토리를 include 경로에 추가 (단일 파일일 때만 명시적으로 추가)
+        source_dir = os.path.dirname(os.path.abspath(args.source_file))
+        if source_dir not in include_paths:
+            include_paths.insert(0, source_dir)
+
+    # -----------------------------------------------------------
+    # Generator 인스턴스 생성 (캐시 공유를 위해 한 번만 생성)
+    # -----------------------------------------------------------
+    generator = UnifiedMetadataGenerator(
+        include_paths=include_paths,
+        base_package=args.base_package,
+        generate_artifacts=args.with_artifacts
+    )
+
+    # -----------------------------------------------------------
+    # 공통 처리 함수
+    # -----------------------------------------------------------
+    def process_file(source_path, output_path):
+        try:
+            if args.verbose:
+                print(f"분석 시작: {source_path}")
+            
+            metadata = generator.generate(source_path)
+            
+            # 저장
+            if args.format == 'yaml':
+                generator.save_yaml(metadata, output_path)
+            else:
+                generator.save_json(metadata, output_path, indent=args.indent)
+            
+            if args.verbose:
+                print(f"저장 완료: {output_path}")
+                cached_count = len(generator._header_cache)
+                print(f"  캐시된 헤더: {cached_count}개")
+                
+            return metadata
+        except Exception as e:
+            print(f"실패 ({source_path}): {e}")
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+            return None
+
+    # -----------------------------------------------------------
+    # 실행 루프
+    # -----------------------------------------------------------
+    success_count = 0
+    total_count = len(targets)
     
-    try:
-        # 메타데이터 생성기 초기화
-        generator = UnifiedMetadataGenerator(
-            include_paths=include_paths,
-            base_package=args.base_package,
-            generate_artifacts=args.with_artifacts
-        )
+    print(f"총 {total_count}개 파일 처리 예정...")
+    
+    for i, source_path in enumerate(targets):
+        source_path = os.path.abspath(source_path)
         
-        if args.verbose:
-            print("분석 시작...")
-        
-        # 메타데이터 생성
-        metadata = generator.generate(args.source_file)
-        
-        if args.verbose:
-            summary = metadata.get('source_analysis', {}).get('summary', {})
-            print(f"분석 완료: {summary.get('total_elements', 0)}개 요소")
-            print(f"유형별: {summary.get('by_type', {})}")
-            print()
-        
-        # 출력 파일 저장
-        output_path = args.output
-        
-        if args.format == 'yaml':
-            generator.save_yaml(metadata, output_path)
+        if is_directory:
+            # 출력 파일명 생성: 입력 디렉토리 기준 상대 경로 유지
+            rel_path = os.path.relpath(source_path, os.path.abspath(args.source_file))
+            # 확장자 변경
+            base_name = os.path.splitext(rel_path)[0]
+            ext = '.yaml' if args.format == 'yaml' else '.json'
+            output_file_name = base_name + ext
+            
+            final_output_path = os.path.join(args.output, output_file_name)
+            
+            # 하위 디렉토리 생성
+            os.makedirs(os.path.dirname(final_output_path), exist_ok=True)
         else:
-            generator.save_json(metadata, output_path, indent=args.indent)
+            final_output_path = args.output
+            
+        print(f"[{i+1}/{total_count}] {os.path.basename(source_path)} -> {final_output_path}")
         
-        print(f"메타데이터 저장 완료: {output_path}")
-        
-        # 요약 출력
-        summary = metadata.get('source_analysis', {}).get('summary', {})
-        header_count = len(metadata.get('header_tree', {}).get('all_headers_flat', []))
-        print(f"  - 총 요소: {summary.get('total_elements', 0)}개")
-        print(f"  - 헤더 파일: {header_count}개")
-        
-        if args.with_artifacts:
-            artifacts = metadata.get('generated_artifacts', {})
-            omm_count = len(artifacts.get('omm', {}))
-            print(f"  - OMM 아티팩트: {omm_count}개")
-        
-    except FileNotFoundError as e:
-        print(f"오류: 파일을 찾을 수 없습니다: {e}")
-        sys.exit(1)
-    except ImportError as e:
-        print(f"오류: 필요한 모듈이 없습니다: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"오류: {e}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
+        result = process_file(source_path, final_output_path)
+        if result:
+            success_count += 1
+            
+            # (옵션) 요약 정보 출력
+            if not is_directory or args.verbose:
+                summary = result.get('source_analysis', {}).get('summary', {})
+                print(f"  완료: 요소 {summary.get('total_elements', 0)}개")
+                if args.with_artifacts:
+                    artifacts = result.get('generated_artifacts', {})
+                    dao_count = 1 if 'dao' in artifacts else 0
+                    print(f"  Artifacts: DAO {dao_count}개 생성됨")
+
+    print()
+    print(f"작업 완료: 성공 {success_count}/{total_count} 파일")
+    
+    if success_count < total_count:
         sys.exit(1)
 
 

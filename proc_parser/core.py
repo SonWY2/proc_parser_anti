@@ -363,20 +363,15 @@ class ProCParser:
             if el['type'] != 'variable':
                 continue
             
-            # 스코프 분류
-            is_in_declare_section = any(
+            # Boolean 플래그 설정
+            el['is_static'] = el.get('storage_class') == 'static'
+            el['is_declare_section'] = any(
                 start <= el['line_start'] <= end 
                 for start, end in declare_sections
             )
             
-            if is_in_declare_section:
-                el['scope'] = 'declare_section'
-            elif el.get('storage_class') == 'static':
-                el['scope'] = 'static_local' if el.get('function') else 'static'
-            elif el.get('function') is None:
-                el['scope'] = 'global'
-            else:
-                el['scope'] = 'local'
+            # scope는 전역/지역만 구분
+            el['scope'] = 'local' if el.get('function') else 'global'
             
             # 배열 크기 매크로 치환
             array_sizes = el.get('array_sizes', [])

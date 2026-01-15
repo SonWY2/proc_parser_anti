@@ -1,0 +1,34 @@
+/*
+ * Cursor Test Sample
+ */
+#include "sqlca.h"
+
+void demo_cursor() {
+    EXEC SQL BEGIN DECLARE SECTION;
+        char *username;
+        char *password;
+        int emp_id;
+        char emp_name[50];
+    EXEC SQL END DECLARE SECTION;
+
+    /* 1. Declare Cursor */
+    EXEC SQL DECLARE emp_cursor CURSOR FOR
+        SELECT id, name
+        FROM employee
+        WHERE department = 'IT';
+
+    /* 2. Open Cursor */
+    EXEC SQL OPEN emp_cursor;
+
+    /* 3. Fetch Loop */
+    while (1) {
+        EXEC SQL FETCH emp_cursor INTO :emp_id, :emp_name;
+        
+        if (sqlca.sqlcode != 0) break;
+        
+        printf("Employee: %d - %s\n", emp_id, emp_name);
+    }
+
+    /* 4. Close Cursor */
+    EXEC SQL CLOSE emp_cursor;
+}

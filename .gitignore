@@ -1,22 +1,48 @@
+# Python
 /__pycache__
+**/__pycache__
 *.pyc
-logs/2026-01-10_session.log
-proc_parser.legacy/__init__.py
-proc_parser.legacy/c_parser.py
-proc_parser.legacy/core.py
-proc_parser.legacy/file_handler.py
-proc_parser.legacy/interfaces.py
-proc_parser.legacy/patterns.py
-proc_parser.legacy/requirements.txt
-proc_parser.legacy/sql_converter.py
-proc_parser.legacy/USAGE.md
-proc_parser.legacy/plugins/__init__.py
-proc_parser.legacy/plugins/array_dml_relationship.py
-proc_parser.legacy/plugins/bam_call.py
-proc_parser.legacy/plugins/cursor_relationship.py
-proc_parser.legacy/plugins/docstring_enricher.py
-proc_parser.legacy/plugins/dynamic_sql_relationship.py
-proc_parser.legacy/plugins/naming_convention.py
-proc_parser.legacy/plugins/transaction_relationship.py
+
+# Logs
+logs/*.log
+sql_validator.log
+
+# Environment
+.env
 .db.env
-tests/samples/*
+
+# Legacy (deprecated)
+proc_parser.legacy/
+
+# Test outputs (generated)
+tests/output/
+tests/debug/output/
+
+# Test samples with sensitive data
+tests/fixtures/samples/*
+tests/fixtures/sample_input_data/original_source.sqc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Temporary files
+*.tmp
+_reorganize_tests.py
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_0_original.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_1_after_include.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_2_after_macro.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_3_after_sql.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_4_after_bamcall.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_5_after_comments.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_6_after_func_calls.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_7_after_local_vars.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_8_after_functions.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_9_after_global_vars.c
+tests/fixtures/sample_input_data/original_source_parsing_stages/stage_10_after_structs.c
+tests/fixtures/artifact_test_metadata.json
+tests/fixtures/cursor_metadata.json
+tests/fixtures/sample_result.json
+tests/fixtures/test_metadata_with_dup.json
+tests/fixtures/test_metadata.json
