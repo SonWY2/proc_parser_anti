@@ -1,20 +1,9 @@
 """
-Variable Lineage Tracker Module
+variable_lineage - 변수 추적 (호환성 레이어)
 
-Pro*C 코드에서 추출된 변수들이 MyBatis/Java로 변환되는 과정에서의
-연결관계(Lineage)를 추적합니다.
+이 모듈은 이전 경로에서의 import를 지원하기 위한 호환성 레이어입니다.
+실제 구현은 analysis.lineage 패키지에 있습니다.
 """
 
-from .types import LineageNode, LineageLink, LineageGraph, NodeType, LinkType
-from .tracker import VariableLineageTracker
-from .exporters import Neo4jExporter
-
-__all__ = [
-    'LineageNode',
-    'LineageLink',
-    'LineageGraph',
-    'NodeType',
-    'LinkType',
-    'VariableLineageTracker',
-    'Neo4jExporter',
-]
+from analysis.lineage import *
+from analysis.lineage import __all__

@@ -1,0 +1,28 @@
+name: Header Parsing Verification
+description: 헤더 파일(.h) 파싱 결과 검증
+
+static_checks:
+  - id: struct_count
+    description: 구조체 추출 수
+    severity: info
+
+llm_checks:
+  - id: all_structs_found
+    question: "원본 헤더의 모든 구조체가 추출되었나요?"
+    severity: error
+    
+  - id: field_types_correct
+    question: "필드 타입(char, int, long 등)이 올바르게 파싱되었나요?"
+    severity: warning
+    
+  - id: array_sizes_correct
+    question: "배열 크기가 정확하게 파싱되었나요?"
+    severity: warning
+    
+  - id: nested_structs
+    question: "중첩된 구조체가 올바르게 처리되었나요?"
+    severity: info
+    
+  - id: stp_definitions
+    question: "STP 정의(_stp 배열)가 올바르게 파싱되었나요?"
+    severity: warning

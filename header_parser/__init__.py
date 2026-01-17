@@ -1,29 +1,9 @@
 """
-header_parser 모듈
-C 헤더 파일을 파싱하여 구조체 정보를 추출합니다.
+header_parser - 헤더 파일 파서 (호환성 레이어)
+
+이 모듈은 이전 경로에서의 import를 지원하기 위한 호환성 레이어입니다.
+실제 구현은 parsing.header 패키지에 있습니다.
 """
 
-from .typedef_parser import TypedefStructParser, StructInfo, FieldInfo
-from .stp_parser import STPParser
-from .header_parser import HeaderParser
-from .classifier import HeaderClassifier, HeaderType, HeaderInfo
-from .macro_extractor import MacroExtractor
-from .integrated_parser import IntegratedHeaderParser, ParseResult
-
-__all__ = [
-    # 기본 파서
-    "TypedefStructParser",
-    "StructInfo",
-    "FieldInfo",
-    "STPParser",
-    "HeaderParser",
-    # 헤더 분류
-    "HeaderClassifier",
-    "HeaderType",
-    "HeaderInfo",
-    # 매크로 추출
-    "MacroExtractor",
-    # 통합 파서
-    "IntegratedHeaderParser",
-    "ParseResult",
-]
+from parsing.header import *
+from parsing.header import __all__

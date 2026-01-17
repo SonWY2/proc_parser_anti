@@ -1,0 +1,16 @@
+# sql_validator 모듈 의존성
+
+# 로깅
+loguru>=0.7.0
+
+# 환경 변수 관리
+python-dotenv>=1.0.0
+
+# YAML 파일 처리
+PyYAML>=6.0
+
+# LLM API 호출
+requests>=2.28.0
+
+# 선택적: GUI (tkinter는 Python 표준 라이브러리)
+# tkinter는 별도 설치 불필요 (Python 기본 포함)

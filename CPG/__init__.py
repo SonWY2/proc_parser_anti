@@ -1,29 +1,9 @@
 """
-CPG (Code Property Graph) 모듈
+CPG - Code Property Graph (호환성 레이어)
 
-Pro*C/.c 파일에서 코드 속성 그래프를 생성합니다.
-- 함수 호출 관계
-- 헤더 파일 의존성
-- 변수/구조체 데이터 흐름
+이 모듈은 이전 경로에서의 import를 지원하기 위한 호환성 레이어입니다.
+실제 구현은 analysis.cpg 패키지에 있습니다.
 """
 
-from .models import (
-    Node, Edge, CPG,
-    FunctionNode, VariableNode, StructNode,
-    CallEdge, DataFlowEdge, IncludeEdge
-)
-from .call_graph import CallGraphExtractor
-from .header_analyzer import HeaderAnalyzer
-from .data_flow import DataFlowAnalyzer
-from .cpg_builder import CPGBuilder
-
-__all__ = [
-    'CPGBuilder',
-    'CallGraphExtractor',
-    'HeaderAnalyzer', 
-    'DataFlowAnalyzer',
-    'CPG',
-    'Node', 'Edge',
-    'FunctionNode', 'VariableNode', 'StructNode',
-    'CallEdge', 'DataFlowEdge', 'IncludeEdge'
-]
+from analysis.cpg import *
+from analysis.cpg import __all__

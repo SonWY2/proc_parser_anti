@@ -1,3 +1,9 @@
-from .generator import DAOGenerator
+"""
+dao_generator - DAO 생성기 (호환성 레이어)
 
-__all__ = ["DAOGenerator"]
+이 모듈은 이전 경로에서의 import를 지원하기 위한 호환성 레이어입니다.
+실제 구현은 generation.dao 패키지에 있습니다.
+"""
+
+from generation.dao import *
+from generation.dao import __all__

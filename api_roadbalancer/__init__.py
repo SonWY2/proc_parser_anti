@@ -1,20 +1,9 @@
 """
-API Load Balancer (api_roadbalancer)
+api_roadbalancer - API 로드밸런서 (호환성 레이어)
 
-여러 OpenAI 호환 API 엔드포인트에 대해 요청을 분산시키는 로드밸런서 모듈입니다.
-vLLM, OpenAI 등 호환 서버를 지원합니다.
+이 모듈은 이전 경로에서의 import를 지원하기 위한 호환성 레이어입니다.
+실제 구현은 infra.api 패키지에 있습니다.
 """
 
-from .endpoint import Endpoint, EndpointState
-from .strategies import BalancingStrategy, get_strategy
-from .health_check import HealthChecker
-from .balancer import LoadBalancer
-
-__all__ = [
-    'Endpoint',
-    'EndpointState',
-    'BalancingStrategy',
-    'get_strategy',
-    'HealthChecker',
-    'LoadBalancer',
-]
+from infra.api import *
+from infra.api import __all__

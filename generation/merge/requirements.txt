@@ -1,0 +1,8 @@
+# translation_merge 모듈 의존성
+# 이 모듈은 표준 라이브러리만 사용합니다.
+# - dataclasses (Python 3.7+)
+# - typing (Python 3.5+)
+# - re, pathlib, importlib, pkgutil
+# - abc, enum
+
+# 추가 의존성 없음
