@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from .classifier import HeaderClassifier, HeaderType, HeaderInfo
 from .macro_extractor import MacroExtractor
 from .header_parser import HeaderParser
-from shared_config.logger import logger, LogStage
+from infra.config.logger import logger, LogStage
 
 
 @dataclass
@@ -93,7 +93,7 @@ class IntegratedHeaderParser:
         """CPGBuilder 지연 로딩"""
         if self._cpg_builder is None:
             try:
-                from CPG import CPGBuilder
+                from analysis.cpg import CPGBuilder
                 self._cpg_builder = CPGBuilder(
                     include_paths=self.include_paths,
                     verbose=self.verbose

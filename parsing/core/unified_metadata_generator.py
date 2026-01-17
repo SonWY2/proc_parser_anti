@@ -27,37 +27,35 @@ try:
     from .c_parser import CParser
     from .sql_converter import SQLConverter
 except ImportError:
-    from proc_parser.core import ProCParser
-    from proc_parser.c_parser import CParser
-    from proc_parser.sql_converter import SQLConverter
+    from parsing.core.core import ProCParser
+    from parsing.core.c_parser import CParser
+    from parsing.core.sql_converter import SQLConverter
 
 # CPG 모듈
 try:
-    from CPG import HeaderAnalyzer
+    from analysis.cpg import HeaderAnalyzer
 except ImportError:
-    from CPG.header_analyzer import HeaderAnalyzer
+    from analysis.cpg.header_analyzer import HeaderAnalyzer
 
 # header_parser 모듈
 try:
-    from header_parser import HeaderParser, MacroExtractor, STPParser
+    from parsing.header import HeaderParser, MacroExtractor, STPParser
 except ImportError:
-    from header_parser.header_parser import HeaderParser
-    from header_parser.macro_extractor import MacroExtractor
-    from header_parser.stp_parser import STPParser
+    from parsing.header.header_parser import HeaderParser
+    from parsing.header.macro_extractor import MacroExtractor
+    from parsing.header.stp_parser import STPParser
 
 # OMM/DBIO/DAO 생성기
 try:
-    from omm_generator import OMMGenerator
-    from dbio_generator import DBIOGenerator
-    from dao_generator import DAOGenerator
+    from generation.artifacts import OMMGenerator, DBIOGenerator, DAOGenerator
 except ImportError:
     OMMGenerator = None
     DBIOGenerator = None
     DAOGenerator = None
 
-# shared_config
+# infra.config
 try:
-    from shared_config import snake_to_camel, get_jdbc_type
+    from infra.config import snake_to_camel, get_jdbc_type
 except ImportError:
     def snake_to_camel(s): 
         parts = s.split('_')

@@ -50,7 +50,7 @@ from .plugins import (
 
 # SQL 관계 플러그인 (sql_extractor에서 import)
 try:
-    from sql_extractor.plugins import (
+    from parsing.sql.plugins import (
         CursorRelationshipPlugin,
         DynamicSQLRelationshipPlugin,
         TransactionRelationshipPlugin,

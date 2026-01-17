@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from .typedef_parser import TypedefStructParser, StructInfo, FieldInfo
 from .stp_parser import STPParser
-from shared_config import (
+from infra.config import (
     get_java_type,
     snake_to_camel,
     camel_to_pascal,
@@ -19,7 +19,7 @@ from shared_config import (
     is_custom_struct,
     PRIMITIVE_TYPES,
 )
-from shared_config.logger import logger
+from infra.config.logger import logger
 
 
 class HeaderParser:

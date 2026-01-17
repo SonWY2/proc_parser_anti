@@ -9,7 +9,7 @@ from collections import Counter
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from proc_parser import ProCParser
+from parsing.core import ProCParser
 
 def main():
     # Input file

@@ -1,0 +1,838 @@
+/*
+*******************************************************************************
+**  시스템 명 : TL (현/선물주문)
+**  프로그램ID : tlfb000m (TOFE_SP_WITHDR_POSS_AMT)
+**  프로그램명 : tlfb000m
+**  개      요 : 인출가능금액계산
+*******************************************************************************
+**
+** << 프로그램 변경 정보 >>
+**  변경 일자 : 변경자 : 변   경   내   역
+**  2012-05-17 : 변태완 : 프로그램 신규 작성
+**  2012-08-17 : 변태완 : UNIX 변환작업
+**  2013-11-13 : 이기재 : 로직재검
+**  2017-07-07 : CONVERSION : 소스변환 자동전환
+*******************************************************************************
+*/
+
+/*---------------------------------------------------------------------------
+ * 주문가능액 및 인출가능액 (원문 주석 유지)
+ *--------------------------------------------------------------------------*/
+
+#include "afc_bam.h"        /* BAM / Logging / Return macro */
+#include "tlfb000m.h"       /* In/Out record struct */
+
+#include "mba0360m.h"       /* BAM Call Parameters */
+#include "tlf9600m.h"       /* BAM Call Parameters */
+#include "mbe1210m.h"       /* 일자별 계산 */
+
+#ifndef BAMMAIN
+#define BAMMAIN(A,B)
+#endif
+
+/* ============================================================================
+ * (3) Host Variable Define (정상화)
+ *  - 원문에서 char 단일/배열 혼재 -> 필요한 길이로 통일
+ *  - 중복 선언 제거
+ * ==========================================================================*/
+EXEC SQL BEGIN DECLARE SECTION;
+
+/* InRec1 */
+static long   H_iacnt_id;                           /* 계좌ID */
+static char   H_ibsns_date           [ 8 + 1 ];     /* 영업일자 */
+static char   H_ia_acnt_ifnm_updt_yn [ 1 + 1 ];     /* 계좌정보갱신여부(Y/N) */
+static char   H_ia_funds_sbtt_wtdw_yn[ 1 + 1 ];     /* 자금대체출금여부(Y/N) */
+
+/* OutRec1 */
+static long   H_oftrs_opts_wtdw_psbl_tamt;          /* 선물옵션출금가능총액 */
+static long   H_oftrs_opts_wtdw_psbl_cash_amnt;     /* 선물옵션출금가능현금액 */
+static char   H_oa_excp_ocrn_yn      [ 1 + 1 ];     /* 예외발생여부(Y/N) */
+static long   H_oa_sbtt_psbl_amnt;                  /* 대체가능금액(최종) */
+static long   H_wthd_prev_blnc_amnt;                /* 예수금전잔고금액(원문 필드명 정합) */
+static long   H_oa_un_clam_samt;                    /* 예수금청구금액(미수 등) */
+static long   H_ofuns_sbtt_rcny_amnt;               /* 자금대체입금액 */
+static char   H_oerrno_msg_code     [ 4 + 1 ];      /* 오류메시지코드 */
+
+/* Etc */
+static long   H_iwthd_totl_sum_amnt;                /* 예수금총합계금액 */
+static long   H_idpsd_sban_amnt;                    /* 예탁대용금액 */
+static long   H_lsttl_prev_cash_amnt;               /* 결제전현금액 */
+static long   H_lsbts_sell_samt;                    /* 대용매도합계금액 */
+static char   H_pstn_unit_no         [ 5 + 1 ];     /* 포지션단위번호 */
+static long   H_uncl_amnt_sum;                      /* 미수금합계 */
+static long   H_cash_uncl_dlf_amnt;                 /* 현금미수연체료 */
+static long   H_etc_rntl_dlf_amnt;                  /* 기타연체이자 */
+
+static long   H_tmp_psbl_totl_amnt;                 /* 임시출금가능총액(비교) */
+static long   H_tmp_psbl_cash_amnt;                 /* 임시출금가능현금(비교) */
+
+static char   H_tagy_yn              [ 1 + 1 ];     /* 해외파생계약대상여부 */
+
+EXEC SQL END DECLARE SECTION;
+
+/* ============================================================================
+ * (4) 일반 변수 / BAM 구조체
+ * ==========================================================================*/
+static FAMMCA *p_fammca;
+
+static tlfb000m_in_t  *p_in;
+static tlfb000m_out_t *p_out;
+
+/* 사용하는 BAM 의 구조체 선언 */
+static mba0360m_in_t   mba0360m_in;
+static mba0360m_out_t  mba0360m_out;
+
+static tlf9600m_in_t   tlf9600m_in;
+static tlf9600m_out_t  tlf9600m_out;
+
+static mbe1210m_in_t   s_mbe1210m_in;
+static mbe1210m_out_t  s_mbe1210m_out;
+
+/* 수표 */
+static char   H_tsdd_chck_rcny_date      [ 8 + 1 ]; /* 금일수표입금일자 */
+static long   H_tsdd_chck_rcny_amnt;               /* 금일수표입금액 */
+static long   H_tsdd_chck_rcny_cncl_amnt;          /* 금일수표입금취소액 */
+static char   H_pvdd_chck_rcny_date      [ 8 + 1 ]; /* 전일수표입금일자 */
+static long   H_pvdd_chck_rcny_amnt;               /* 전일수표입금액 */
+static long   H_pvdd_chck_rcny_cncl_amnt;          /* 전일수표입금취소액 */
+static long   H_chck_rcny_sum_amnt;                /* 수표입금합계액 */
+
+/* 증거금/예외/시장 */
+static long   H_cnst_mrgn_tamt;                    /* 위탁증거금총액 */
+static long   H_cnst_mrgn_cash_amnt;               /* 위탁증거금현금액 */
+static long   H_ftrs_opts_bsc_dpmy_amnt;           /* 선물옵션기본예탁금 */
+static long   H_ftrs_dlng_loss_amnt;               /* 선물매매손실/수수료 */
+static long   H_nxdd_stlt_amnt;                    /* 익일결제금액 */
+static char   H_mrkt_end_yn           [ 1 + 1 ];   /* 시장종료여부(Y/N) */
+
+/* 산출 결과(중간) */
+static long   H_totl_mrgn_amnt;                    /* 총증거금액 = Max(위탁증거금총액, 기본예탁금) */
+static long   H_wtdw_psbl_totl_amnt;               /* 출금가능총액(중간) */
+static long   H_wtdw_psbl_cash_amnt;               /* 출금가능현금(중간) */
+static long   H_adtl_wtdw_psbl_totl_amnt;          /* 추가출금가능총액 */
+static long   H_adtl_wtdw_psbl_cash_amnt;          /* 추가출금가능현금 */
+static long   H_sbtt_psbl_tamt;                    /* 대체가능총액(중간) */
+
+static long   H_tmp_add_wtdw_psbl_tamt;            /* temp */
+
+/* ============================================================================
+ * (5) Function prototypes (정상화)
+ * ==========================================================================*/
+BAMMAIN(tlfb000m, "인출가능금액계산");
+
+static int  tlfb000m_main(tlfb000m_in_t *pIn, tlfb000m_out_t *pOut);
+
+static int  tlfb000m_a000_initialize(void);
+static int  tlfb000m_a099_host_variable_init(void);
+static int  tlfb000m_a500_input_check(void);
+
+static int  tlfb000m_c000_event_process(void);
+static int  tlfb000m_c100_update_meg_ftrs_wthd_blnc(void);
+static int  tlfb000m_c200_select_meg_ftrs_wthd_blnc(void);
+static int  tlfb000m_c210_bamcall_mbe1210m(void);
+static int  tlfb000m_c300_bamcall_mba0360m(void);
+static int  tlfb000m_c400_bamcall_tlf9600m(void);
+static int  tlfb000m_c500_update_meg_ftrs_wthd_blnc(void);
+
+static int  tlfb000m_aa00_inrec_init(void);
+static int  tlfb000m_aa01_inrec_assign(void);
+static int  tlfb000m_aa02_outrec_init(void);
+static int  tlfb000m_aa03_outrec_assign(void);
+
+/* ============================================================================
+ * MAIN
+ * ==========================================================================*/
+static int tlfb000m_main(tlfb000m_in_t *pIn, tlfb000m_out_t *pOut)
+{
+    p_fammca = pBIZ;
+    p_in     = pIn;
+    p_out    = pOut;
+
+    ILOG("인출가능금액 조회 시작\n");
+
+    if (tlfb000m_a000_initialize() != SUCC)
+    {
+        BAM_RETURN_FAIL;
+    }
+
+    if (tlfb000m_a500_input_check() != SUCC)
+    {
+        BAM_RETURN_FAIL;
+    }
+
+    if (tlfb000m_c000_event_process() != SUCC)
+    {
+        COPYS(p_out->erro_msg_code, H_oerrno_msg_code);
+        BAM_RETURN_FAIL;
+    }
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * 초기화
+ * ==========================================================================*/
+static int tlfb000m_a000_initialize(void)
+{
+    BAM_START;
+
+    tlfb000m_a099_host_variable_init();
+
+    /* 거래 초기화 */
+    H_iwthd_totl_sum_amnt      = 0L;
+    H_idpsd_sban_amnt          = 0L;
+    H_lsttl_prev_cash_amnt     = 0L;
+    H_lsbts_sell_samt          = 0L;
+
+    memset(H_pstn_unit_no, 0x00, sizeof(H_pstn_unit_no));
+    memcpy(H_pstn_unit_no, "GEBL", 4); /* 원문 유지 */
+
+    memset(H_tsdd_chck_rcny_date, 0x00, sizeof(H_tsdd_chck_rcny_date));
+    H_tsdd_chck_rcny_amnt      = 0L;
+    H_tsdd_chck_rcny_cncl_amnt = 0L;
+
+    memset(H_pvdd_chck_rcny_date, 0x00, sizeof(H_pvdd_chck_rcny_date));
+    H_pvdd_chck_rcny_amnt      = 0L;
+    H_pvdd_chck_rcny_cncl_amnt = 0L;
+
+    H_chck_rcny_sum_amnt = 0L;
+
+    H_cnst_mrgn_tamt         = 0L;
+    H_cnst_mrgn_cash_amnt    = 0L;
+    H_ftrs_opts_bsc_dpmy_amnt= 0L;
+    H_ftrs_dlng_loss_amnt    = 0L;
+    H_nxdd_stlt_amnt         = 0L;
+
+    memset(H_mrkt_end_yn, 0x00, sizeof(H_mrkt_end_yn));
+
+    H_totl_mrgn_amnt           = 0L;
+    H_wtdw_psbl_totl_amnt      = 0L;
+    H_wtdw_psbl_cash_amnt      = 0L;
+    H_adtl_wtdw_psbl_totl_amnt = 0L;
+    H_adtl_wtdw_psbl_cash_amnt = 0L;
+    H_sbtt_psbl_tamt           = 0L;
+
+    H_tmp_psbl_totl_amnt       = 0L;
+    H_tmp_psbl_cash_amnt       = 0L;
+
+    memset(H_tagy_yn, 0x00, sizeof(H_tagy_yn));
+
+    /* In/Out host init + assign */
+    tlfb000m_aa00_inrec_init();
+    tlfb000m_aa02_outrec_init();
+    tlfb000m_aa01_inrec_assign();
+
+    BAM_RETURN_SUCC;
+}
+
+/* Host Variable 초기화 */
+static int tlfb000m_a099_host_variable_init(void)
+{
+    BAM_START;
+
+    H_iacnt_id = 0L;
+    memset(H_ibsns_date, 0x00, sizeof(H_ibsns_date));
+    memset(H_ia_acnt_ifnm_updt_yn, 0x00, sizeof(H_ia_acnt_ifnm_updt_yn));
+    memset(H_ia_funds_sbtt_wtdw_yn, 0x00, sizeof(H_ia_funds_sbtt_wtdw_yn));
+
+    H_oftrs_opts_wtdw_psbl_tamt      = 0L;
+    H_oftrs_opts_wtdw_psbl_cash_amnt = 0L;
+    memset(H_oa_excp_ocrn_yn, 0x00, sizeof(H_oa_excp_ocrn_yn));
+    H_oa_sbtt_psbl_amnt              = 0L;
+    H_wthd_prev_blnc_amnt            = 0L;
+    H_oa_un_clam_samt                = 0L;
+    H_ofuns_sbtt_rcny_amnt           = 0L;
+    memset(H_oerrno_msg_code, 0x00, sizeof(H_oerrno_msg_code));
+
+    H_uncl_amnt_sum      = 0L;
+    H_cash_uncl_dlf_amnt = 0L;
+    H_etc_rntl_dlf_amnt  = 0L;
+
+    H_tmp_psbl_totl_amnt = 0L;
+    H_tmp_psbl_cash_amnt = 0L;
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * INPUT 검증
+ * ==========================================================================*/
+static int tlfb000m_a500_input_check(void)
+{
+    BAM_START;
+
+    /* 해외파생계약이면: 존재하면 FAIL, 없으면 SUCC */
+    EXEC SQL
+        SELECT 'Y'
+          INTO :H_tagy_yn
+          FROM SUU_UUA_ACNT A
+             , SUU_UUA_ACNT_FUNCTION B
+         WHERE A.ACNT_ID = :H_iacnt_id
+           AND A.ACNT_ID = B.ACNT_ID
+           AND B.ACNT_FNCN_TYPE_CODE = 'FDVA'
+        WITH UR;
+
+    switch(SQLCODE)
+    {
+        case SQLNOTFOUND:
+            /* 미등록이면 정상 */
+            break;
+
+        case SQLOK:
+            ELOG("계좌확인요망(해외선물계좌 사용자) [ACNT_ID = %ld]", H_iacnt_id);
+            COPYS(H_oerrno_msg_code, "5795"); /* 해외선물계좌는 사용할 수 없습니다 */
+            COPYS(p_out->erro_msg_code, H_oerrno_msg_code);
+            BAM_RETURN_FAIL;
+
+        default:
+            ELOG("UUA ACNT SELECT Error ( SQLCODE : %d / SQLMSG : %s ) [ ACNT_ID = %ld ]",
+                 SQLCODE, SQLMSG, H_iacnt_id);
+            COPYS(H_oerrno_msg_code, "0181"); /* 전산실로 연락하십시오. */
+            COPYS(p_out->erro_msg_code, H_oerrno_msg_code);
+            BAM_RETURN_FAIL;
+    }
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * 업무 처리
+ * ==========================================================================*/
+static int tlfb000m_c000_event_process(void)
+{
+    BAM_START;
+
+    /* 계좌정보갱신여부가 'Y'면 선행 update로 lock 유도 */
+    if (strcmp(H_ia_acnt_ifnm_updt_yn, "Y") == 0)
+    {
+        if (tlfb000m_c100_update_meg_ftrs_wthd_blnc() != SUCC)
+        {
+            BAM_RETURN_FAIL;
+        }
+    }
+
+    if (tlfb000m_c200_select_meg_ftrs_wthd_blnc() != SUCC)
+    {
+        BAM_RETURN_FAIL;
+    }
+
+    if (tlfb000m_c210_bamcall_mbe1210m() != SUCC)
+    {
+        BAM_RETURN_FAIL;
+    }
+
+    if (tlfb000m_c300_bamcall_mba0360m() != SUCC)
+    {
+        BAM_RETURN_FAIL;
+    }
+
+    if (tlfb000m_c400_bamcall_tlf9600m() != SUCC)
+    {
+        BAM_RETURN_FAIL;
+    }
+
+    /* ------------------------------------------------------------------------
+     * 산식(원문 로직 기반) 정상화
+     * ----------------------------------------------------------------------*/
+
+    /* 총증거금액 = Max(위탁증거금총액, 기본예탁금) */
+    H_totl_mrgn_amnt = (H_cnst_mrgn_tamt > H_ftrs_opts_bsc_dpmy_amnt)
+                      ? H_cnst_mrgn_tamt
+                      : H_ftrs_opts_bsc_dpmy_amnt;
+
+    /* 예외발생(입출금) 여부 */
+    if (strcmp(H_oa_excp_ocrn_yn, "Y") == 0)
+    {
+        if (strcmp(H_mrkt_end_yn, "Y") != 0)
+        {
+            if (H_cnst_mrgn_tamt < 0L) H_cnst_mrgn_tamt = 0L;
+
+            H_adtl_wtdw_psbl_totl_amnt =
+                    H_nxdd_stlt_amnt
+                  + H_lsttl_prev_cash_amnt
+                  + H_cnst_mrgn_tamt;
+
+            H_adtl_wtdw_psbl_cash_amnt =
+                    H_nxdd_stlt_amnt
+                  + H_cnst_mrgn_cash_amnt;
+        }
+        else
+        {
+            if (H_cnst_mrgn_tamt < 0L)      H_cnst_mrgn_tamt = 0L;
+            if (H_cnst_mrgn_cash_amnt < 0L) H_cnst_mrgn_cash_amnt = 0L;
+
+            H_adtl_wtdw_psbl_totl_amnt =
+                    H_nxdd_stlt_amnt
+                  + H_lsttl_prev_cash_amnt
+                  - H_ftrs_dlng_loss_amnt;
+
+            H_adtl_wtdw_psbl_cash_amnt =
+                    H_nxdd_stlt_amnt
+                  - H_ftrs_dlng_loss_amnt;
+        }
+
+        if (H_adtl_wtdw_psbl_totl_amnt > H_cnst_mrgn_tamt)
+            H_adtl_wtdw_psbl_totl_amnt = H_cnst_mrgn_tamt;
+
+        if (H_adtl_wtdw_psbl_cash_amnt > H_cnst_mrgn_cash_amnt)
+            H_adtl_wtdw_psbl_cash_amnt = H_cnst_mrgn_cash_amnt;
+    }
+    else
+    {
+        /* 장중이면 익일결제금액은 제외 */
+        if (strcmp(H_mrkt_end_yn, "Y") != 0)
+        {
+            H_nxdd_stlt_amnt = 0L;
+            if (H_cnst_mrgn_tamt < 0L) H_cnst_mrgn_tamt = 0L;
+
+            H_adtl_wtdw_psbl_totl_amnt = H_nxdd_stlt_amnt + H_lsttl_prev_cash_amnt;
+            if (H_adtl_wtdw_psbl_totl_amnt > H_cnst_mrgn_tamt)
+                H_adtl_wtdw_psbl_totl_amnt = H_cnst_mrgn_tamt;
+
+            H_adtl_wtdw_psbl_cash_amnt =
+                (H_nxdd_stlt_amnt > H_cnst_mrgn_cash_amnt) ? H_cnst_mrgn_cash_amnt
+                                                          : H_nxdd_stlt_amnt;
+        }
+        else
+        {
+            if (H_cnst_mrgn_tamt < 0L) H_cnst_mrgn_tamt = 0L;
+
+            H_tmp_add_wtdw_psbl_tamt =
+                    H_nxdd_stlt_amnt
+                  + H_lsttl_prev_cash_amnt
+                  - H_ftrs_dlng_loss_amnt;
+
+            H_adtl_wtdw_psbl_totl_amnt =
+                (H_tmp_add_wtdw_psbl_tamt > H_cnst_mrgn_tamt) ? H_cnst_mrgn_tamt
+                                                             : H_tmp_add_wtdw_psbl_tamt;
+
+            if (H_adtl_wtdw_psbl_totl_amnt > 0)
+            {
+                long mrgn_minus_base = H_cnst_mrgn_tamt - H_ftrs_opts_bsc_dpmy_amnt;
+                H_adtl_wtdw_psbl_totl_amnt =
+                    (H_tmp_add_wtdw_psbl_tamt > mrgn_minus_base) ? mrgn_minus_base
+                                                                : H_tmp_add_wtdw_psbl_tamt;
+
+                if (H_adtl_wtdw_psbl_totl_amnt < 0) H_adtl_wtdw_psbl_totl_amnt = 0;
+            }
+
+            H_adtl_wtdw_psbl_cash_amnt = H_nxdd_stlt_amnt - H_ftrs_dlng_loss_amnt;
+            if (H_adtl_wtdw_psbl_cash_amnt > H_cnst_mrgn_cash_amnt)
+                H_adtl_wtdw_psbl_cash_amnt = H_cnst_mrgn_cash_amnt;
+        }
+    }
+
+    /* 출금가능(중간) */
+    H_wtdw_psbl_totl_amnt =
+            H_iwthd_totl_sum_amnt
+          - H_oa_un_clam_samt
+          + H_idpsd_sban_amnt
+          - H_lsbts_sell_samt
+          + H_adtl_wtdw_psbl_totl_amnt;
+
+    H_wtdw_psbl_cash_amnt =
+            H_iwthd_totl_sum_amnt
+          - H_oa_un_clam_samt
+          + H_adtl_wtdw_psbl_cash_amnt;
+
+    /* 선물옵션출금가능(총/현금) 1차 */
+    if (strcmp(H_ia_funds_sbtt_wtdw_yn, "Y") == 0)
+    {
+        /* 총액: - Max(총증거금, 수표합계) */
+        long m1 = (H_totl_mrgn_amnt > H_chck_rcny_sum_amnt) ? H_totl_mrgn_amnt : H_chck_rcny_sum_amnt;
+        H_oftrs_opts_wtdw_psbl_tamt = H_wtdw_psbl_totl_amnt - m1;
+
+        /* 현금: 원문 분기 유지 */
+        if (H_cnst_mrgn_cash_amnt > 0)
+        {
+            long m2 = (H_cnst_mrgn_cash_amnt > H_chck_rcny_sum_amnt) ? H_cnst_mrgn_cash_amnt : H_chck_rcny_sum_amnt;
+            H_oftrs_opts_wtdw_psbl_cash_amnt = H_wtdw_psbl_cash_amnt - m2;
+        }
+        else
+        {
+            H_oftrs_opts_wtdw_psbl_cash_amnt =
+                    H_wtdw_psbl_cash_amnt
+                  - H_cnst_mrgn_cash_amnt
+                  - H_chck_rcny_sum_amnt;
+        }
+    }
+    else
+    {
+        /* 총액: - Max(총증거금, 수표합계+자금대체입금) */
+        long s = H_chck_rcny_sum_amnt + H_ofuns_sbtt_rcny_amnt;
+        long m1 = (H_totl_mrgn_amnt > s) ? H_totl_mrgn_amnt : s;
+        H_oftrs_opts_wtdw_psbl_tamt = H_wtdw_psbl_totl_amnt - m1;
+
+        /* 현금: 원문 분기 유지 */
+        if (H_cnst_mrgn_cash_amnt > 0)
+        {
+            long m2 = (H_cnst_mrgn_cash_amnt > s) ? H_cnst_mrgn_cash_amnt : s;
+            H_oftrs_opts_wtdw_psbl_cash_amnt = H_wtdw_psbl_cash_amnt - m2;
+        }
+        else
+        {
+            H_oftrs_opts_wtdw_psbl_cash_amnt =
+                    H_wtdw_psbl_cash_amnt
+                  - H_cnst_mrgn_cash_amnt
+                  - s;
+        }
+    }
+
+    /* 실제 예수금 기준 한도와 비교하여 MIN */
+    H_tmp_psbl_totl_amnt =
+            H_iwthd_totl_sum_amnt
+          - H_oa_un_clam_samt
+          + H_idpsd_sban_amnt
+          - H_chck_rcny_sum_amnt
+          - H_ofuns_sbtt_rcny_amnt;
+
+    H_tmp_psbl_cash_amnt =
+            H_iwthd_totl_sum_amnt
+          - H_oa_un_clam_samt
+          - H_chck_rcny_sum_amnt
+          - H_ofuns_sbtt_rcny_amnt;
+
+    if (H_oftrs_opts_wtdw_psbl_tamt > H_tmp_psbl_totl_amnt)
+        H_oftrs_opts_wtdw_psbl_tamt = H_tmp_psbl_totl_amnt;
+
+    if (H_oftrs_opts_wtdw_psbl_cash_amnt > H_tmp_psbl_cash_amnt)
+        H_oftrs_opts_wtdw_psbl_cash_amnt = H_tmp_psbl_cash_amnt;
+
+    /* 최종 인출가능액 산정식 적용 */
+    H_oftrs_opts_wtdw_psbl_tamt = H_oftrs_opts_wtdw_psbl_tamt - H_totl_mrgn_amnt;
+
+    if ((H_oftrs_opts_wtdw_psbl_cash_amnt - H_cnst_mrgn_cash_amnt) > H_oftrs_opts_wtdw_psbl_tamt)
+        H_oftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_tamt;
+    else
+        H_oftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_cash_amnt - H_cnst_mrgn_cash_amnt;
+
+    if (H_oftrs_opts_wtdw_psbl_tamt < 0L)      H_oftrs_opts_wtdw_psbl_tamt = 0L;
+    if (H_oftrs_opts_wtdw_psbl_cash_amnt < 0L) H_oftrs_opts_wtdw_psbl_cash_amnt = 0L;
+
+    if (H_oftrs_opts_wtdw_psbl_cash_amnt > H_oftrs_opts_wtdw_psbl_tamt)
+        H_oftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_tamt;
+
+    /* 대체가능금액(최종) */
+    long m_sbtt = (H_totl_mrgn_amnt > H_ofuns_sbtt_rcny_amnt) ? H_totl_mrgn_amnt : H_ofuns_sbtt_rcny_amnt;
+    H_sbtt_psbl_tamt = H_wtdw_psbl_totl_amnt - m_sbtt;
+
+    long m_cash = (H_cnst_mrgn_cash_amnt > H_ofuns_sbtt_rcny_amnt) ? H_cnst_mrgn_cash_amnt : H_ofuns_sbtt_rcny_amnt;
+    H_oa_sbtt_psbl_amnt = H_wtdw_psbl_cash_amnt - m_cash;
+
+    if (H_oa_sbtt_psbl_amnt > H_sbtt_psbl_tamt)
+        H_oa_sbtt_psbl_amnt = H_sbtt_psbl_tamt;
+
+    if (H_oa_sbtt_psbl_amnt < 0L)
+        H_oa_sbtt_psbl_amnt = 0L;
+
+    /* 계좌정보갱신여부 & 예외발생여부가 모두 Y면 출금건수 update */
+    if ((strcmp(H_ia_acnt_ifnm_updt_yn, "Y") == 0) &&
+        (strcmp(H_oa_excp_ocrn_yn, "Y") == 0))
+    {
+        if (tlfb000m_c500_update_meg_ftrs_wthd_blnc() != SUCC)
+            BAM_RETURN_FAIL;
+    }
+
+    /* OUTPUT assign */
+    tlfb000m_aa03_outrec_assign();
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * DB Update/Select
+ * ==========================================================================*/
+static int tlfb000m_c100_update_meg_ftrs_wthd_blnc(void)
+{
+    BAM_START;
+
+    /* 원문은 Dummy Update로 Lock 목적 */
+    EXEC SQL
+        UPDATE SME_MEG_FTRS_WTHD_BLNC
+           SET WTHD_TOTL_SUM_AMNT = WTHD_TOTL_SUM_AMNT
+         WHERE ACNT_ID      = :H_iacnt_id
+           AND PSTN_UNIT_NO = :H_pstn_unit_no;
+
+    switch(SQLCODE)
+    {
+        case SQLOK:
+            break;
+
+        case SQLNOTFOUND:
+            ELOG("MEG_FTRS_WTHD_BLNC Dummy UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]",
+                 SQLCODE, H_iacnt_id);
+            COPYS(H_oerrno_msg_code, "0181");
+            BAM_RETURN_FAIL;
+
+        default:
+            ELOG("MEG_FTRS_WTHD_BLNC Dummy UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]",
+                 SQLCODE, SQLMSG, H_iacnt_id);
+            COPYS(H_oerrno_msg_code, "0181");
+            BAM_RETURN_FAIL;
+    }
+
+    BAM_RETURN_SUCC;
+}
+
+static int tlfb000m_c200_select_meg_ftrs_wthd_blnc(void)
+{
+    BAM_START;
+
+    EXEC SQL
+        SELECT WTHD_TOTL_SUM_AMNT
+             , DPSD_SBAN_AMNT
+             , (PVDW_STLT_PREV_CASH_AMNT - TSDD_STLT_PREV_CASH_AMNT)
+             , (PVDW_SBTT_SELL_AMNT      - TSDD_SBTT_SELL_AMNT)
+             , CASH_UNCL_AMNT + ETC_RMNTL_SUM_AMNT
+             , OFUNS_SBTT_RCNY_AMNT
+          INTO :H_iwthd_totl_sum_amnt
+             , :H_idpsd_sban_amnt
+             , :H_lsttl_prev_cash_amnt
+             , :H_lsbts_sell_samt
+             , :H_oa_un_clam_samt
+             , :H_ofuns_sbtt_rcny_amnt
+          FROM SME_MEG_FTRS_WTHD_BLNC
+         WHERE ACNT_ID      = :H_iacnt_id
+           AND PSTN_UNIT_NO = :H_pstn_unit_no
+         FETCH FIRST 1 ROW ONLY
+         WITH UR;
+
+    switch(SQLCODE)
+    {
+        case SQLOK:
+            break;
+
+        case SQLNOTFOUND:
+            COPYS(H_oerrno_msg_code, "2820");
+            BAM_RETURN_FAIL;
+
+        default:
+            ELOG("MEG_FTRS_WTHD_BLNC SELECT Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]",
+                 SQLCODE, SQLMSG, H_iacnt_id);
+            COPYS(H_oerrno_msg_code, "0181");
+            BAM_RETURN_FAIL;
+    }
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * BAMCALL: mbe1210m (연체료 반영)
+ * ==========================================================================*/
+static int tlfb000m_c210_bamcall_mbe1210m(void)
+{
+    BAM_START;
+
+    memset(&s_mbe1210m_in,  0x00, sizeof(mbe1210m_in_t));
+    memset(&s_mbe1210m_out, 0x00, sizeof(mbe1210m_out_t));
+
+    if (H_oa_un_clam_samt > 0L)
+    {
+        s_mbe1210m_in.acnt_id = H_iacnt_id;
+        COPYS(s_mbe1210m_in.strt_stnr_date, "00000000");
+        COPYS(s_mbe1210m_in.a_rnbr_date, H_ibsns_date);
+
+        BAMCALL(mbe1210m, &s_mbe1210m_in, &s_mbe1210m_out);
+        if (RTNCD != SUCC)
+        {
+            ELOG("mbe1210m 호출 오류 RTNCD=%d MSG=%s", RTNCD, s_mbe1210m_out.error_msg_cnts);
+            COPYS(H_oerrno_msg_code, "0181");
+            BAM_RETURN_FAIL;
+        }
+
+        H_cash_uncl_dlf_amnt = s_mbe1210m_out.cash_uncl_dlf_amnt;
+        H_etc_rntl_dlf_amnt  = s_mbe1210m_out.etc_rntl_dlf_amnt;
+
+        /* 원문 일부 변수명 혼재 -> 총합계에 반영만 유지 */
+        H_iwthd_totl_sum_amnt =
+            H_iwthd_totl_sum_amnt + H_cash_uncl_dlf_amnt + H_etc_rntl_dlf_amnt;
+    }
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * BAMCALL: mba0360m (수표미결제)
+ * ==========================================================================*/
+static int tlfb000m_c300_bamcall_mba0360m(void)
+{
+    BAM_START;
+
+    memset(&mba0360m_in,  0x00, sizeof(mba0360m_in_t));
+    memset(&mba0360m_out, 0x00, sizeof(mba0360m_out_t));
+
+    mba0360m_in.acnt_id      = H_iacnt_id;
+    COPYS(mba0360m_in.pstn_unit_no, H_pstn_unit_no);   /* 구조체 필드 타입 가정 */
+    memcpy(mba0360m_in.acnt_type_code, "FOAC", 4);
+    memcpy(mba0360m_in.trdng_code,     "0000", 4);
+    memcpy(mba0360m_in.frgn_date,      H_ibsns_date, 8);
+    mba0360m_in.a_acnt_ifnm_ackn_yn = 'Y';
+
+    BAMCALL(mba0360m, &mba0360m_in, &mba0360m_out);
+    if (RTNCD != SUCC)
+    {
+        ELOG("mba0360m 호출 오류 RTNCD=%d MSG=%s", RTNCD, mba0360m_out.error_msg_cnts);
+        COPYS(H_oerrno_msg_code, "0181");
+        BAM_RETURN_FAIL;
+    }
+
+    COPYS(H_tsdd_chck_rcny_date, mba0360m_out.a_chck_rcmy_date1);
+    H_tsdd_chck_rcny_amnt = mba0360m_out.chck_rcmy_amnt1;
+
+    COPYS(H_pvdd_chck_rcny_date, mba0360m_out.a_chck_rcmy_date2);
+    H_pvdd_chck_rcny_amnt = mba0360m_out.chck_rcmy_amnt2;
+
+    H_chck_rcny_sum_amnt = H_tsdd_chck_rcny_amnt + H_pvdd_chck_rcny_amnt;
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * BAMCALL: tlf9600m (증거금/예외/시장종료)
+ * ==========================================================================*/
+static int tlfb000m_c400_bamcall_tlf9600m(void)
+{
+    BAM_START;
+
+    memset(&tlf9600m_in,  0x00, sizeof(tlf9600m_in_t));
+    memset(&tlf9600m_out, 0x00, sizeof(tlf9600m_out_t));
+
+    COPYS(tlf9600m_in.prce_date, H_ibsns_date);
+    tlf9600m_in.acnt_id = H_iacnt_id;
+
+    BAMCALL(tlf9600m, &tlf9600m_in, &tlf9600m_out);
+    if (RTNCD != SUCC)
+    {
+        ELOG("tlf9600m 호출 오류 RTNCD=%d ACNT_ID=%ld", RTNCD, H_iacnt_id);
+        COPYS(H_oerrno_msg_code, tlf9600m_out.error_msg_code);
+        BAM_RETURN_FAIL;
+    }
+
+    H_cnst_mrgn_tamt          = tlf9600m_out.cnst_mrgn_tamt;
+    H_cnst_mrgn_cash_amnt     = tlf9600m_out.cnst_mrgn_cash_amnt;
+    H_ftrs_opts_bsc_dpmy_amnt = tlf9600m_out.ftrs_opts_bsc_dpmy_amnt;
+
+    H_oa_excp_ocrn_yn[0]      = tlf9600m_out.excp_ocrn_yn;
+    H_oa_excp_ocrn_yn[1]      = '\0';
+
+    H_ftrs_dlng_loss_amnt     = tlf9600m_out.ftrs_dlng_loss_amnt;
+    H_nxdd_stlt_amnt          = tlf9600m_out.nxdd_stlt_amnt;
+
+    H_mrkt_end_yn[0]          = tlf9600m_out.mrkt_end_yn;
+    H_mrkt_end_yn[1]          = '\0';
+
+    COPYS(H_oerrno_msg_code, tlf9600m_out.error_msg_code);
+
+    BAM_RETURN_SUCC;
+}
+
+/* 출금건수 Update */
+static int tlfb000m_c500_update_meg_ftrs_wthd_blnc(void)
+{
+    BAM_START;
+
+    EXEC SQL
+        UPDATE SME_MEG_FTRS_WTHD_BLNC
+           SET WTDW_CONT = WTDW_CONT + 1
+         WHERE ACNT_ID      = :H_iacnt_id
+           AND PSTN_UNIT_NO = :H_pstn_unit_no;
+
+    switch(SQLCODE)
+    {
+        case SQLOK:
+            break;
+
+        case SQLNOTFOUND:
+            ELOG("MEG_FTRS_WTHD_BLNC UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]",
+                 SQLCODE, H_iacnt_id);
+            COPYS(H_oerrno_msg_code, "0181");
+            BAM_RETURN_FAIL;
+
+        default:
+            ELOG("MEG_FTRS_WTHD_BLNC UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]",
+                 SQLCODE, SQLMSG, H_iacnt_id);
+            COPYS(H_oerrno_msg_code, "0181");
+            BAM_RETURN_FAIL;
+    }
+
+    BAM_RETURN_SUCC;
+}
+
+/* ============================================================================
+ * In/Out Assign (정상화)
+ * ==========================================================================*/
+static int tlfb000m_aa00_inrec_init(void)
+{
+    BAM_START;
+
+    H_iacnt_id = 0L;
+    memset(H_ibsns_date, 0x00, sizeof(H_ibsns_date));
+    memset(H_ia_acnt_ifnm_updt_yn, 0x00, sizeof(H_ia_acnt_ifnm_updt_yn));
+    memset(H_ia_funds_sbtt_wtdw_yn, 0x00, sizeof(H_ia_funds_sbtt_wtdw_yn));
+
+    BAM_RETURN_VOID;
+}
+
+static int tlfb000m_aa02_outrec_init(void)
+{
+    BAM_START;
+
+    H_oftrs_opts_wtdw_psbl_tamt      = 0L;
+    H_oftrs_opts_wtdw_psbl_cash_amnt = 0L;
+    memset(H_oa_excp_ocrn_yn, 0x00, sizeof(H_oa_excp_ocrn_yn));
+    H_oa_sbtt_psbl_amnt              = 0L;
+    H_wthd_prev_blnc_amnt            = 0L;
+    H_oa_un_clam_samt                = 0L;
+    H_ofuns_sbtt_rcny_amnt           = 0L;
+    memset(H_oerrno_msg_code, 0x00, sizeof(H_oerrno_msg_code));
+
+    BAM_RETURN_VOID;
+}
+
+static int tlfb000m_aa01_inrec_assign(void)
+{
+    BAM_START;
+
+    H_iacnt_id = p_in->acnt_id;
+    COPYS(H_ibsns_date, p_in->a_bsns_date);
+
+    H_ia_acnt_ifnm_updt_yn[0]  = p_in->a_acnt_ifnm_updt_yn;
+    H_ia_acnt_ifnm_updt_yn[1]  = '\0';
+
+    H_ia_funds_sbtt_wtdw_yn[0] = p_in->a_funs_sbtt_wtdw_yn; /* 원문 struct 필드명 가정 */
+    H_ia_funds_sbtt_wtdw_yn[1] = '\0';
+
+    ILOG("계좌ID(%ld), 영업일자(%s), 계좌정보갱신여부(%c), 자금대체출금여부(%c)",
+         H_iacnt_id, H_ibsns_date, H_ia_acnt_ifnm_updt_yn[0], H_ia_funds_sbtt_wtdw_yn[0]);
+
+    BAM_RETURN_SUCC;
+}
+
+static int tlfb000m_aa03_outrec_assign(void)
+{
+    BAM_START;
+
+    p_out->ftrs_opts_wtdw_psbl_tamt      = H_oftrs_opts_wtdw_psbl_tamt;
+    p_out->ftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_cash_amnt;
+    p_out->a_excp_ocrn_yn                = H_oa_excp_ocrn_yn[0];
+    p_out->a_sbtt_psbl_amnt              = H_oa_sbtt_psbl_amnt;
+    p_out->wthd_prev_blnc_amnt           = H_wthd_prev_blnc_amnt;
+    p_out->a_un_clam_samt                = H_oa_un_clam_samt;
+    p_out->funs_sbtt_rcny_amnt           = H_ofuns_sbtt_rcny_amnt;
+    COPYS(p_out->erro_msg_code, H_oerrno_msg_code);
+
+    ILOG("출금가능총액(%ld) 출금가능현금(%ld) 예외(%c) 대체가능(%ld) 미수합계(%ld) 자금대체입금(%ld) 오류코드(%s)",
+         p_out->ftrs_opts_wtdw_psbl_tamt,
+         p_out->ftrs_opts_wtdw_psbl_cash_amnt,
+         p_out->a_excp_ocrn_yn,
+         p_out->a_sbtt_psbl_amnt,
+         p_out->a_un_clam_samt,
+         p_out->funs_sbtt_rcny_amnt,
+         p_out->erro_msg_code);
+
+    BAM_RETURN_VOID;
+}
+
+/*
+ *                                E N D   O F   P R O G R A M
+ */

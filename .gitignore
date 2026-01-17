@@ -46,3 +46,5 @@ tests/fixtures/cursor_metadata.json
 tests/fixtures/sample_result.json
 tests/fixtures/test_metadata_with_dup.json
 tests/fixtures/test_metadata.json
+
+./original_source.sqc

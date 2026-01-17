@@ -114,7 +114,7 @@ class TestFunctionContextExtractor:
     @pytest.fixture
     def extractor(self):
         """테스트용 추출기 생성"""
-        from function_context import FunctionContextExtractor
+        from analysis.context import FunctionContextExtractor
         metadata = create_test_metadata()
         return FunctionContextExtractor(metadata)
     
@@ -231,7 +231,7 @@ class TestMetadataIndexer:
     @pytest.fixture
     def indexer(self):
         """테스트용 인덱서 생성"""
-        from function_context.indexer import MetadataIndexer
+        from analysis.context.indexer import MetadataIndexer
         metadata = create_test_metadata()
         return MetadataIndexer(metadata)
     

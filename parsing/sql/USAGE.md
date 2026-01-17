@@ -7,7 +7,7 @@ Pro*C/SQLC 코드에서 SQL을 추출하고 MyBatis 형식으로 변환하는 �
 ### 1. SQL 추출 및 MyBatis 변환
 
 ```python
-from sql_extractor import SQLExtractor
+from parsing.sql import SQLExtractor
 
 extractor = SQLExtractor()
 
@@ -70,7 +70,7 @@ sql_extractor 패키지는 여러 독립적인 컴포넌트로 구성되어 있�
 **역할**: Pro*C 코드에서 `EXEC SQL ... ;` 블록을 추출합니다.
 
 ```python
-from sql_extractor import TreeSitterSQLExtractor
+from parsing.sql import TreeSitterSQLExtractor
 
 # Tree-sitter 기반 추출기 생성
 extractor = TreeSitterSQLExtractor()
@@ -109,7 +109,7 @@ SQL: EXEC SQL INSERT INTO logs VALUES (:log_msg);
 **역할**: SQL 구문의 타입(SELECT, INSERT 등)을 결정하고, 호스트 변수를 입력/출력으로 분류합니다.
 
 ```python
-from sql_extractor.pyparsing_parser import get_sql_parser
+from parsing.sql.pyparsing_parser import get_sql_parser
 
 parser = get_sql_parser()
 
@@ -143,7 +143,7 @@ print(f"출력 변수: {output_vars}")  # [':out_name', ':out_age']
 - 컬럼 alias 자동 추가
 
 ```python
-from sql_extractor import MyBatisConverter
+from parsing.sql import MyBatisConverter
 
 converter = MyBatisConverter()
 
@@ -187,7 +187,7 @@ print(result.sql)  # UPDATE users SET name = ${param.new_name} WHERE id = ${para
 **역할**: SQL 타입별로 고유한 ID를 자동 생성합니다.
 
 ```python
-from sql_extractor import SQLIdGenerator
+from parsing.sql import SQLIdGenerator
 
 id_gen = SQLIdGenerator()
 
@@ -208,7 +208,7 @@ print(id_gen.generate_id("select"))  # "select_0"
 **역할**: 원본 SQL을 식별 가능한 주석으로 대체할 때 사용합니다.
 
 ```python
-from sql_extractor import SQLCommentMarker
+from parsing.sql import SQLCommentMarker
 
 # 기본 템플릿
 marker = SQLCommentMarker()
@@ -228,7 +228,7 @@ print(marker.mark("select_0", "select"))
 **역할**: DECLARE CURSOR + OPEN + FETCH + CLOSE 패턴을 단일 SELECT 문으로 병합합니다.
 
 ```python
-from sql_extractor import CursorMerger
+from parsing.sql import CursorMerger
 
 merger = CursorMerger()
 
@@ -267,7 +267,7 @@ for group in groups:
 **역할**: strncpy, sprintf 등으로 조합된 동적 SQL을 재구성합니다.
 
 ```python
-from sql_extractor import DynamicSQLExtractor
+from parsing.sql import DynamicSQLExtractor
 
 extractor = DynamicSQLExtractor()
 

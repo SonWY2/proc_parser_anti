@@ -1,5 +1,5 @@
 import rich
-from proc_parser import ProCParser
+from parsing.core import ProCParser
 
 parser = ProCParser()
 elements = parser.parse_file("sample_input/enterprise_complex_sql.pc")
@@ -42,7 +42,7 @@ print("\n" + "=" * 80)
 print("Header Parser 테스트")
 print("=" * 80)
 
-from header_parser import HeaderParser, TypedefStructParser, STPParser
+from parsing.header import HeaderParser, TypedefStructParser, STPParser
 
 # 1. HeaderParser 통합 테스트
 header_parser = HeaderParser(external_macros={"MAX_SIZE": 30})
@@ -82,7 +82,7 @@ print("\n" + "=" * 80)
 print("OMM Generator 테스트")
 print("=" * 80)
 
-from omm_generator import OMMGenerator
+from generation.artifacts import OMMGenerator
 
 omm_generator = OMMGenerator(
     base_package="sp.spa.frgn.dao.dto",
@@ -115,7 +115,7 @@ print("\n" + "=" * 80)
 print("DBIO Generator 테스트")
 print("=" * 80)
 
-from dbio_generator import DBIOGenerator
+from generation.artifacts import DBIOGenerator
 
 dbio_generator = DBIOGenerator(
     base_package="sp.spa.cbc.dao",
@@ -168,7 +168,7 @@ print("\n" + "=" * 80)
 print("shared_config 테스트")
 print("=" * 80)
 
-from shared_config import (
+from infra.config import (
     get_java_type,
     get_jdbc_type,
     get_mybatis_tag,
@@ -205,8 +205,8 @@ print("\n" + "=" * 80)
 print("Variable Lineage Tracker 테스트")
 print("=" * 80)
 
-from variable_lineage import VariableLineageTracker
-from variable_lineage.tracker import LineageConfig
+from analysis.lineage import VariableLineageTracker
+from analysis.lineage.tracker import LineageConfig
 import json
 import os
 
@@ -292,7 +292,7 @@ print("\n" + "=" * 80)
 print("Neo4j Exporter 테스트")
 print("=" * 80)
 
-from variable_lineage import Neo4jExporter
+from analysis.lineage import Neo4jExporter
 
 # 1. 모든 프로그램 요소 노드 추가 (새 기능)
 print("\n1. 프로그램 요소 노드 추가 (Headers, Macros, Functions, BamCalls)")
@@ -357,8 +357,8 @@ print("\n" + "=" * 80)
 print("Context Metadata Extractor 테스트")
 print("=" * 80)
 
-from variable_lineage.context_extractor import ContextExtractor, FunctionContext
-from variable_lineage.context_extractor.formatters import PromptFormatter
+from analysis.lineage.context_extractor import ContextExtractor, FunctionContext
+from analysis.lineage.context_extractor.formatters import PromptFormatter
 
 # 1. ContextExtractor 생성
 print("\n1. ContextExtractor 초기화")

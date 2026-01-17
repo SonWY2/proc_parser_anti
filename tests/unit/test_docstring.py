@@ -4,7 +4,7 @@ Docstring 추출 기능 테스트 스크립트
 import sys
 sys.path.insert(0, r'd:\workspace\proc_parser_antigravity\proc_parser')
 
-from proc_parser import ProCParser
+from parsing.core import ProCParser
 
 parser = ProCParser()
 elements = parser.parse_file(r'd:\workspace\proc_parser_antigravity\proc_parser\sample_input\enterprise_complex_sql.pc')

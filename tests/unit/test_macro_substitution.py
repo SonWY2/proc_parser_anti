@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from proc_parser import ProCParser
+from parsing.core import ProCParser
 
 def test_macro_substitution():
     """매크로 상수 치환 테스트"""

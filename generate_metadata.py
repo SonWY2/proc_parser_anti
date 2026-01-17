@@ -18,7 +18,7 @@ import sys
 # proc_parser 모듈 경로 추가
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from proc_parser.unified_metadata_generator import UnifiedMetadataGenerator
+from parsing.core.unified_metadata_generator import UnifiedMetadataGenerator
 
 
 def main():

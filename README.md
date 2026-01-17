@@ -16,26 +16,33 @@ Pro*C 파일(.pc, .sqc, .h)을 파싱하여 코드 요소별로 분해하고, Ja
 
 ```
 proc_parser/
-├── main.py                    # 메인 진입점
-├── parser_core.py             # 핵심 파싱 로직
-├── c_parser.py                # tree-sitter 기반 C 파서
-├── sql_converter.py           # Pro*C SQL → 표준 SQL 변환
-├── generate_metadata.py       # 통합 메타데이터 생성기
+├── parsing/                        # 🔍 코드 파싱
+│   ├── core/                       # 핵심 파서 + plugins/
+│   ├── sql/                        # SQL 추출 + plugins/
+│   └── header/                     # 헤더 파싱
 │
-├── sql_extractor/             # SQL 추출 및 MyBatis 변환
-├── sql_validator/             # LLM 기반 SQL 검증 (GUI 포함)
-├── translation_merge/         # 번역 코드 병합
-├── llm_verifier/              # LLM 기반 변환 검증
-├── variable_lineage/          # 변수 추적 및 데이터 흐름 분석
-├── header_parser/             # 헤더 파일 분석
-├── CPG/                       # Code Property Graph 생성
+├── analysis/                       # 📊 코드 분석
+│   ├── cpg/                        # Code Property Graph
+│   ├── lineage/                    # 변수 추적
+│   └── context/                    # 함수 컨텍스트
 │
-├── omm_generator/             # OMM (Object Mapping Model) 생성
-├── dbio_generator/            # DBIO (Database I/O) 생성
-├── dao_generator/             # DAO (MyBatis Mapper) 생성
+├── generation/                     # 🏗️ 코드 생성
+│   ├── artifacts/                  # OMM, DBIO, DAO 생성기
+│   └── merge/                      # 번역 병합 + plugins/
 │
-├── agent_system/              # 멀티 에이전트 시스템
-└── plugins/                   # 확장 플러그인
+├── validation/                     # ✅ 검증
+│   ├── sql/                        # SQL 검증 (GUI 포함)
+│   └── llm/                        # LLM 검증 + plugins/
+│
+├── infra/                          # 🔧 인프라
+│   ├── agents/                     # 에이전트 시스템
+│   ├── api/                        # API 로드밸런서
+│   └── config/                     # 공유 설정
+│
+├── tests/
+├── main.py
+├── generate_metadata.py
+└── README.md
 ```
 
 ---
@@ -70,7 +77,7 @@ python -m sql_validator
 
 ## 📚 주요 모듈
 
-### 1. 핵심 파서 (`parser_core.py`)
+### 1. 핵심 파서 (`parsing/core/`)
 
 Pro*C 파일을 파싱하여 코드 요소 추출:
 
@@ -83,18 +90,18 @@ Pro*C 파일을 파싱하여 코드 요소 추출:
 - **Unknown**: 미분류 요소 (디버깅용)
 
 ```python
-from parser_core import ProCParser
+from parsing.core import ProCParser
 
 parser = ProCParser()
 elements = parser.parse_file("example.pc")
 ```
 
-### 2. SQL 추출기 (`sql_extractor/`)
+### 2. SQL 추출기 (`parsing/sql/`)
 
 임베디드 SQL을 분석하고 MyBatis XML로 변환:
 
 ```python
-from sql_extractor import SQLExtractor, MyBatisConverter
+from parsing.sql import SQLExtractor, MyBatisConverter
 
 # SQL 추출
 extractor = SQLExtractor()
@@ -111,16 +118,16 @@ mybatis_xml = converter.convert(sql_elements)
 - Transaction (COMMIT, ROLLBACK, SAVEPOINT)
 - Array DML (BULK INSERT/UPDATE)
 
-### 3. SQL 검증기 (`sql_validator/`)
+### 3. SQL 검증기 (`validation/sql/`)
 
 LLM 기반 SQL 변환 검증 도구:
 
 ```bash
 # GUI 실행
-python -m sql_validator
+python -m validation.sql
 
 # CLI 사용
-python -m sql_validator --batch input_dir output_dir
+python -m validation.sql --batch input_dir output_dir
 ```
 
 **기능:**
@@ -129,12 +136,12 @@ python -m sql_validator --batch input_dir output_dir
 - Diff 하이라이팅
 - 세션 저장/불러오기
 
-### 4. CPG (Code Property Graph) (`CPG/`)
+### 4. CPG (Code Property Graph) (`analysis/cpg/`)
 
 코드 분석을 위한 그래프 생성:
 
 ```python
-from CPG import CPGBuilder
+from analysis.cpg import CPGBuilder
 
 builder = CPGBuilder()
 cpg = builder.build("input.pc")
@@ -160,39 +167,39 @@ python generate_metadata.py ./proc_files ./output.json
 - **DBIO**: 데이터베이스 접근 클래스
 - **DAO**: MyBatis Mapper 인터페이스
 
-### 6. LLM 검증기 (`llm_verifier/`)
+### 6. LLM 검증기 (`validation/llm/`)
 
 변환 품질을 AI로 검증:
 
 ```python
-from llm_verifier import Verifier
+from validation.llm import LLMVerifier
 
-verifier = Verifier()
+verifier = LLMVerifier()
 result = verifier.verify_transformation(
     source_code="...",
     transformed_code="..."
 )
 ```
 
-### 7. 변수 추적 (`variable_lineage/`)
+### 7. 변수 추적 (`analysis/lineage/`)
 
 변수 흐름 및 의존성 분석:
 
 ```python
-from variable_lineage import VariableTracker
+from analysis.lineage import VariableLineageTracker
 
-tracker = VariableTracker()
+tracker = VariableLineageTracker()
 lineage = tracker.trace("input.pc")
 tracker.export_to_json(lineage, "output.json")
 ```
 
-### 8. 에이전트 시스템 (`agent_system/`)
+### 8. 에이전트 시스템 (`infra/agents/`)
 
 멀티 에이전트 기반 자동화:
 
 ```bash
-python -m agent_system --mode gui
-python -m agent_system --mode cli --agent orchestrator
+python -m infra.agents.base --mode gui
+python -m infra.agents.base --mode cli --agent orchestrator
 ```
 
 ---
@@ -204,9 +211,9 @@ python -m agent_system --mode cli --agent orchestrator
 특수 구조 파싱을 위한 확장:
 
 ```python
-from plugin_interface import PluginInterface
+from parsing.core.interfaces import ParserPlugin
 
-class CustomPlugin(PluginInterface):
+class CustomPlugin(ParserPlugin):
     def can_handle(self, text, start_pos):
         return text[start_pos:].startswith("CUSTOM_MACRO")
     
@@ -221,10 +228,10 @@ class CustomPlugin(PluginInterface):
 
 ### SQL 관계 플러그인
 
-SQL 패턴 감지를 위한 확장 (위치: `sql_extractor/plugins/`):
+SQL 패턴 감지를 위한 확장 (위치: `parsing/sql/plugins/`):
 
 ```python
-from sql_extractor.plugins import SQLRelationshipPlugin
+from parsing.sql.plugins import SQLRelationshipPlugin
 
 class BulkCollectPlugin(SQLRelationshipPlugin):
     def can_handle(self, sql_elements):
@@ -319,14 +326,15 @@ cp .db.env.example .db.env
 
 각 모듈별 상세 문서:
 
-- [`sql_extractor/USAGE.md`](sql_extractor/USAGE.md) - SQL 추출기 사용법
-- [`sql_validator/USAGE.md`](sql_validator/USAGE.md) - SQL 검증기 사용법
-- [`CPG/USAGE.md`](CPG/USAGE.md) - CPG 빌더 사용법
-- [`CPG/README.md`](CPG/README.md) - CPG 아키텍처 설명
-- [`translation_merge/USAGE.md`](translation_merge/USAGE.md) - 번역 병합 사용법
-- [`llm_verifier/USAGE.md`](llm_verifier/USAGE.md) - LLM 검증기 사용법
-- [`variable_lineage/USAGE.md`](variable_lineage/USAGE.md) - 변수 추적 사용법
-- [`agent_system/README.md`](agent_system/README.md) - 에이전트 시스템 가이드
+- [`parsing/core/USAGE.md`](parsing/core/USAGE.md) - 핵심 파서 사용법
+- [`parsing/sql/USAGE.md`](parsing/sql/USAGE.md) - SQL 추출기 사용법
+- [`analysis/cpg/USAGE.md`](analysis/cpg/USAGE.md) - CPG 빌더 사용법
+- [`analysis/context/USAGE.md`](analysis/context/USAGE.md) - 함수 컨텍스트 사용법
+- [`analysis/lineage/USAGE.md`](analysis/lineage/USAGE.md) - 변수 추적 사용법
+- [`generation/merge/USAGE.md`](generation/merge/USAGE.md) - 번역 병합 사용법
+- [`validation/sql/USAGE.md`](validation/sql/USAGE.md) - SQL 검증기 사용법
+- [`validation/llm/USAGE.md`](validation/llm/USAGE.md) - LLM 검증기 사용법
+- [`infra/agents/base/README.md`](infra/agents/base/README.md) - 에이전트 시스템 가이드
 
 ---
 

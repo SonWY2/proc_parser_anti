@@ -1,8 +1,8 @@
 """노드 연결 관계 테스트"""
-from variable_lineage import VariableLineageTracker
-from variable_lineage.types import NodeType, LinkType
-from proc_parser import ProCParser
-from header_parser import HeaderParser
+from analysis.lineage import VariableLineageTracker
+from analysis.lineage.types import NodeType, LinkType
+from parsing.core import ProCParser
+from parsing.header import HeaderParser
 import os
 
 # 파싱

@@ -13,7 +13,7 @@ pip install tree-sitter tree-sitter-c
 ### 단일 파일 파싱
 
 ```python
-from proc_parser import ProCParser
+from parsing.core import ProCParser
 
 parser = ProCParser()
 elements = parser.parse_file("sample.pc")
@@ -26,7 +26,7 @@ for el in elements:
 ### 디렉토리 일괄 처리
 
 ```python
-from proc_parser import process_directory
+from parsing.core import process_directory
 
 # input_dir 내의 모든 .pc, .h 파일을 파싱하여
 # output_dir에 타입별 JSONL 파일로 저장
@@ -86,7 +86,7 @@ print(parser.plugins.keys())
 ### ParserPlugin (구문 파싱)
 
 ```python
-from proc_parser import ParserPlugin
+from parsing.core import ParserPlugin
 import re
 
 class MyCustomPlugin(ParserPlugin):
@@ -116,7 +116,7 @@ class MyCustomPlugin(ParserPlugin):
 ### SQLRelationshipPlugin (SQL 관계 감지)
 
 ```python
-from proc_parser import SQLRelationshipPlugin
+from parsing.core import SQLRelationshipPlugin
 from typing import List, Dict
 
 class MyRelationshipPlugin(SQLRelationshipPlugin):
@@ -152,7 +152,7 @@ C 헤더 파일을 파싱하여 구조체/STP 정보를 추출합니다.
 ### 기본 사용법
 
 ```python
-from header_parser import HeaderParser
+from parsing.header import HeaderParser
 
 parser = HeaderParser(
     external_macros={"MAX_SIZE": 30},      # 매크로 값 주입
@@ -190,7 +190,7 @@ db_vars_info = parser.parse(header_content)
 db_vars_info를 OMM 파일로 변환합니다.
 
 ```python
-from omm_generator import OMMGenerator
+from generation.artifacts import OMMGenerator
 
 generator = OMMGenerator(
     base_package="com.example.dao.dto",
@@ -225,7 +225,7 @@ OMM com.example.dao.dto.Spaa010pInrec1
 SQL 정보를 MyBatis XML로 변환합니다.
 
 ```python
-from dbio_generator import DBIOGenerator
+from generation.artifacts import DBIOGenerator
 
 generator = DBIOGenerator(
     base_package="com.example.dao",
@@ -254,21 +254,21 @@ generator.write(content, "SPAA0010Dao")
 
 ---
 
-## 공통 설정 (shared_config)
+## 공통 설정 (infra.config)
 
 타입 매핑을 중앙에서 관리합니다. 새 타입 추가 시 해당 파일만 수정:
 
 | 파일 | 내용 |
 |------|------|
-| `shared_config/type_mappings.py` | C→Java, STP 타입 매핑 |
-| `shared_config/sql_mappings.py` | SQL→MyBatis 태그 매핑 |
-| `shared_config/naming_rules.py` | 네이밍 규칙, count 패턴 |
-| `shared_config/logger.py` | Loguru 기반 로깅 설정 |
+| `infra/config/type_mappings.py` | C→Java, STP 타입 매핑 |
+| `infra/config/sql_mappings.py` | SQL→MyBatis 태그 매핑 |
+| `infra/config/naming_rules.py` | 네이밍 규칙, count 패턴 |
+| `infra/config/logger.py` | Loguru 기반 로깅 설정 |
 
 ### 타입 매핑 수정 예시
 
 ```python
-# shared_config/type_mappings.py
+# infra/config/type_mappings.py
 
 C_TO_JAVA_TYPE_MAP = {
     "int": ("Integer", "INTEGER"),

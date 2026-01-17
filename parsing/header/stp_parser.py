@@ -10,7 +10,7 @@ import os
 # 상위 디렉토리를 path에 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared_config import STP_NUMERIC_TYPES, snake_to_camel
+from infra.config import STP_NUMERIC_TYPES, snake_to_camel
 
 
 class STPParser:

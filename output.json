@@ -1,0 +1,3588 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "generated_at": "2026-01-17T22:39:42.271505",
+    "source_file": "original_source.sqc",
+    "source_file_path": "D:\\workspace\\proc_parser_antigravity\\proc_parser\\original_source.sqc"
+  },
+  "source_analysis": {
+    "summary": {
+      "total_elements": 289,
+      "by_type": {
+        "comments": 99,
+        "includes": 5,
+        "preprocessor_directives": 2,
+        "macros": 1,
+        "sql": 6,
+        "variables": 60,
+        "function_calls": 83,
+        "function_prototypes": 15,
+        "functions": 15,
+        "bam_calls": 3
+      },
+      "total_relationships": 0
+    },
+    "elements_by_type": {
+      "comments": [
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 1,
+          "line_end": 16,
+          "raw_content": "/*\n*******************************************************************************\n**  시스템 명 : TL (현/선물주문)\n**  프로그램ID : tlfb000m (TOFE_SP_WITHDR_POSS_AMT)\n**  프로그램명 : tlfb000m\n**  개      요 : 인출가능금액계산\n*******************************************************************************\n**\n** << 프로그램 변경 정보 >>\n**  변경 일자 : 변경자 : 변   경   내   역\n**  2012-05-17 : 변태완 : 프로그램 신규 작성\n**  2012-08-17 : 변태완 : UNIX 변환작업\n**  2013-11-13 : 이기재 : 로직재검\n**  2017-07-07 : CONVERSION : 소스변환 자동전환\n*******************************************************************************\n*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 18,
+          "line_end": 20,
+          "raw_content": "/*---------------------------------------------------------------------------\n * 주문가능액 및 인출가능액 (원문 주석 유지)\n *--------------------------------------------------------------------------*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 22,
+          "line_end": 22,
+          "raw_content": "/* BAM / Logging / Return macro */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 23,
+          "line_end": 23,
+          "raw_content": "/* In/Out record struct */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 25,
+          "line_end": 25,
+          "raw_content": "/* BAM Call Parameters */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 26,
+          "line_end": 26,
+          "raw_content": "/* BAM Call Parameters */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 27,
+          "line_end": 27,
+          "raw_content": "/* 일자별 계산 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 33,
+          "line_end": 37,
+          "raw_content": "/* ============================================================================\n * (3) Host Variable Define (정상화)\n *  - 원문에서 char 단일/배열 혼재 -> 필요한 길이로 통일\n *  - 중복 선언 제거\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 40,
+          "line_end": 40,
+          "raw_content": "/* InRec1 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 41,
+          "line_end": 41,
+          "raw_content": "/* 계좌ID */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 42,
+          "line_end": 42,
+          "raw_content": "/* 영업일자 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 43,
+          "line_end": 43,
+          "raw_content": "/* 계좌정보갱신여부(Y/N) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 44,
+          "line_end": 44,
+          "raw_content": "/* 자금대체출금여부(Y/N) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 46,
+          "line_end": 46,
+          "raw_content": "/* OutRec1 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 47,
+          "line_end": 47,
+          "raw_content": "/* 선물옵션출금가능총액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 48,
+          "line_end": 48,
+          "raw_content": "/* 선물옵션출금가능현금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 49,
+          "line_end": 49,
+          "raw_content": "/* 예외발생여부(Y/N) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 50,
+          "line_end": 50,
+          "raw_content": "/* 대체가능금액(최종) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 51,
+          "line_end": 51,
+          "raw_content": "/* 예수금전잔고금액(원문 필드명 정합) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 52,
+          "line_end": 52,
+          "raw_content": "/* 예수금청구금액(미수 등) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 53,
+          "line_end": 53,
+          "raw_content": "/* 자금대체입금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 54,
+          "line_end": 54,
+          "raw_content": "/* 오류메시지코드 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 56,
+          "line_end": 56,
+          "raw_content": "/* Etc */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 57,
+          "line_end": 57,
+          "raw_content": "/* 예수금총합계금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 58,
+          "line_end": 58,
+          "raw_content": "/* 예탁대용금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 59,
+          "line_end": 59,
+          "raw_content": "/* 결제전현금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 60,
+          "line_end": 60,
+          "raw_content": "/* 대용매도합계금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 61,
+          "line_end": 61,
+          "raw_content": "/* 포지션단위번호 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 62,
+          "line_end": 62,
+          "raw_content": "/* 미수금합계 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 63,
+          "line_end": 63,
+          "raw_content": "/* 현금미수연체료 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 64,
+          "line_end": 64,
+          "raw_content": "/* 기타연체이자 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 66,
+          "line_end": 66,
+          "raw_content": "/* 임시출금가능총액(비교) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 67,
+          "line_end": 67,
+          "raw_content": "/* 임시출금가능현금(비교) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 69,
+          "line_end": 69,
+          "raw_content": "/* 해외파생계약대상여부 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 73,
+          "line_end": 75,
+          "raw_content": "/* ============================================================================\n * (4) 일반 변수 / BAM 구조체\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 81,
+          "line_end": 81,
+          "raw_content": "/* 사용하는 BAM 의 구조체 선언 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 91,
+          "line_end": 91,
+          "raw_content": "/* 수표 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 92,
+          "line_end": 92,
+          "raw_content": "/* 금일수표입금일자 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 93,
+          "line_end": 93,
+          "raw_content": "/* 금일수표입금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 94,
+          "line_end": 94,
+          "raw_content": "/* 금일수표입금취소액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 95,
+          "line_end": 95,
+          "raw_content": "/* 전일수표입금일자 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 96,
+          "line_end": 96,
+          "raw_content": "/* 전일수표입금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 97,
+          "line_end": 97,
+          "raw_content": "/* 전일수표입금취소액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 98,
+          "line_end": 98,
+          "raw_content": "/* 수표입금합계액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 100,
+          "line_end": 100,
+          "raw_content": "/* 증거금/예외/시장 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 101,
+          "line_end": 101,
+          "raw_content": "/* 위탁증거금총액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 102,
+          "line_end": 102,
+          "raw_content": "/* 위탁증거금현금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 103,
+          "line_end": 103,
+          "raw_content": "/* 선물옵션기본예탁금 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 104,
+          "line_end": 104,
+          "raw_content": "/* 선물매매손실/수수료 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 105,
+          "line_end": 105,
+          "raw_content": "/* 익일결제금액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 106,
+          "line_end": 106,
+          "raw_content": "/* 시장종료여부(Y/N) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 108,
+          "line_end": 108,
+          "raw_content": "/* 산출 결과(중간) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 109,
+          "line_end": 109,
+          "raw_content": "/* 총증거금액 = Max(위탁증거금총액, 기본예탁금) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 110,
+          "line_end": 110,
+          "raw_content": "/* 출금가능총액(중간) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 111,
+          "line_end": 111,
+          "raw_content": "/* 출금가능현금(중간) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 112,
+          "line_end": 112,
+          "raw_content": "/* 추가출금가능총액 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 113,
+          "line_end": 113,
+          "raw_content": "/* 추가출금가능현금 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 114,
+          "line_end": 114,
+          "raw_content": "/* 대체가능총액(중간) */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 116,
+          "line_end": 116,
+          "raw_content": "/* temp */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 118,
+          "line_end": 120,
+          "raw_content": "/* ============================================================================\n * (5) Function prototypes (정상화)\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 142,
+          "line_end": 144,
+          "raw_content": "/* ============================================================================\n * MAIN\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 172,
+          "line_end": 174,
+          "raw_content": "/* ============================================================================\n * 초기화\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 181,
+          "line_end": 181,
+          "raw_content": "/* 거래 초기화 */",
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 188,
+          "line_end": 188,
+          "raw_content": "/* 원문 유지 */",
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 220,
+          "line_end": 220,
+          "raw_content": "/* In/Out host init + assign */",
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 228,
+          "line_end": 228,
+          "raw_content": "/* Host Variable 초기화 */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 257,
+          "line_end": 259,
+          "raw_content": "/* ============================================================================\n * INPUT 검증\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 264,
+          "line_end": 264,
+          "raw_content": "/* 해외파생계약이면: 존재하면 FAIL, 없으면 SUCC */",
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 278,
+          "line_end": 278,
+          "raw_content": "/* 미등록이면 정상 */",
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 283,
+          "line_end": 283,
+          "raw_content": "/* 해외선물계좌는 사용할 수 없습니다 */",
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 290,
+          "line_end": 290,
+          "raw_content": "/* 전산실로 연락하십시오. */",
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 298,
+          "line_end": 300,
+          "raw_content": "/* ============================================================================\n * 업무 처리\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 305,
+          "line_end": 305,
+          "raw_content": "/* 계좌정보갱신여부가 'Y'면 선행 update로 lock 유도 */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 334,
+          "line_end": 336,
+          "raw_content": "/* ------------------------------------------------------------------------\n     * 산식(원문 로직 기반) 정상화\n     * ----------------------------------------------------------------------*/",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 338,
+          "line_end": 338,
+          "raw_content": "/* 총증거금액 = Max(위탁증거금총액, 기본예탁금) */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 343,
+          "line_end": 343,
+          "raw_content": "/* 예외발생(입출금) 여부 */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 382,
+          "line_end": 382,
+          "raw_content": "/* 장중이면 익일결제금액은 제외 */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 425,
+          "line_end": 425,
+          "raw_content": "/* 출금가능(중간) */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 438,
+          "line_end": 438,
+          "raw_content": "/* 선물옵션출금가능(총/현금) 1차 */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 441,
+          "line_end": 441,
+          "raw_content": "/* 총액: - Max(총증거금, 수표합계) */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 445,
+          "line_end": 445,
+          "raw_content": "/* 현금: 원문 분기 유지 */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 461,
+          "line_end": 461,
+          "raw_content": "/* 총액: - Max(총증거금, 수표합계+자금대체입금) */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 466,
+          "line_end": 466,
+          "raw_content": "/* 현금: 원문 분기 유지 */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 481,
+          "line_end": 481,
+          "raw_content": "/* 실제 예수금 기준 한도와 비교하여 MIN */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 501,
+          "line_end": 501,
+          "raw_content": "/* 최종 인출가능액 산정식 적용 */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 515,
+          "line_end": 515,
+          "raw_content": "/* 대체가능금액(최종) */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 528,
+          "line_end": 528,
+          "raw_content": "/* 계좌정보갱신여부 & 예외발생여부가 모두 Y면 출금건수 update */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 536,
+          "line_end": 536,
+          "raw_content": "/* OUTPUT assign */",
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 542,
+          "line_end": 544,
+          "raw_content": "/* ============================================================================\n * DB Update/Select\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 549,
+          "line_end": 549,
+          "raw_content": "/* 원문은 Dummy Update로 Lock 목적 */",
+          "function": "tlfb000m_c100_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 619,
+          "line_end": 621,
+          "raw_content": "/* ============================================================================\n * BAMCALL: mbe1210m (연체료 반영)\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 646,
+          "line_end": 646,
+          "raw_content": "/* 원문 일부 변수명 혼재 -> 총합계에 반영만 유지 */",
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 654,
+          "line_end": 656,
+          "raw_content": "/* ============================================================================\n * BAMCALL: mba0360m (수표미결제)\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 665,
+          "line_end": 665,
+          "raw_content": "/* 구조체 필드 타입 가정 */",
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 690,
+          "line_end": 692,
+          "raw_content": "/* ============================================================================\n * BAMCALL: tlf9600m (증거금/예외/시장종료)\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 729,
+          "line_end": 729,
+          "raw_content": "/* 출금건수 Update */",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 761,
+          "line_end": 763,
+          "raw_content": "/* ============================================================================\n * In/Out Assign (정상화)\n * ==========================================================================*/",
+          "function": null
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 802,
+          "line_end": 802,
+          "raw_content": "/* 원문 struct 필드명 가정 */",
+          "function": "tlfb000m_aa01_inrec_assign"
+        },
+        {
+          "type": "comment",
+          "is_multiline": true,
+          "line_start": 836,
+          "line_end": 838,
+          "raw_content": "/*\n *                                E N D   O F   P R O G R A M\n */",
+          "function": null
+        }
+      ],
+      "includes": [
+        {
+          "type": "include",
+          "path": "afc_bam.h",
+          "is_system": false,
+          "line_start": 22,
+          "line_end": 22,
+          "raw_content": "#include \"afc_bam.h\"",
+          "function": null
+        },
+        {
+          "type": "include",
+          "path": "tlfb000m.h",
+          "is_system": false,
+          "line_start": 23,
+          "line_end": 23,
+          "raw_content": "#include \"tlfb000m.h\"",
+          "function": null
+        },
+        {
+          "type": "include",
+          "path": "mba0360m.h",
+          "is_system": false,
+          "line_start": 25,
+          "line_end": 25,
+          "raw_content": "#include \"mba0360m.h\"",
+          "function": null
+        },
+        {
+          "type": "include",
+          "path": "tlf9600m.h",
+          "is_system": false,
+          "line_start": 26,
+          "line_end": 26,
+          "raw_content": "#include \"tlf9600m.h\"",
+          "function": null
+        },
+        {
+          "type": "include",
+          "path": "mbe1210m.h",
+          "is_system": false,
+          "line_start": 27,
+          "line_end": 27,
+          "raw_content": "#include \"mbe1210m.h\"",
+          "function": null
+        }
+      ],
+      "preprocessor_directives": [
+        {
+          "type": "preprocessor",
+          "directive": "ifndef",
+          "line_start": 29,
+          "line_end": 29,
+          "raw_content": "#ifndef BAMMAIN",
+          "function": null
+        },
+        {
+          "type": "preprocessor",
+          "directive": "endif",
+          "line_start": 31,
+          "line_end": 31,
+          "raw_content": "#endif",
+          "function": null
+        }
+      ],
+      "macros": [
+        {
+          "type": "macro",
+          "name": "BAMMAIN",
+          "params": "(A,B)",
+          "value": "#endif",
+          "line_start": 30,
+          "line_end": 31,
+          "raw_content": "#define BAMMAIN(A,B)\n#endif",
+          "function": null
+        }
+      ],
+      "sql": [
+        {
+          "type": "sql",
+          "sql_id": "sql_001",
+          "sql_type": "BEGIN",
+          "raw_content": "EXEC SQL BEGIN DECLARE SECTION;",
+          "normalized_sql": "BEGIN DECLARE SECTION",
+          "input_host_vars": [],
+          "output_host_vars": [],
+          "line_start": 38,
+          "line_end": 38,
+          "function": null,
+          "relationship": null,
+          "mybatis_sql": "BEGIN DECLARE SECTION",
+          "is_duplicate": false,
+          "duplicate_group_id": null,
+          "duplicate_count": 1,
+          "call_sites": [
+            {
+              "sql_id": "sql_001",
+              "function": null,
+              "line_start": 38,
+              "line_end": 38
+            }
+          ]
+        },
+        {
+          "type": "sql",
+          "sql_id": "sql_002",
+          "sql_type": "END",
+          "raw_content": "EXEC SQL END DECLARE SECTION;",
+          "normalized_sql": "END DECLARE SECTION",
+          "input_host_vars": [],
+          "output_host_vars": [],
+          "line_start": 71,
+          "line_end": 71,
+          "function": null,
+          "relationship": null,
+          "mybatis_sql": "END DECLARE SECTION",
+          "is_duplicate": false,
+          "duplicate_group_id": null,
+          "duplicate_count": 1,
+          "call_sites": [
+            {
+              "sql_id": "sql_002",
+              "function": null,
+              "line_start": 71,
+              "line_end": 71
+            }
+          ]
+        },
+        {
+          "type": "sql",
+          "sql_id": "sql_003",
+          "sql_type": "SELECT",
+          "raw_content": "EXEC SQL\n        SELECT 'Y'\n          INTO :H_tagy_yn\n          FROM SUU_UUA_ACNT A\n             , SUU_UUA_ACNT_FUNCTION B\n         WHERE A.ACNT_ID = :H_iacnt_id\n           AND A.ACNT_ID = B.ACNT_ID\n           AND B.ACNT_FNCN_TYPE_CODE = 'FDVA'\n        WITH UR;",
+          "normalized_sql": "SELECT 'Y' FROM SUU_UUA_ACNT A , SUU_UUA_ACNT_FUNCTION B WHERE A.ACNT_ID = :H_iacnt_id AND A.ACNT_ID = B.ACNT_ID AND B.ACNT_FNCN_TYPE_CODE = 'FDVA' WITH UR",
+          "input_host_vars": [
+            ":H_iacnt_id"
+          ],
+          "output_host_vars": [
+            ":H_tagy_yn"
+          ],
+          "line_start": 265,
+          "line_end": 273,
+          "function": "tlfb000m_a500_input_check",
+          "relationship": null,
+          "mybatis_sql": "SELECT 'Y' FROM SUU_UUA_ACNT A , SUU_UUA_ACNT_FUNCTION B WHERE A.ACNT_ID = #{hIacntId, jdbcType=VARCHAR} AND A.ACNT_ID = B.ACNT_ID AND B.ACNT_FNCN_TYPE_CODE = 'FDVA' WITH UR",
+          "is_duplicate": false,
+          "duplicate_group_id": null,
+          "duplicate_count": 1,
+          "call_sites": [
+            {
+              "sql_id": "sql_003",
+              "function": "tlfb000m_a500_input_check",
+              "line_start": 265,
+              "line_end": 273
+            }
+          ]
+        },
+        {
+          "type": "sql",
+          "sql_id": "sql_004",
+          "sql_type": "UPDATE",
+          "raw_content": "EXEC SQL\n        UPDATE SME_MEG_FTRS_WTHD_BLNC\n           SET WTHD_TOTL_SUM_AMNT = WTHD_TOTL_SUM_AMNT\n         WHERE ACNT_ID      = :H_iacnt_id\n           AND PSTN_UNIT_NO = :H_pstn_unit_no;",
+          "normalized_sql": "UPDATE SME_MEG_FTRS_WTHD_BLNC SET WTHD_TOTL_SUM_AMNT = WTHD_TOTL_SUM_AMNT WHERE ACNT_ID = :H_iacnt_id AND PSTN_UNIT_NO = :H_pstn_unit_no",
+          "input_host_vars": [
+            ":H_iacnt_id",
+            ":H_pstn_unit_no"
+          ],
+          "output_host_vars": [],
+          "line_start": 550,
+          "line_end": 554,
+          "function": "tlfb000m_c100_update_meg_ftrs_wthd_blnc",
+          "relationship": null,
+          "mybatis_sql": "UPDATE SME_MEG_FTRS_WTHD_BLNC SET WTHD_TOTL_SUM_AMNT = WTHD_TOTL_SUM_AMNT WHERE ACNT_ID = #{hIacntId, jdbcType=VARCHAR} AND PSTN_UNIT_NO = #{hPstnUnitNo, jdbcType=VARCHAR}",
+          "is_duplicate": false,
+          "duplicate_group_id": null,
+          "duplicate_count": 1,
+          "call_sites": [
+            {
+              "sql_id": "sql_004",
+              "function": "tlfb000m_c100_update_meg_ftrs_wthd_blnc",
+              "line_start": 550,
+              "line_end": 554
+            }
+          ]
+        },
+        {
+          "type": "sql",
+          "sql_id": "sql_005",
+          "sql_type": "SELECT",
+          "raw_content": "EXEC SQL\n        SELECT WTHD_TOTL_SUM_AMNT\n             , DPSD_SBAN_AMNT\n             , (PVDW_STLT_PREV_CASH_AMNT - TSDD_STLT_PREV_CASH_AMNT)\n             , (PVDW_SBTT_SELL_AMNT      - TSDD_SBTT_SELL_AMNT)\n             , CASH_UNCL_AMNT + ETC_RMNTL_SUM_AMNT\n             , OFUNS_SBTT_RCNY_AMNT\n          INTO :H_iwthd_totl_sum_amnt\n             , :H_idpsd_sban_amnt\n             , :H_lsttl_prev_cash_amnt\n             , :H_lsbts_sell_samt\n             , :H_oa_un_clam_samt\n             , :H_ofuns_sbtt_rcny_amnt\n          FROM SME_MEG_FTRS_WTHD_BLNC\n         WHERE ACNT_ID      = :H_iacnt_id\n           AND PSTN_UNIT_NO = :H_pstn_unit_no\n         FETCH FIRST 1 ROW ONLY\n         WITH UR;",
+          "normalized_sql": "SELECT WTHD_TOTL_SUM_AMNT , DPSD_SBAN_AMNT , (PVDW_STLT_PREV_CASH_AMNT - TSDD_STLT_PREV_CASH_AMNT) , (PVDW_SBTT_SELL_AMNT - TSDD_SBTT_SELL_AMNT) , CASH_UNCL_AMNT + ETC_RMNTL_SUM_AMNT , OFUNS_SBTT_RCNY_AMNT FROM SME_MEG_FTRS_WTHD_BLNC WHERE ACNT_ID = :H_iacnt_id AND PSTN_UNIT_NO = :H_pstn_unit_no FETCH FIRST 1 ROW ONLY WITH UR",
+          "input_host_vars": [
+            ":H_iacnt_id",
+            ":H_pstn_unit_no"
+          ],
+          "output_host_vars": [
+            ":H_iwthd_totl_sum_amnt",
+            ":H_idpsd_sban_amnt",
+            ":H_lsttl_prev_cash_amnt",
+            ":H_lsbts_sell_samt",
+            ":H_oa_un_clam_samt",
+            ":H_ofuns_sbtt_rcny_amnt"
+          ],
+          "line_start": 581,
+          "line_end": 598,
+          "function": "tlfb000m_c200_select_meg_ftrs_wthd_blnc",
+          "relationship": null,
+          "mybatis_sql": "SELECT WTHD_TOTL_SUM_AMNT , DPSD_SBAN_AMNT , (PVDW_STLT_PREV_CASH_AMNT - TSDD_STLT_PREV_CASH_AMNT) , (PVDW_SBTT_SELL_AMNT - TSDD_SBTT_SELL_AMNT) , CASH_UNCL_AMNT + ETC_RMNTL_SUM_AMNT , OFUNS_SBTT_RCNY_AMNT FROM SME_MEG_FTRS_WTHD_BLNC WHERE ACNT_ID = #{hIacntId, jdbcType=VARCHAR} AND PSTN_UNIT_NO = #{hPstnUnitNo, jdbcType=VARCHAR} FETCH FIRST 1 ROW ONLY WITH UR",
+          "is_duplicate": false,
+          "duplicate_group_id": null,
+          "duplicate_count": 1,
+          "call_sites": [
+            {
+              "sql_id": "sql_005",
+              "function": "tlfb000m_c200_select_meg_ftrs_wthd_blnc",
+              "line_start": 581,
+              "line_end": 598
+            }
+          ]
+        },
+        {
+          "type": "sql",
+          "sql_id": "sql_006",
+          "sql_type": "UPDATE",
+          "raw_content": "EXEC SQL\n        UPDATE SME_MEG_FTRS_WTHD_BLNC\n           SET WTDW_CONT = WTDW_CONT + 1\n         WHERE ACNT_ID      = :H_iacnt_id\n           AND PSTN_UNIT_NO = :H_pstn_unit_no;",
+          "normalized_sql": "UPDATE SME_MEG_FTRS_WTHD_BLNC SET WTDW_CONT = WTDW_CONT + 1 WHERE ACNT_ID = :H_iacnt_id AND PSTN_UNIT_NO = :H_pstn_unit_no",
+          "input_host_vars": [
+            ":H_iacnt_id",
+            ":H_pstn_unit_no"
+          ],
+          "output_host_vars": [],
+          "line_start": 734,
+          "line_end": 738,
+          "function": "tlfb000m_c500_update_meg_ftrs_wthd_blnc",
+          "relationship": null,
+          "mybatis_sql": "UPDATE SME_MEG_FTRS_WTHD_BLNC SET WTDW_CONT = WTDW_CONT + 1 WHERE ACNT_ID = #{hIacntId, jdbcType=VARCHAR} AND PSTN_UNIT_NO = #{hPstnUnitNo, jdbcType=VARCHAR}",
+          "is_duplicate": false,
+          "duplicate_group_id": null,
+          "duplicate_count": 1,
+          "call_sites": [
+            {
+              "sql_id": "sql_006",
+              "function": "tlfb000m_c500_update_meg_ftrs_wthd_blnc",
+              "line_start": 734,
+              "line_end": 738
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "type": "variable",
+          "name": "H_iacnt_id",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "계좌ID",
+          "line_start": 41,
+          "line_end": 41,
+          "raw_content": "static long   H_iacnt_id;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_ibsns_date",
+          "data_type": "char",
+          "array_sizes": [
+            "8 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "영업일자",
+          "line_start": 42,
+          "line_end": 42,
+          "raw_content": "static char   H_ibsns_date           [ 8 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "8 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_ia_acnt_ifnm_updt_yn",
+          "data_type": "char",
+          "array_sizes": [
+            "1 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "계좌정보갱신여부(Y/N)",
+          "line_start": 43,
+          "line_end": 43,
+          "raw_content": "static char   H_ia_acnt_ifnm_updt_yn [ 1 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "1 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_ia_funds_sbtt_wtdw_yn",
+          "data_type": "char",
+          "array_sizes": [
+            "1 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "자금대체출금여부(Y/N)",
+          "line_start": 44,
+          "line_end": 44,
+          "raw_content": "static char   H_ia_funds_sbtt_wtdw_yn[ 1 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "1 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_oftrs_opts_wtdw_psbl_tamt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "선물옵션출금가능총액",
+          "line_start": 47,
+          "line_end": 47,
+          "raw_content": "static long   H_oftrs_opts_wtdw_psbl_tamt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_oftrs_opts_wtdw_psbl_cash_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "선물옵션출금가능현금액",
+          "line_start": 48,
+          "line_end": 48,
+          "raw_content": "static long   H_oftrs_opts_wtdw_psbl_cash_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_oa_excp_ocrn_yn",
+          "data_type": "char",
+          "array_sizes": [
+            "1 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "예외발생여부(Y/N)",
+          "line_start": 49,
+          "line_end": 49,
+          "raw_content": "static char   H_oa_excp_ocrn_yn      [ 1 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "1 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_oa_sbtt_psbl_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "대체가능금액(최종)",
+          "line_start": 50,
+          "line_end": 50,
+          "raw_content": "static long   H_oa_sbtt_psbl_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_wthd_prev_blnc_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "예수금전잔고금액(원문 필드명 정합)",
+          "line_start": 51,
+          "line_end": 51,
+          "raw_content": "static long   H_wthd_prev_blnc_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_oa_un_clam_samt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "예수금청구금액(미수 등)",
+          "line_start": 52,
+          "line_end": 52,
+          "raw_content": "static long   H_oa_un_clam_samt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_ofuns_sbtt_rcny_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "자금대체입금액",
+          "line_start": 53,
+          "line_end": 53,
+          "raw_content": "static long   H_ofuns_sbtt_rcny_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_oerrno_msg_code",
+          "data_type": "char",
+          "array_sizes": [
+            "4 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "오류메시지코드",
+          "line_start": 54,
+          "line_end": 54,
+          "raw_content": "static char   H_oerrno_msg_code     [ 4 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "4 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_iwthd_totl_sum_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "예수금총합계금액",
+          "line_start": 57,
+          "line_end": 57,
+          "raw_content": "static long   H_iwthd_totl_sum_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_idpsd_sban_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "예탁대용금액",
+          "line_start": 58,
+          "line_end": 58,
+          "raw_content": "static long   H_idpsd_sban_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_lsttl_prev_cash_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "결제전현금액",
+          "line_start": 59,
+          "line_end": 59,
+          "raw_content": "static long   H_lsttl_prev_cash_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_lsbts_sell_samt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "대용매도합계금액",
+          "line_start": 60,
+          "line_end": 60,
+          "raw_content": "static long   H_lsbts_sell_samt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_pstn_unit_no",
+          "data_type": "char",
+          "array_sizes": [
+            "5 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "포지션단위번호",
+          "line_start": 61,
+          "line_end": 61,
+          "raw_content": "static char   H_pstn_unit_no         [ 5 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "5 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_uncl_amnt_sum",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "미수금합계",
+          "line_start": 62,
+          "line_end": 62,
+          "raw_content": "static long   H_uncl_amnt_sum;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_cash_uncl_dlf_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "현금미수연체료",
+          "line_start": 63,
+          "line_end": 63,
+          "raw_content": "static long   H_cash_uncl_dlf_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_etc_rntl_dlf_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "기타연체이자",
+          "line_start": 64,
+          "line_end": 64,
+          "raw_content": "static long   H_etc_rntl_dlf_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_tmp_psbl_totl_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "임시출금가능총액(비교)",
+          "line_start": 66,
+          "line_end": 66,
+          "raw_content": "static long   H_tmp_psbl_totl_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_tmp_psbl_cash_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "임시출금가능현금(비교)",
+          "line_start": 67,
+          "line_end": 67,
+          "raw_content": "static long   H_tmp_psbl_cash_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_tagy_yn",
+          "data_type": "char",
+          "array_sizes": [
+            "1 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "해외파생계약대상여부",
+          "line_start": 69,
+          "line_end": 69,
+          "raw_content": "static char   H_tagy_yn              [ 1 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": true,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "1 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "p_fammca",
+          "data_type": "FAMMCA",
+          "array_sizes": [],
+          "is_pointer": true,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 76,
+          "line_end": 76,
+          "raw_content": "static FAMMCA *p_fammca;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "p_in",
+          "data_type": "tlfb000m_in_t",
+          "array_sizes": [],
+          "is_pointer": true,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 78,
+          "line_end": 78,
+          "raw_content": "static tlfb000m_in_t  *p_in;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "p_out",
+          "data_type": "tlfb000m_out_t",
+          "array_sizes": [],
+          "is_pointer": true,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 79,
+          "line_end": 79,
+          "raw_content": "static tlfb000m_out_t *p_out;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "mba0360m_in",
+          "data_type": "mba0360m_in_t",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 82,
+          "line_end": 82,
+          "raw_content": "static mba0360m_in_t   mba0360m_in;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "mba0360m_out",
+          "data_type": "mba0360m_out_t",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 83,
+          "line_end": 83,
+          "raw_content": "static mba0360m_out_t  mba0360m_out;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "tlf9600m_in",
+          "data_type": "tlf9600m_in_t",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 85,
+          "line_end": 85,
+          "raw_content": "static tlf9600m_in_t   tlf9600m_in;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "tlf9600m_out",
+          "data_type": "tlf9600m_out_t",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 86,
+          "line_end": 86,
+          "raw_content": "static tlf9600m_out_t  tlf9600m_out;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "s_mbe1210m_in",
+          "data_type": "mbe1210m_in_t",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 88,
+          "line_end": 88,
+          "raw_content": "static mbe1210m_in_t   s_mbe1210m_in;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "s_mbe1210m_out",
+          "data_type": "mbe1210m_out_t",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": null,
+          "line_start": 89,
+          "line_end": 89,
+          "raw_content": "static mbe1210m_out_t  s_mbe1210m_out;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_tsdd_chck_rcny_date",
+          "data_type": "char",
+          "array_sizes": [
+            "8 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "금일수표입금일자",
+          "line_start": 92,
+          "line_end": 92,
+          "raw_content": "static char   H_tsdd_chck_rcny_date      [ 8 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "8 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_tsdd_chck_rcny_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "금일수표입금액",
+          "line_start": 93,
+          "line_end": 93,
+          "raw_content": "static long   H_tsdd_chck_rcny_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_tsdd_chck_rcny_cncl_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "금일수표입금취소액",
+          "line_start": 94,
+          "line_end": 94,
+          "raw_content": "static long   H_tsdd_chck_rcny_cncl_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_pvdd_chck_rcny_date",
+          "data_type": "char",
+          "array_sizes": [
+            "8 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "전일수표입금일자",
+          "line_start": 95,
+          "line_end": 95,
+          "raw_content": "static char   H_pvdd_chck_rcny_date      [ 8 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "8 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_pvdd_chck_rcny_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "전일수표입금액",
+          "line_start": 96,
+          "line_end": 96,
+          "raw_content": "static long   H_pvdd_chck_rcny_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_pvdd_chck_rcny_cncl_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "전일수표입금취소액",
+          "line_start": 97,
+          "line_end": 97,
+          "raw_content": "static long   H_pvdd_chck_rcny_cncl_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_chck_rcny_sum_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "수표입금합계액",
+          "line_start": 98,
+          "line_end": 98,
+          "raw_content": "static long   H_chck_rcny_sum_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_cnst_mrgn_tamt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "위탁증거금총액",
+          "line_start": 101,
+          "line_end": 101,
+          "raw_content": "static long   H_cnst_mrgn_tamt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_cnst_mrgn_cash_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "위탁증거금현금액",
+          "line_start": 102,
+          "line_end": 102,
+          "raw_content": "static long   H_cnst_mrgn_cash_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_ftrs_opts_bsc_dpmy_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "선물옵션기본예탁금",
+          "line_start": 103,
+          "line_end": 103,
+          "raw_content": "static long   H_ftrs_opts_bsc_dpmy_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_ftrs_dlng_loss_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "선물매매손실/수수료",
+          "line_start": 104,
+          "line_end": 104,
+          "raw_content": "static long   H_ftrs_dlng_loss_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_nxdd_stlt_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "익일결제금액",
+          "line_start": 105,
+          "line_end": 105,
+          "raw_content": "static long   H_nxdd_stlt_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_mrkt_end_yn",
+          "data_type": "char",
+          "array_sizes": [
+            "1 + 1"
+          ],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "시장종료여부(Y/N)",
+          "line_start": 106,
+          "line_end": 106,
+          "raw_content": "static char   H_mrkt_end_yn           [ 1 + 1 ];",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": [
+            "1 + 1"
+          ]
+        },
+        {
+          "type": "variable",
+          "name": "H_totl_mrgn_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "총증거금액 = Max(위탁증거금총액, 기본예탁금)",
+          "line_start": 109,
+          "line_end": 109,
+          "raw_content": "static long   H_totl_mrgn_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_wtdw_psbl_totl_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "출금가능총액(중간)",
+          "line_start": 110,
+          "line_end": 110,
+          "raw_content": "static long   H_wtdw_psbl_totl_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_wtdw_psbl_cash_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "출금가능현금(중간)",
+          "line_start": 111,
+          "line_end": 111,
+          "raw_content": "static long   H_wtdw_psbl_cash_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_adtl_wtdw_psbl_totl_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "추가출금가능총액",
+          "line_start": 112,
+          "line_end": 112,
+          "raw_content": "static long   H_adtl_wtdw_psbl_totl_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_adtl_wtdw_psbl_cash_amnt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "추가출금가능현금",
+          "line_start": 113,
+          "line_end": 113,
+          "raw_content": "static long   H_adtl_wtdw_psbl_cash_amnt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_sbtt_psbl_tamt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "대체가능총액(중간)",
+          "line_start": 114,
+          "line_end": 114,
+          "raw_content": "static long   H_sbtt_psbl_tamt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "H_tmp_add_wtdw_psbl_tamt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": "static",
+          "comment": "temp",
+          "line_start": 116,
+          "line_end": 116,
+          "raw_content": "static long   H_tmp_add_wtdw_psbl_tamt;",
+          "function": null,
+          "is_static": true,
+          "is_declare_section": false,
+          "scope": "global",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "mrgn_minus_base",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 411,
+          "line_end": 411,
+          "raw_content": "long mrgn_minus_base = H_cnst_mrgn_tamt - H_ftrs_opts_bsc_dpmy_amnt;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "m1",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 442,
+          "line_end": 442,
+          "raw_content": "long m1 = (H_totl_mrgn_amnt > H_chck_rcny_sum_amnt) ? H_totl_mrgn_amnt : H_chck_rcny_sum_amnt;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "m2",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 448,
+          "line_end": 448,
+          "raw_content": "long m2 = (H_cnst_mrgn_cash_amnt > H_chck_rcny_sum_amnt) ? H_cnst_mrgn_cash_amnt : H_chck_rcny_sum_amnt;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "s",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 462,
+          "line_end": 462,
+          "raw_content": "long s = H_chck_rcny_sum_amnt + H_ofuns_sbtt_rcny_amnt;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "m1",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 463,
+          "line_end": 463,
+          "raw_content": "long m1 = (H_totl_mrgn_amnt > s) ? H_totl_mrgn_amnt : s;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "m2",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 469,
+          "line_end": 469,
+          "raw_content": "long m2 = (H_cnst_mrgn_cash_amnt > s) ? H_cnst_mrgn_cash_amnt : s;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "m_sbtt",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 516,
+          "line_end": 516,
+          "raw_content": "long m_sbtt = (H_totl_mrgn_amnt > H_ofuns_sbtt_rcny_amnt) ? H_totl_mrgn_amnt : H_ofuns_sbtt_rcny_amnt;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        },
+        {
+          "type": "variable",
+          "name": "m_cash",
+          "data_type": "long",
+          "array_sizes": [],
+          "is_pointer": false,
+          "storage_class": null,
+          "comment": null,
+          "line_start": 519,
+          "line_end": 519,
+          "raw_content": "long m_cash = (H_cnst_mrgn_cash_amnt > H_ofuns_sbtt_rcny_amnt) ? H_cnst_mrgn_cash_amnt : H_ofuns_sbtt_rcny_amnt;",
+          "function": "tlfb000m_c000_event_process",
+          "is_static": false,
+          "is_declare_section": false,
+          "scope": "local",
+          "resolved_array_sizes": []
+        }
+      ],
+      "function_calls": [
+        {
+          "type": "function_call",
+          "name": "BAMMAIN",
+          "args": [
+            "tlfb000m",
+            "\"인출가능금액계산\""
+          ],
+          "raw_content": "BAMMAIN(tlfb000m, \"인출가능금액계산\")",
+          "line_start": 121,
+          "line_end": 121,
+          "function": null
+        },
+        {
+          "type": "function_call",
+          "name": "ILOG",
+          "args": [
+            "\"인출가능금액 조회 시작\\n\""
+          ],
+          "raw_content": "ILOG(\"인출가능금액 조회 시작\\n\")",
+          "line_start": 151,
+          "line_end": 151,
+          "function": "tlfb000m_main"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_a000_initialize",
+          "args": [],
+          "raw_content": "tlfb000m_a000_initialize()",
+          "line_start": 153,
+          "line_end": 153,
+          "function": "tlfb000m_main"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_a500_input_check",
+          "args": [],
+          "raw_content": "tlfb000m_a500_input_check()",
+          "line_start": 158,
+          "line_end": 158,
+          "function": "tlfb000m_main"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_c000_event_process",
+          "args": [],
+          "raw_content": "tlfb000m_c000_event_process()",
+          "line_start": 163,
+          "line_end": 163,
+          "function": "tlfb000m_main"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "p_out->erro_msg_code",
+            "H_oerrno_msg_code"
+          ],
+          "raw_content": "COPYS(p_out->erro_msg_code, H_oerrno_msg_code)",
+          "line_start": 165,
+          "line_end": 165,
+          "function": "tlfb000m_main"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_a099_host_variable_init",
+          "args": [],
+          "raw_content": "tlfb000m_a099_host_variable_init()",
+          "line_start": 179,
+          "line_end": 179,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_pstn_unit_no",
+            "0x00",
+            "sizeof(H_pstn_unit_no)"
+          ],
+          "raw_content": "memset(H_pstn_unit_no, 0x00, sizeof(H_pstn_unit_no))",
+          "line_start": 187,
+          "line_end": 187,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "memcpy",
+          "args": [
+            "H_pstn_unit_no",
+            "\"GEBL\"",
+            "4"
+          ],
+          "raw_content": "memcpy(H_pstn_unit_no, \"GEBL\", 4)",
+          "line_start": 188,
+          "line_end": 188,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_tsdd_chck_rcny_date",
+            "0x00",
+            "sizeof(H_tsdd_chck_rcny_date)"
+          ],
+          "raw_content": "memset(H_tsdd_chck_rcny_date, 0x00, sizeof(H_tsdd_chck_rcny_date))",
+          "line_start": 190,
+          "line_end": 190,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_pvdd_chck_rcny_date",
+            "0x00",
+            "sizeof(H_pvdd_chck_rcny_date)"
+          ],
+          "raw_content": "memset(H_pvdd_chck_rcny_date, 0x00, sizeof(H_pvdd_chck_rcny_date))",
+          "line_start": 194,
+          "line_end": 194,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_mrkt_end_yn",
+            "0x00",
+            "sizeof(H_mrkt_end_yn)"
+          ],
+          "raw_content": "memset(H_mrkt_end_yn, 0x00, sizeof(H_mrkt_end_yn))",
+          "line_start": 206,
+          "line_end": 206,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_tagy_yn",
+            "0x00",
+            "sizeof(H_tagy_yn)"
+          ],
+          "raw_content": "memset(H_tagy_yn, 0x00, sizeof(H_tagy_yn))",
+          "line_start": 218,
+          "line_end": 218,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_aa00_inrec_init",
+          "args": [],
+          "raw_content": "tlfb000m_aa00_inrec_init()",
+          "line_start": 221,
+          "line_end": 221,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_aa02_outrec_init",
+          "args": [],
+          "raw_content": "tlfb000m_aa02_outrec_init()",
+          "line_start": 222,
+          "line_end": 222,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_aa01_inrec_assign",
+          "args": [],
+          "raw_content": "tlfb000m_aa01_inrec_assign()",
+          "line_start": 223,
+          "line_end": 223,
+          "function": "tlfb000m_a000_initialize"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_ibsns_date",
+            "0x00",
+            "sizeof(H_ibsns_date)"
+          ],
+          "raw_content": "memset(H_ibsns_date, 0x00, sizeof(H_ibsns_date))",
+          "line_start": 234,
+          "line_end": 234,
+          "function": "tlfb000m_a099_host_variable_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_ia_acnt_ifnm_updt_yn",
+            "0x00",
+            "sizeof(H_ia_acnt_ifnm_updt_yn)"
+          ],
+          "raw_content": "memset(H_ia_acnt_ifnm_updt_yn, 0x00, sizeof(H_ia_acnt_ifnm_updt_yn))",
+          "line_start": 235,
+          "line_end": 235,
+          "function": "tlfb000m_a099_host_variable_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_ia_funds_sbtt_wtdw_yn",
+            "0x00",
+            "sizeof(H_ia_funds_sbtt_wtdw_yn)"
+          ],
+          "raw_content": "memset(H_ia_funds_sbtt_wtdw_yn, 0x00, sizeof(H_ia_funds_sbtt_wtdw_yn))",
+          "line_start": 236,
+          "line_end": 236,
+          "function": "tlfb000m_a099_host_variable_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_oa_excp_ocrn_yn",
+            "0x00",
+            "sizeof(H_oa_excp_ocrn_yn)"
+          ],
+          "raw_content": "memset(H_oa_excp_ocrn_yn, 0x00, sizeof(H_oa_excp_ocrn_yn))",
+          "line_start": 240,
+          "line_end": 240,
+          "function": "tlfb000m_a099_host_variable_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_oerrno_msg_code",
+            "0x00",
+            "sizeof(H_oerrno_msg_code)"
+          ],
+          "raw_content": "memset(H_oerrno_msg_code, 0x00, sizeof(H_oerrno_msg_code))",
+          "line_start": 245,
+          "line_end": 245,
+          "function": "tlfb000m_a099_host_variable_init"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"계좌확인요망(해외선물계좌 사용자) [ACNT_ID = %ld]\"",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"계좌확인요망(해외선물계좌 사용자) [ACNT_ID = %ld]\", H_iacnt_id)",
+          "line_start": 282,
+          "line_end": 282,
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"5795\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"5795\")",
+          "line_start": 283,
+          "line_end": 283,
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "p_out->erro_msg_code",
+            "H_oerrno_msg_code"
+          ],
+          "raw_content": "COPYS(p_out->erro_msg_code, H_oerrno_msg_code)",
+          "line_start": 284,
+          "line_end": 284,
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"UUA ACNT SELECT Error ( SQLCODE : %d / SQLMSG : %s ) [ ACNT_ID = %ld ]\"",
+            "SQLCODE",
+            "SQLMSG",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"UUA ACNT SELECT Error ( SQLCODE : %d / SQLMSG : %s ) [ ACNT_ID = %ld ]\",\n                 SQLCODE, SQLMSG, H_iacnt_id)",
+          "line_start": 288,
+          "line_end": 289,
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 290,
+          "line_end": 290,
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "p_out->erro_msg_code",
+            "H_oerrno_msg_code"
+          ],
+          "raw_content": "COPYS(p_out->erro_msg_code, H_oerrno_msg_code)",
+          "line_start": 291,
+          "line_end": 291,
+          "function": "tlfb000m_a500_input_check"
+        },
+        {
+          "type": "function_call",
+          "name": "strcmp",
+          "args": [
+            "H_ia_acnt_ifnm_updt_yn",
+            "\"Y\""
+          ],
+          "raw_content": "strcmp(H_ia_acnt_ifnm_updt_yn, \"Y\")",
+          "line_start": 306,
+          "line_end": 306,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_c100_update_meg_ftrs_wthd_blnc",
+          "args": [],
+          "raw_content": "tlfb000m_c100_update_meg_ftrs_wthd_blnc()",
+          "line_start": 308,
+          "line_end": 308,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_c200_select_meg_ftrs_wthd_blnc",
+          "args": [],
+          "raw_content": "tlfb000m_c200_select_meg_ftrs_wthd_blnc()",
+          "line_start": 314,
+          "line_end": 314,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_c210_bamcall_mbe1210m",
+          "args": [],
+          "raw_content": "tlfb000m_c210_bamcall_mbe1210m()",
+          "line_start": 319,
+          "line_end": 319,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_c300_bamcall_mba0360m",
+          "args": [],
+          "raw_content": "tlfb000m_c300_bamcall_mba0360m()",
+          "line_start": 324,
+          "line_end": 324,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_c400_bamcall_tlf9600m",
+          "args": [],
+          "raw_content": "tlfb000m_c400_bamcall_tlf9600m()",
+          "line_start": 329,
+          "line_end": 329,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "strcmp",
+          "args": [
+            "H_oa_excp_ocrn_yn",
+            "\"Y\""
+          ],
+          "raw_content": "strcmp(H_oa_excp_ocrn_yn, \"Y\")",
+          "line_start": 344,
+          "line_end": 344,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "strcmp",
+          "args": [
+            "H_mrkt_end_yn",
+            "\"Y\""
+          ],
+          "raw_content": "strcmp(H_mrkt_end_yn, \"Y\")",
+          "line_start": 346,
+          "line_end": 346,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "strcmp",
+          "args": [
+            "H_mrkt_end_yn",
+            "\"Y\""
+          ],
+          "raw_content": "strcmp(H_mrkt_end_yn, \"Y\")",
+          "line_start": 383,
+          "line_end": 383,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "strcmp",
+          "args": [
+            "H_ia_funds_sbtt_wtdw_yn",
+            "\"Y\""
+          ],
+          "raw_content": "strcmp(H_ia_funds_sbtt_wtdw_yn, \"Y\")",
+          "line_start": 439,
+          "line_end": 439,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "strcmp",
+          "args": [
+            "H_ia_acnt_ifnm_updt_yn",
+            "\"Y\""
+          ],
+          "raw_content": "strcmp(H_ia_acnt_ifnm_updt_yn, \"Y\")",
+          "line_start": 529,
+          "line_end": 529,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "strcmp",
+          "args": [
+            "H_oa_excp_ocrn_yn",
+            "\"Y\""
+          ],
+          "raw_content": "strcmp(H_oa_excp_ocrn_yn, \"Y\")",
+          "line_start": 530,
+          "line_end": 530,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_c500_update_meg_ftrs_wthd_blnc",
+          "args": [],
+          "raw_content": "tlfb000m_c500_update_meg_ftrs_wthd_blnc()",
+          "line_start": 532,
+          "line_end": 532,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "tlfb000m_aa03_outrec_assign",
+          "args": [],
+          "raw_content": "tlfb000m_aa03_outrec_assign()",
+          "line_start": 537,
+          "line_end": 537,
+          "function": "tlfb000m_c000_event_process"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"MEG_FTRS_WTHD_BLNC Dummy UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]\"",
+            "SQLCODE",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"MEG_FTRS_WTHD_BLNC Dummy UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]\",\n                 SQLCODE, H_iacnt_id)",
+          "line_start": 562,
+          "line_end": 563,
+          "function": "tlfb000m_c100_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 564,
+          "line_end": 564,
+          "function": "tlfb000m_c100_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"MEG_FTRS_WTHD_BLNC Dummy UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\"",
+            "SQLCODE",
+            "SQLMSG",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"MEG_FTRS_WTHD_BLNC Dummy UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\",\n                 SQLCODE, SQLMSG, H_iacnt_id)",
+          "line_start": 568,
+          "line_end": 569,
+          "function": "tlfb000m_c100_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 570,
+          "line_end": 570,
+          "function": "tlfb000m_c100_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"2820\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"2820\")",
+          "line_start": 606,
+          "line_end": 606,
+          "function": "tlfb000m_c200_select_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"MEG_FTRS_WTHD_BLNC SELECT Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\"",
+            "SQLCODE",
+            "SQLMSG",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"MEG_FTRS_WTHD_BLNC SELECT Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\",\n                 SQLCODE, SQLMSG, H_iacnt_id)",
+          "line_start": 610,
+          "line_end": 611,
+          "function": "tlfb000m_c200_select_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 612,
+          "line_end": 612,
+          "function": "tlfb000m_c200_select_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "&s_mbe1210m_in",
+            "0x00",
+            "sizeof(mbe1210m_in_t)"
+          ],
+          "raw_content": "memset(&s_mbe1210m_in,  0x00, sizeof(mbe1210m_in_t))",
+          "line_start": 626,
+          "line_end": 626,
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "&s_mbe1210m_out",
+            "0x00",
+            "sizeof(mbe1210m_out_t)"
+          ],
+          "raw_content": "memset(&s_mbe1210m_out, 0x00, sizeof(mbe1210m_out_t))",
+          "line_start": 627,
+          "line_end": 627,
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "s_mbe1210m_in.strt_stnr_date",
+            "\"00000000\""
+          ],
+          "raw_content": "COPYS(s_mbe1210m_in.strt_stnr_date, \"00000000\")",
+          "line_start": 632,
+          "line_end": 632,
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "s_mbe1210m_in.a_rnbr_date",
+            "H_ibsns_date"
+          ],
+          "raw_content": "COPYS(s_mbe1210m_in.a_rnbr_date, H_ibsns_date)",
+          "line_start": 633,
+          "line_end": 633,
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"mbe1210m 호출 오류 RTNCD=%d MSG=%s\"",
+            "RTNCD",
+            "s_mbe1210m_out.error_msg_cnts"
+          ],
+          "raw_content": "ELOG(\"mbe1210m 호출 오류 RTNCD=%d MSG=%s\", RTNCD, s_mbe1210m_out.error_msg_cnts)",
+          "line_start": 638,
+          "line_end": 638,
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 639,
+          "line_end": 639,
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "&mba0360m_in",
+            "0x00",
+            "sizeof(mba0360m_in_t)"
+          ],
+          "raw_content": "memset(&mba0360m_in,  0x00, sizeof(mba0360m_in_t))",
+          "line_start": 661,
+          "line_end": 661,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "&mba0360m_out",
+            "0x00",
+            "sizeof(mba0360m_out_t)"
+          ],
+          "raw_content": "memset(&mba0360m_out, 0x00, sizeof(mba0360m_out_t))",
+          "line_start": 662,
+          "line_end": 662,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "mba0360m_in.pstn_unit_no",
+            "H_pstn_unit_no"
+          ],
+          "raw_content": "COPYS(mba0360m_in.pstn_unit_no, H_pstn_unit_no)",
+          "line_start": 665,
+          "line_end": 665,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "memcpy",
+          "args": [
+            "mba0360m_in.acnt_type_code",
+            "\"FOAC\"",
+            "4"
+          ],
+          "raw_content": "memcpy(mba0360m_in.acnt_type_code, \"FOAC\", 4)",
+          "line_start": 666,
+          "line_end": 666,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "memcpy",
+          "args": [
+            "mba0360m_in.trdng_code",
+            "\"0000\"",
+            "4"
+          ],
+          "raw_content": "memcpy(mba0360m_in.trdng_code,     \"0000\", 4)",
+          "line_start": 667,
+          "line_end": 667,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "memcpy",
+          "args": [
+            "mba0360m_in.frgn_date",
+            "H_ibsns_date",
+            "8"
+          ],
+          "raw_content": "memcpy(mba0360m_in.frgn_date,      H_ibsns_date, 8)",
+          "line_start": 668,
+          "line_end": 668,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"mba0360m 호출 오류 RTNCD=%d MSG=%s\"",
+            "RTNCD",
+            "mba0360m_out.error_msg_cnts"
+          ],
+          "raw_content": "ELOG(\"mba0360m 호출 오류 RTNCD=%d MSG=%s\", RTNCD, mba0360m_out.error_msg_cnts)",
+          "line_start": 674,
+          "line_end": 674,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 675,
+          "line_end": 675,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_tsdd_chck_rcny_date",
+            "mba0360m_out.a_chck_rcmy_date1"
+          ],
+          "raw_content": "COPYS(H_tsdd_chck_rcny_date, mba0360m_out.a_chck_rcmy_date1)",
+          "line_start": 679,
+          "line_end": 679,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_pvdd_chck_rcny_date",
+            "mba0360m_out.a_chck_rcmy_date2"
+          ],
+          "raw_content": "COPYS(H_pvdd_chck_rcny_date, mba0360m_out.a_chck_rcmy_date2)",
+          "line_start": 682,
+          "line_end": 682,
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "&tlf9600m_in",
+            "0x00",
+            "sizeof(tlf9600m_in_t)"
+          ],
+          "raw_content": "memset(&tlf9600m_in,  0x00, sizeof(tlf9600m_in_t))",
+          "line_start": 697,
+          "line_end": 697,
+          "function": "tlfb000m_c400_bamcall_tlf9600m"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "&tlf9600m_out",
+            "0x00",
+            "sizeof(tlf9600m_out_t)"
+          ],
+          "raw_content": "memset(&tlf9600m_out, 0x00, sizeof(tlf9600m_out_t))",
+          "line_start": 698,
+          "line_end": 698,
+          "function": "tlfb000m_c400_bamcall_tlf9600m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "tlf9600m_in.prce_date",
+            "H_ibsns_date"
+          ],
+          "raw_content": "COPYS(tlf9600m_in.prce_date, H_ibsns_date)",
+          "line_start": 700,
+          "line_end": 700,
+          "function": "tlfb000m_c400_bamcall_tlf9600m"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"tlf9600m 호출 오류 RTNCD=%d ACNT_ID=%ld\"",
+            "RTNCD",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"tlf9600m 호출 오류 RTNCD=%d ACNT_ID=%ld\", RTNCD, H_iacnt_id)",
+          "line_start": 706,
+          "line_end": 706,
+          "function": "tlfb000m_c400_bamcall_tlf9600m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "tlf9600m_out.error_msg_code"
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, tlf9600m_out.error_msg_code)",
+          "line_start": 707,
+          "line_end": 707,
+          "function": "tlfb000m_c400_bamcall_tlf9600m"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "tlf9600m_out.error_msg_code"
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, tlf9600m_out.error_msg_code)",
+          "line_start": 724,
+          "line_end": 724,
+          "function": "tlfb000m_c400_bamcall_tlf9600m"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"MEG_FTRS_WTHD_BLNC UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]\"",
+            "SQLCODE",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"MEG_FTRS_WTHD_BLNC UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]\",\n                 SQLCODE, H_iacnt_id)",
+          "line_start": 746,
+          "line_end": 747,
+          "function": "tlfb000m_c500_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 748,
+          "line_end": 748,
+          "function": "tlfb000m_c500_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "ELOG",
+          "args": [
+            "\"MEG_FTRS_WTHD_BLNC UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\"",
+            "SQLCODE",
+            "SQLMSG",
+            "H_iacnt_id"
+          ],
+          "raw_content": "ELOG(\"MEG_FTRS_WTHD_BLNC UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\",\n                 SQLCODE, SQLMSG, H_iacnt_id)",
+          "line_start": 752,
+          "line_end": 753,
+          "function": "tlfb000m_c500_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_oerrno_msg_code",
+            "\"0181\""
+          ],
+          "raw_content": "COPYS(H_oerrno_msg_code, \"0181\")",
+          "line_start": 754,
+          "line_end": 754,
+          "function": "tlfb000m_c500_update_meg_ftrs_wthd_blnc"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_ibsns_date",
+            "0x00",
+            "sizeof(H_ibsns_date)"
+          ],
+          "raw_content": "memset(H_ibsns_date, 0x00, sizeof(H_ibsns_date))",
+          "line_start": 769,
+          "line_end": 769,
+          "function": "tlfb000m_aa00_inrec_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_ia_acnt_ifnm_updt_yn",
+            "0x00",
+            "sizeof(H_ia_acnt_ifnm_updt_yn)"
+          ],
+          "raw_content": "memset(H_ia_acnt_ifnm_updt_yn, 0x00, sizeof(H_ia_acnt_ifnm_updt_yn))",
+          "line_start": 770,
+          "line_end": 770,
+          "function": "tlfb000m_aa00_inrec_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_ia_funds_sbtt_wtdw_yn",
+            "0x00",
+            "sizeof(H_ia_funds_sbtt_wtdw_yn)"
+          ],
+          "raw_content": "memset(H_ia_funds_sbtt_wtdw_yn, 0x00, sizeof(H_ia_funds_sbtt_wtdw_yn))",
+          "line_start": 771,
+          "line_end": 771,
+          "function": "tlfb000m_aa00_inrec_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_oa_excp_ocrn_yn",
+            "0x00",
+            "sizeof(H_oa_excp_ocrn_yn)"
+          ],
+          "raw_content": "memset(H_oa_excp_ocrn_yn, 0x00, sizeof(H_oa_excp_ocrn_yn))",
+          "line_start": 782,
+          "line_end": 782,
+          "function": "tlfb000m_aa02_outrec_init"
+        },
+        {
+          "type": "function_call",
+          "name": "memset",
+          "args": [
+            "H_oerrno_msg_code",
+            "0x00",
+            "sizeof(H_oerrno_msg_code)"
+          ],
+          "raw_content": "memset(H_oerrno_msg_code, 0x00, sizeof(H_oerrno_msg_code))",
+          "line_start": 787,
+          "line_end": 787,
+          "function": "tlfb000m_aa02_outrec_init"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "H_ibsns_date",
+            "p_in->a_bsns_date"
+          ],
+          "raw_content": "COPYS(H_ibsns_date, p_in->a_bsns_date)",
+          "line_start": 797,
+          "line_end": 797,
+          "function": "tlfb000m_aa01_inrec_assign"
+        },
+        {
+          "type": "function_call",
+          "name": "ILOG",
+          "args": [
+            "\"계좌ID(%ld), 영업일자(%s), 계좌정보갱신여부(%c), 자금대체출금여부(%c)\"",
+            "H_iacnt_id",
+            "H_ibsns_date",
+            "H_ia_acnt_ifnm_updt_yn[0]",
+            "H_ia_funds_sbtt_wtdw_yn[0]"
+          ],
+          "raw_content": "ILOG(\"계좌ID(%ld), 영업일자(%s), 계좌정보갱신여부(%c), 자금대체출금여부(%c)\",\n         H_iacnt_id, H_ibsns_date, H_ia_acnt_ifnm_updt_yn[0], H_ia_funds_sbtt_wtdw_yn[0])",
+          "line_start": 805,
+          "line_end": 806,
+          "function": "tlfb000m_aa01_inrec_assign"
+        },
+        {
+          "type": "function_call",
+          "name": "COPYS",
+          "args": [
+            "p_out->erro_msg_code",
+            "H_oerrno_msg_code"
+          ],
+          "raw_content": "COPYS(p_out->erro_msg_code, H_oerrno_msg_code)",
+          "line_start": 822,
+          "line_end": 822,
+          "function": "tlfb000m_aa03_outrec_assign"
+        },
+        {
+          "type": "function_call",
+          "name": "ILOG",
+          "args": [
+            "\"출금가능총액(%ld) 출금가능현금(%ld) 예외(%c) 대체가능(%ld) 미수합계(%ld) 자금대체입금(%ld) 오류코드(%s)\"",
+            "p_out->ftrs_opts_wtdw_psbl_tamt",
+            "p_out->ftrs_opts_wtdw_psbl_cash_amnt",
+            "p_out->a_excp_ocrn_yn",
+            "p_out->a_sbtt_psbl_amnt",
+            "p_out->a_un_clam_samt",
+            "p_out->funs_sbtt_rcny_amnt",
+            "p_out->erro_msg_code"
+          ],
+          "raw_content": "ILOG(\"출금가능총액(%ld) 출금가능현금(%ld) 예외(%c) 대체가능(%ld) 미수합계(%ld) 자금대체입금(%ld) 오류코드(%s)\",\n         p_out->ftrs_opts_wtdw_psbl_tamt,\n         p_out->ftrs_opts_wtdw_psbl_cash_amnt,\n         p_out->a_excp_ocrn_yn,\n         p_out->a_sbtt_psbl_amnt,\n         p_out->a_un_clam_samt,\n         p_out->funs_sbtt_rcny_amnt,\n         p_out->erro_msg_code)",
+          "line_start": 824,
+          "line_end": 831,
+          "function": "tlfb000m_aa03_outrec_assign"
+        }
+      ],
+      "function_prototypes": [
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_main",
+          "return_type": "int",
+          "parameters": [
+            "tlfb000m_in_t *pIn",
+            "tlfb000m_out_t *pOut"
+          ],
+          "storage_class": "static",
+          "line_start": 123,
+          "line_end": 123,
+          "raw_content": "static int  tlfb000m_main(tlfb000m_in_t *pIn, tlfb000m_out_t *pOut);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_a000_initialize",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 125,
+          "line_end": 125,
+          "raw_content": "static int  tlfb000m_a000_initialize(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_a099_host_variable_init",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 126,
+          "line_end": 126,
+          "raw_content": "static int  tlfb000m_a099_host_variable_init(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_a500_input_check",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 127,
+          "line_end": 127,
+          "raw_content": "static int  tlfb000m_a500_input_check(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_c000_event_process",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 129,
+          "line_end": 129,
+          "raw_content": "static int  tlfb000m_c000_event_process(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_c100_update_meg_ftrs_wthd_blnc",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 130,
+          "line_end": 130,
+          "raw_content": "static int  tlfb000m_c100_update_meg_ftrs_wthd_blnc(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_c200_select_meg_ftrs_wthd_blnc",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 131,
+          "line_end": 131,
+          "raw_content": "static int  tlfb000m_c200_select_meg_ftrs_wthd_blnc(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_c210_bamcall_mbe1210m",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 132,
+          "line_end": 132,
+          "raw_content": "static int  tlfb000m_c210_bamcall_mbe1210m(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_c300_bamcall_mba0360m",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 133,
+          "line_end": 133,
+          "raw_content": "static int  tlfb000m_c300_bamcall_mba0360m(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_c400_bamcall_tlf9600m",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 134,
+          "line_end": 134,
+          "raw_content": "static int  tlfb000m_c400_bamcall_tlf9600m(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_c500_update_meg_ftrs_wthd_blnc",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 135,
+          "line_end": 135,
+          "raw_content": "static int  tlfb000m_c500_update_meg_ftrs_wthd_blnc(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_aa00_inrec_init",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 137,
+          "line_end": 137,
+          "raw_content": "static int  tlfb000m_aa00_inrec_init(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_aa01_inrec_assign",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 138,
+          "line_end": 138,
+          "raw_content": "static int  tlfb000m_aa01_inrec_assign(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_aa02_outrec_init",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 139,
+          "line_end": 139,
+          "raw_content": "static int  tlfb000m_aa02_outrec_init(void);",
+          "function": null
+        },
+        {
+          "type": "function_prototype",
+          "name": "tlfb000m_aa03_outrec_assign",
+          "return_type": "int",
+          "parameters": [
+            "void"
+          ],
+          "storage_class": "static",
+          "line_start": 140,
+          "line_end": 140,
+          "raw_content": "static int  tlfb000m_aa03_outrec_assign(void);",
+          "function": null
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "name": "tlfb000m_main",
+          "line_start": 145,
+          "line_end": 170,
+          "raw_content": "/* ============================================================================\n * MAIN\n * ==========================================================================*/\nstatic int tlfb000m_main(tlfb000m_in_t *pIn, tlfb000m_out_t *pOut)\n{\n    p_fammca = pBIZ;\n    p_in     = pIn;\n    p_out    = pOut;\n\n    ILOG(\"인출가능금액 조회 시작\\n\");\n\n    if (tlfb000m_a000_initialize() != SUCC)\n    {\n        BAM_RETURN_FAIL;\n    }\n\n    if (tlfb000m_a500_input_check() != SUCC)\n    {\n        BAM_RETURN_FAIL;\n    }\n\n    if (tlfb000m_c000_event_process() != SUCC)\n    {\n        COPYS(p_out->erro_msg_code, H_oerrno_msg_code);\n        BAM_RETURN_FAIL;\n    }\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * MAIN\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_a000_initialize",
+          "line_start": 175,
+          "line_end": 226,
+          "raw_content": "/* ============================================================================\n * 초기화\n * ==========================================================================*/\nstatic int tlfb000m_a000_initialize(void)\n{\n    BAM_START;\n\n    tlfb000m_a099_host_variable_init();\n\n    /* 거래 초기화 */\n    H_iwthd_totl_sum_amnt      = 0L;\n    H_idpsd_sban_amnt          = 0L;\n    H_lsttl_prev_cash_amnt     = 0L;\n    H_lsbts_sell_samt          = 0L;\n\n    memset(H_pstn_unit_no, 0x00, sizeof(H_pstn_unit_no));\n    memcpy(H_pstn_unit_no, \"GEBL\", 4); /* 원문 유지 */\n\n    memset(H_tsdd_chck_rcny_date, 0x00, sizeof(H_tsdd_chck_rcny_date));\n    H_tsdd_chck_rcny_amnt      = 0L;\n    H_tsdd_chck_rcny_cncl_amnt = 0L;\n\n    memset(H_pvdd_chck_rcny_date, 0x00, sizeof(H_pvdd_chck_rcny_date));\n    H_pvdd_chck_rcny_amnt      = 0L;\n    H_pvdd_chck_rcny_cncl_amnt = 0L;\n\n    H_chck_rcny_sum_amnt = 0L;\n\n    H_cnst_mrgn_tamt         = 0L;\n    H_cnst_mrgn_cash_amnt    = 0L;\n    H_ftrs_opts_bsc_dpmy_amnt= 0L;\n    H_ftrs_dlng_loss_amnt    = 0L;\n    H_nxdd_stlt_amnt         = 0L;\n\n    memset(H_mrkt_end_yn, 0x00, sizeof(H_mrkt_end_yn));\n\n    H_totl_mrgn_amnt           = 0L;\n    H_wtdw_psbl_totl_amnt      = 0L;\n    H_wtdw_psbl_cash_amnt      = 0L;\n    H_adtl_wtdw_psbl_totl_amnt = 0L;\n    H_adtl_wtdw_psbl_cash_amnt = 0L;\n    H_sbtt_psbl_tamt           = 0L;\n\n    H_tmp_psbl_totl_amnt       = 0L;\n    H_tmp_psbl_cash_amnt       = 0L;\n\n    memset(H_tagy_yn, 0x00, sizeof(H_tagy_yn));\n\n    /* In/Out host init + assign */\n    tlfb000m_aa00_inrec_init();\n    tlfb000m_aa02_outrec_init();\n    tlfb000m_aa01_inrec_assign();\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * 초기화\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_a099_host_variable_init",
+          "line_start": 229,
+          "line_end": 255,
+          "raw_content": "/* Host Variable 초기화 */\nstatic int tlfb000m_a099_host_variable_init(void)\n{\n    BAM_START;\n\n    H_iacnt_id = 0L;\n    memset(H_ibsns_date, 0x00, sizeof(H_ibsns_date));\n    memset(H_ia_acnt_ifnm_updt_yn, 0x00, sizeof(H_ia_acnt_ifnm_updt_yn));\n    memset(H_ia_funds_sbtt_wtdw_yn, 0x00, sizeof(H_ia_funds_sbtt_wtdw_yn));\n\n    H_oftrs_opts_wtdw_psbl_tamt      = 0L;\n    H_oftrs_opts_wtdw_psbl_cash_amnt = 0L;\n    memset(H_oa_excp_ocrn_yn, 0x00, sizeof(H_oa_excp_ocrn_yn));\n    H_oa_sbtt_psbl_amnt              = 0L;\n    H_wthd_prev_blnc_amnt            = 0L;\n    H_oa_un_clam_samt                = 0L;\n    H_ofuns_sbtt_rcny_amnt           = 0L;\n    memset(H_oerrno_msg_code, 0x00, sizeof(H_oerrno_msg_code));\n\n    H_uncl_amnt_sum      = 0L;\n    H_cash_uncl_dlf_amnt = 0L;\n    H_etc_rntl_dlf_amnt  = 0L;\n\n    H_tmp_psbl_totl_amnt = 0L;\n    H_tmp_psbl_cash_amnt = 0L;\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* Host Variable 초기화 */"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_a500_input_check",
+          "line_start": 260,
+          "line_end": 296,
+          "raw_content": "/* ============================================================================\n * INPUT 검증\n * ==========================================================================*/\nstatic int tlfb000m_a500_input_check(void)\n{\n    BAM_START;\n\n    /* 해외파생계약이면: 존재하면 FAIL, 없으면 SUCC */\n            \n                  \n                         \n                             \n                                      \n                                      \n                                    \n                                             \n                \n\n    switch(SQLCODE)\n    {\n        case SQLNOTFOUND:\n            /* 미등록이면 정상 */\n            break;\n\n        case SQLOK:\n            ELOG(\"계좌확인요망(해외선물계좌 사용자) [ACNT_ID = %ld]\", H_iacnt_id);\n            COPYS(H_oerrno_msg_code, \"5795\"); /* 해외선물계좌는 사용할 수 없습니다 */\n            COPYS(p_out->erro_msg_code, H_oerrno_msg_code);\n            BAM_RETURN_FAIL;\n\n        default:\n            ELOG(\"UUA ACNT SELECT Error ( SQLCODE : %d / SQLMSG : %s ) [ ACNT_ID = %ld ]\",\n                 SQLCODE, SQLMSG, H_iacnt_id);\n            COPYS(H_oerrno_msg_code, \"0181\"); /* 전산실로 연락하십시오. */\n            COPYS(p_out->erro_msg_code, H_oerrno_msg_code);\n            BAM_RETURN_FAIL;\n    }\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * INPUT 검증\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_c000_event_process",
+          "line_start": 301,
+          "line_end": 540,
+          "raw_content": "/* ============================================================================\n * 업무 처리\n * ==========================================================================*/\nstatic int tlfb000m_c000_event_process(void)\n{\n    BAM_START;\n\n    /* 계좌정보갱신여부가 'Y'면 선행 update로 lock 유도 */\n    if (strcmp(H_ia_acnt_ifnm_updt_yn, \"Y\") == 0)\n    {\n        if (tlfb000m_c100_update_meg_ftrs_wthd_blnc() != SUCC)\n        {\n            BAM_RETURN_FAIL;\n        }\n    }\n\n    if (tlfb000m_c200_select_meg_ftrs_wthd_blnc() != SUCC)\n    {\n        BAM_RETURN_FAIL;\n    }\n\n    if (tlfb000m_c210_bamcall_mbe1210m() != SUCC)\n    {\n        BAM_RETURN_FAIL;\n    }\n\n    if (tlfb000m_c300_bamcall_mba0360m() != SUCC)\n    {\n        BAM_RETURN_FAIL;\n    }\n\n    if (tlfb000m_c400_bamcall_tlf9600m() != SUCC)\n    {\n        BAM_RETURN_FAIL;\n    }\n\n    /* ------------------------------------------------------------------------\n     * 산식(원문 로직 기반) 정상화\n     * ----------------------------------------------------------------------*/\n\n    /* 총증거금액 = Max(위탁증거금총액, 기본예탁금) */\n    H_totl_mrgn_amnt = (H_cnst_mrgn_tamt > H_ftrs_opts_bsc_dpmy_amnt)\n                      ? H_cnst_mrgn_tamt\n                      : H_ftrs_opts_bsc_dpmy_amnt;\n\n    /* 예외발생(입출금) 여부 */\n    if (strcmp(H_oa_excp_ocrn_yn, \"Y\") == 0)\n    {\n        if (strcmp(H_mrkt_end_yn, \"Y\") != 0)\n        {\n            if (H_cnst_mrgn_tamt < 0L) H_cnst_mrgn_tamt = 0L;\n\n            H_adtl_wtdw_psbl_totl_amnt =\n                    H_nxdd_stlt_amnt\n                  + H_lsttl_prev_cash_amnt\n                  + H_cnst_mrgn_tamt;\n\n            H_adtl_wtdw_psbl_cash_amnt =\n                    H_nxdd_stlt_amnt\n                  + H_cnst_mrgn_cash_amnt;\n        }\n        else\n        {\n            if (H_cnst_mrgn_tamt < 0L)      H_cnst_mrgn_tamt = 0L;\n            if (H_cnst_mrgn_cash_amnt < 0L) H_cnst_mrgn_cash_amnt = 0L;\n\n            H_adtl_wtdw_psbl_totl_amnt =\n                    H_nxdd_stlt_amnt\n                  + H_lsttl_prev_cash_amnt\n                  - H_ftrs_dlng_loss_amnt;\n\n            H_adtl_wtdw_psbl_cash_amnt =\n                    H_nxdd_stlt_amnt\n                  - H_ftrs_dlng_loss_amnt;\n        }\n\n        if (H_adtl_wtdw_psbl_totl_amnt > H_cnst_mrgn_tamt)\n            H_adtl_wtdw_psbl_totl_amnt = H_cnst_mrgn_tamt;\n\n        if (H_adtl_wtdw_psbl_cash_amnt > H_cnst_mrgn_cash_amnt)\n            H_adtl_wtdw_psbl_cash_amnt = H_cnst_mrgn_cash_amnt;\n    }\n    else\n    {\n        /* 장중이면 익일결제금액은 제외 */\n        if (strcmp(H_mrkt_end_yn, \"Y\") != 0)\n        {\n            H_nxdd_stlt_amnt = 0L;\n            if (H_cnst_mrgn_tamt < 0L) H_cnst_mrgn_tamt = 0L;\n\n            H_adtl_wtdw_psbl_totl_amnt = H_nxdd_stlt_amnt + H_lsttl_prev_cash_amnt;\n            if (H_adtl_wtdw_psbl_totl_amnt > H_cnst_mrgn_tamt)\n                H_adtl_wtdw_psbl_totl_amnt = H_cnst_mrgn_tamt;\n\n            H_adtl_wtdw_psbl_cash_amnt =\n                (H_nxdd_stlt_amnt > H_cnst_mrgn_cash_amnt) ? H_cnst_mrgn_cash_amnt\n                                                          : H_nxdd_stlt_amnt;\n        }\n        else\n        {\n            if (H_cnst_mrgn_tamt < 0L) H_cnst_mrgn_tamt = 0L;\n\n            H_tmp_add_wtdw_psbl_tamt =\n                    H_nxdd_stlt_amnt\n                  + H_lsttl_prev_cash_amnt\n                  - H_ftrs_dlng_loss_amnt;\n\n            H_adtl_wtdw_psbl_totl_amnt =\n                (H_tmp_add_wtdw_psbl_tamt > H_cnst_mrgn_tamt) ? H_cnst_mrgn_tamt\n                                                             : H_tmp_add_wtdw_psbl_tamt;\n\n            if (H_adtl_wtdw_psbl_totl_amnt > 0)\n            {\n                long mrgn_minus_base = H_cnst_mrgn_tamt - H_ftrs_opts_bsc_dpmy_amnt;\n                H_adtl_wtdw_psbl_totl_amnt =\n                    (H_tmp_add_wtdw_psbl_tamt > mrgn_minus_base) ? mrgn_minus_base\n                                                                : H_tmp_add_wtdw_psbl_tamt;\n\n                if (H_adtl_wtdw_psbl_totl_amnt < 0) H_adtl_wtdw_psbl_totl_amnt = 0;\n            }\n\n            H_adtl_wtdw_psbl_cash_amnt = H_nxdd_stlt_amnt - H_ftrs_dlng_loss_amnt;\n            if (H_adtl_wtdw_psbl_cash_amnt > H_cnst_mrgn_cash_amnt)\n                H_adtl_wtdw_psbl_cash_amnt = H_cnst_mrgn_cash_amnt;\n        }\n    }\n\n    /* 출금가능(중간) */\n    H_wtdw_psbl_totl_amnt =\n            H_iwthd_totl_sum_amnt\n          - H_oa_un_clam_samt\n          + H_idpsd_sban_amnt\n          - H_lsbts_sell_samt\n          + H_adtl_wtdw_psbl_totl_amnt;\n\n    H_wtdw_psbl_cash_amnt =\n            H_iwthd_totl_sum_amnt\n          - H_oa_un_clam_samt\n          + H_adtl_wtdw_psbl_cash_amnt;\n\n    /* 선물옵션출금가능(총/현금) 1차 */\n    if (strcmp(H_ia_funds_sbtt_wtdw_yn, \"Y\") == 0)\n    {\n        /* 총액: - Max(총증거금, 수표합계) */\n        long m1 = (H_totl_mrgn_amnt > H_chck_rcny_sum_amnt) ? H_totl_mrgn_amnt : H_chck_rcny_sum_amnt;\n        H_oftrs_opts_wtdw_psbl_tamt = H_wtdw_psbl_totl_amnt - m1;\n\n        /* 현금: 원문 분기 유지 */\n        if (H_cnst_mrgn_cash_amnt > 0)\n        {\n            long m2 = (H_cnst_mrgn_cash_amnt > H_chck_rcny_sum_amnt) ? H_cnst_mrgn_cash_amnt : H_chck_rcny_sum_amnt;\n            H_oftrs_opts_wtdw_psbl_cash_amnt = H_wtdw_psbl_cash_amnt - m2;\n        }\n        else\n        {\n            H_oftrs_opts_wtdw_psbl_cash_amnt =\n                    H_wtdw_psbl_cash_amnt\n                  - H_cnst_mrgn_cash_amnt\n                  - H_chck_rcny_sum_amnt;\n        }\n    }\n    else\n    {\n        /* 총액: - Max(총증거금, 수표합계+자금대체입금) */\n        long s = H_chck_rcny_sum_amnt + H_ofuns_sbtt_rcny_amnt;\n        long m1 = (H_totl_mrgn_amnt > s) ? H_totl_mrgn_amnt : s;\n        H_oftrs_opts_wtdw_psbl_tamt = H_wtdw_psbl_totl_amnt - m1;\n\n        /* 현금: 원문 분기 유지 */\n        if (H_cnst_mrgn_cash_amnt > 0)\n        {\n            long m2 = (H_cnst_mrgn_cash_amnt > s) ? H_cnst_mrgn_cash_amnt : s;\n            H_oftrs_opts_wtdw_psbl_cash_amnt = H_wtdw_psbl_cash_amnt - m2;\n        }\n        else\n        {\n            H_oftrs_opts_wtdw_psbl_cash_amnt =\n                    H_wtdw_psbl_cash_amnt\n                  - H_cnst_mrgn_cash_amnt\n                  - s;\n        }\n    }\n\n    /* 실제 예수금 기준 한도와 비교하여 MIN */\n    H_tmp_psbl_totl_amnt =\n            H_iwthd_totl_sum_amnt\n          - H_oa_un_clam_samt\n          + H_idpsd_sban_amnt\n          - H_chck_rcny_sum_amnt\n          - H_ofuns_sbtt_rcny_amnt;\n\n    H_tmp_psbl_cash_amnt =\n            H_iwthd_totl_sum_amnt\n          - H_oa_un_clam_samt\n          - H_chck_rcny_sum_amnt\n          - H_ofuns_sbtt_rcny_amnt;\n\n    if (H_oftrs_opts_wtdw_psbl_tamt > H_tmp_psbl_totl_amnt)\n        H_oftrs_opts_wtdw_psbl_tamt = H_tmp_psbl_totl_amnt;\n\n    if (H_oftrs_opts_wtdw_psbl_cash_amnt > H_tmp_psbl_cash_amnt)\n        H_oftrs_opts_wtdw_psbl_cash_amnt = H_tmp_psbl_cash_amnt;\n\n    /* 최종 인출가능액 산정식 적용 */\n    H_oftrs_opts_wtdw_psbl_tamt = H_oftrs_opts_wtdw_psbl_tamt - H_totl_mrgn_amnt;\n\n    if ((H_oftrs_opts_wtdw_psbl_cash_amnt - H_cnst_mrgn_cash_amnt) > H_oftrs_opts_wtdw_psbl_tamt)\n        H_oftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_tamt;\n    else\n        H_oftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_cash_amnt - H_cnst_mrgn_cash_amnt;\n\n    if (H_oftrs_opts_wtdw_psbl_tamt < 0L)      H_oftrs_opts_wtdw_psbl_tamt = 0L;\n    if (H_oftrs_opts_wtdw_psbl_cash_amnt < 0L) H_oftrs_opts_wtdw_psbl_cash_amnt = 0L;\n\n    if (H_oftrs_opts_wtdw_psbl_cash_amnt > H_oftrs_opts_wtdw_psbl_tamt)\n        H_oftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_tamt;\n\n    /* 대체가능금액(최종) */\n    long m_sbtt = (H_totl_mrgn_amnt > H_ofuns_sbtt_rcny_amnt) ? H_totl_mrgn_amnt : H_ofuns_sbtt_rcny_amnt;\n    H_sbtt_psbl_tamt = H_wtdw_psbl_totl_amnt - m_sbtt;\n\n    long m_cash = (H_cnst_mrgn_cash_amnt > H_ofuns_sbtt_rcny_amnt) ? H_cnst_mrgn_cash_amnt : H_ofuns_sbtt_rcny_amnt;\n    H_oa_sbtt_psbl_amnt = H_wtdw_psbl_cash_amnt - m_cash;\n\n    if (H_oa_sbtt_psbl_amnt > H_sbtt_psbl_tamt)\n        H_oa_sbtt_psbl_amnt = H_sbtt_psbl_tamt;\n\n    if (H_oa_sbtt_psbl_amnt < 0L)\n        H_oa_sbtt_psbl_amnt = 0L;\n\n    /* 계좌정보갱신여부 & 예외발생여부가 모두 Y면 출금건수 update */\n    if ((strcmp(H_ia_acnt_ifnm_updt_yn, \"Y\") == 0) &&\n        (strcmp(H_oa_excp_ocrn_yn, \"Y\") == 0))\n    {\n        if (tlfb000m_c500_update_meg_ftrs_wthd_blnc() != SUCC)\n            BAM_RETURN_FAIL;\n    }\n\n    /* OUTPUT assign */\n    tlfb000m_aa03_outrec_assign();\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * 업무 처리\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_c100_update_meg_ftrs_wthd_blnc",
+          "line_start": 545,
+          "line_end": 575,
+          "raw_content": "/* ============================================================================\n * DB Update/Select\n * ==========================================================================*/\nstatic int tlfb000m_c100_update_meg_ftrs_wthd_blnc(void)\n{\n    BAM_START;\n\n    /* 원문은 Dummy Update로 Lock 목적 */\n            \n                                     \n                                                      \n                                         \n                                              \n\n    switch(SQLCODE)\n    {\n        case SQLOK:\n            break;\n\n        case SQLNOTFOUND:\n            ELOG(\"MEG_FTRS_WTHD_BLNC Dummy UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]\",\n                 SQLCODE, H_iacnt_id);\n            COPYS(H_oerrno_msg_code, \"0181\");\n            BAM_RETURN_FAIL;\n\n        default:\n            ELOG(\"MEG_FTRS_WTHD_BLNC Dummy UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\",\n                 SQLCODE, SQLMSG, H_iacnt_id);\n            COPYS(H_oerrno_msg_code, \"0181\");\n            BAM_RETURN_FAIL;\n    }\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * DB Update/Select\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_c200_select_meg_ftrs_wthd_blnc",
+          "line_start": 577,
+          "line_end": 617,
+          "raw_content": "static int tlfb000m_c200_select_meg_ftrs_wthd_blnc(void)\n{\n    BAM_START;\n\n            \n                                 \n                             \n                                                                    \n                                                               \n                                                  \n                                   \n                                     \n                                 \n                                      \n                                 \n                                 \n                                      \n                                     \n                                         \n                                             \n                               \n                 \n\n    switch(SQLCODE)\n    {\n        case SQLOK:\n            break;\n\n        case SQLNOTFOUND:\n            COPYS(H_oerrno_msg_code, \"2820\");\n            BAM_RETURN_FAIL;\n\n        default:\n            ELOG(\"MEG_FTRS_WTHD_BLNC SELECT Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\",\n                 SQLCODE, SQLMSG, H_iacnt_id);\n            COPYS(H_oerrno_msg_code, \"0181\");\n            BAM_RETURN_FAIL;\n    }\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": null
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_c210_bamcall_mbe1210m",
+          "line_start": 622,
+          "line_end": 652,
+          "raw_content": "/* ============================================================================\n * BAMCALL: mbe1210m (연체료 반영)\n * ==========================================================================*/\nstatic int tlfb000m_c210_bamcall_mbe1210m(void)\n{\n    BAM_START;\n\n    memset(&s_mbe1210m_in,  0x00, sizeof(mbe1210m_in_t));\n    memset(&s_mbe1210m_out, 0x00, sizeof(mbe1210m_out_t));\n\n    if (H_oa_un_clam_samt > 0L)\n    {\n        s_mbe1210m_in.acnt_id = H_iacnt_id;\n        COPYS(s_mbe1210m_in.strt_stnr_date, \"00000000\");\n        COPYS(s_mbe1210m_in.a_rnbr_date, H_ibsns_date);\n\n                                                           \n        if (RTNCD != SUCC)\n        {\n            ELOG(\"mbe1210m 호출 오류 RTNCD=%d MSG=%s\", RTNCD, s_mbe1210m_out.error_msg_cnts);\n            COPYS(H_oerrno_msg_code, \"0181\");\n            BAM_RETURN_FAIL;\n        }\n\n        H_cash_uncl_dlf_amnt = s_mbe1210m_out.cash_uncl_dlf_amnt;\n        H_etc_rntl_dlf_amnt  = s_mbe1210m_out.etc_rntl_dlf_amnt;\n\n        /* 원문 일부 변수명 혼재 -> 총합계에 반영만 유지 */\n        H_iwthd_totl_sum_amnt =\n            H_iwthd_totl_sum_amnt + H_cash_uncl_dlf_amnt + H_etc_rntl_dlf_amnt;\n    }\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * BAMCALL: mbe1210m (연체료 반영)\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_c300_bamcall_mba0360m",
+          "line_start": 657,
+          "line_end": 688,
+          "raw_content": "/* ============================================================================\n * BAMCALL: mba0360m (수표미결제)\n * ==========================================================================*/\nstatic int tlfb000m_c300_bamcall_mba0360m(void)\n{\n    BAM_START;\n\n    memset(&mba0360m_in,  0x00, sizeof(mba0360m_in_t));\n    memset(&mba0360m_out, 0x00, sizeof(mba0360m_out_t));\n\n    mba0360m_in.acnt_id      = H_iacnt_id;\n    COPYS(mba0360m_in.pstn_unit_no, H_pstn_unit_no);   /* 구조체 필드 타입 가정 */\n    memcpy(mba0360m_in.acnt_type_code, \"FOAC\", 4);\n    memcpy(mba0360m_in.trdng_code,     \"0000\", 4);\n    memcpy(mba0360m_in.frgn_date,      H_ibsns_date, 8);\n    mba0360m_in.a_acnt_ifnm_ackn_yn = 'Y';\n\n                                                   \n    if (RTNCD != SUCC)\n    {\n        ELOG(\"mba0360m 호출 오류 RTNCD=%d MSG=%s\", RTNCD, mba0360m_out.error_msg_cnts);\n        COPYS(H_oerrno_msg_code, \"0181\");\n        BAM_RETURN_FAIL;\n    }\n\n    COPYS(H_tsdd_chck_rcny_date, mba0360m_out.a_chck_rcmy_date1);\n    H_tsdd_chck_rcny_amnt = mba0360m_out.chck_rcmy_amnt1;\n\n    COPYS(H_pvdd_chck_rcny_date, mba0360m_out.a_chck_rcmy_date2);\n    H_pvdd_chck_rcny_amnt = mba0360m_out.chck_rcmy_amnt2;\n\n    H_chck_rcny_sum_amnt = H_tsdd_chck_rcny_amnt + H_pvdd_chck_rcny_amnt;\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * BAMCALL: mba0360m (수표미결제)\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_c400_bamcall_tlf9600m",
+          "line_start": 693,
+          "line_end": 727,
+          "raw_content": "/* ============================================================================\n * BAMCALL: tlf9600m (증거금/예외/시장종료)\n * ==========================================================================*/\nstatic int tlfb000m_c400_bamcall_tlf9600m(void)\n{\n    BAM_START;\n\n    memset(&tlf9600m_in,  0x00, sizeof(tlf9600m_in_t));\n    memset(&tlf9600m_out, 0x00, sizeof(tlf9600m_out_t));\n\n    COPYS(tlf9600m_in.prce_date, H_ibsns_date);\n    tlf9600m_in.acnt_id = H_iacnt_id;\n\n                                                   \n    if (RTNCD != SUCC)\n    {\n        ELOG(\"tlf9600m 호출 오류 RTNCD=%d ACNT_ID=%ld\", RTNCD, H_iacnt_id);\n        COPYS(H_oerrno_msg_code, tlf9600m_out.error_msg_code);\n        BAM_RETURN_FAIL;\n    }\n\n    H_cnst_mrgn_tamt          = tlf9600m_out.cnst_mrgn_tamt;\n    H_cnst_mrgn_cash_amnt     = tlf9600m_out.cnst_mrgn_cash_amnt;\n    H_ftrs_opts_bsc_dpmy_amnt = tlf9600m_out.ftrs_opts_bsc_dpmy_amnt;\n\n    H_oa_excp_ocrn_yn[0]      = tlf9600m_out.excp_ocrn_yn;\n    H_oa_excp_ocrn_yn[1]      = '\\0';\n\n    H_ftrs_dlng_loss_amnt     = tlf9600m_out.ftrs_dlng_loss_amnt;\n    H_nxdd_stlt_amnt          = tlf9600m_out.nxdd_stlt_amnt;\n\n    H_mrkt_end_yn[0]          = tlf9600m_out.mrkt_end_yn;\n    H_mrkt_end_yn[1]          = '\\0';\n\n    COPYS(H_oerrno_msg_code, tlf9600m_out.error_msg_code);\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * BAMCALL: tlf9600m (증거금/예외/시장종료)\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_c500_update_meg_ftrs_wthd_blnc",
+          "line_start": 730,
+          "line_end": 759,
+          "raw_content": "/* 출금건수 Update */\nstatic int tlfb000m_c500_update_meg_ftrs_wthd_blnc(void)\n{\n    BAM_START;\n\n            \n                                     \n                                        \n                                         \n                                              \n\n    switch(SQLCODE)\n    {\n        case SQLOK:\n            break;\n\n        case SQLNOTFOUND:\n            ELOG(\"MEG_FTRS_WTHD_BLNC UPDATE NOTFOUND (SQLCODE:%d) [ACNT_ID=%ld]\",\n                 SQLCODE, H_iacnt_id);\n            COPYS(H_oerrno_msg_code, \"0181\");\n            BAM_RETURN_FAIL;\n\n        default:\n            ELOG(\"MEG_FTRS_WTHD_BLNC UPDATE Error (SQLCODE:%d / SQLMSG:%s) [ACNT_ID=%ld]\",\n                 SQLCODE, SQLMSG, H_iacnt_id);\n            COPYS(H_oerrno_msg_code, \"0181\");\n            BAM_RETURN_FAIL;\n    }\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": "/* 출금건수 Update */"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_aa00_inrec_init",
+          "line_start": 764,
+          "line_end": 774,
+          "raw_content": "/* ============================================================================\n * In/Out Assign (정상화)\n * ==========================================================================*/\nstatic int tlfb000m_aa00_inrec_init(void)\n{\n    BAM_START;\n\n    H_iacnt_id = 0L;\n    memset(H_ibsns_date, 0x00, sizeof(H_ibsns_date));\n    memset(H_ia_acnt_ifnm_updt_yn, 0x00, sizeof(H_ia_acnt_ifnm_updt_yn));\n    memset(H_ia_funds_sbtt_wtdw_yn, 0x00, sizeof(H_ia_funds_sbtt_wtdw_yn));\n\n    BAM_RETURN_VOID;\n}",
+          "function": null,
+          "docstring": "/* ============================================================================\n * In/Out Assign (정상화)\n * ==========================================================================*/"
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_aa02_outrec_init",
+          "line_start": 776,
+          "line_end": 790,
+          "raw_content": "static int tlfb000m_aa02_outrec_init(void)\n{\n    BAM_START;\n\n    H_oftrs_opts_wtdw_psbl_tamt      = 0L;\n    H_oftrs_opts_wtdw_psbl_cash_amnt = 0L;\n    memset(H_oa_excp_ocrn_yn, 0x00, sizeof(H_oa_excp_ocrn_yn));\n    H_oa_sbtt_psbl_amnt              = 0L;\n    H_wthd_prev_blnc_amnt            = 0L;\n    H_oa_un_clam_samt                = 0L;\n    H_ofuns_sbtt_rcny_amnt           = 0L;\n    memset(H_oerrno_msg_code, 0x00, sizeof(H_oerrno_msg_code));\n\n    BAM_RETURN_VOID;\n}",
+          "function": null,
+          "docstring": null
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_aa01_inrec_assign",
+          "line_start": 792,
+          "line_end": 809,
+          "raw_content": "static int tlfb000m_aa01_inrec_assign(void)\n{\n    BAM_START;\n\n    H_iacnt_id = p_in->acnt_id;\n    COPYS(H_ibsns_date, p_in->a_bsns_date);\n\n    H_ia_acnt_ifnm_updt_yn[0]  = p_in->a_acnt_ifnm_updt_yn;\n    H_ia_acnt_ifnm_updt_yn[1]  = '\\0';\n\n    H_ia_funds_sbtt_wtdw_yn[0] = p_in->a_funs_sbtt_wtdw_yn; /* 원문 struct 필드명 가정 */\n    H_ia_funds_sbtt_wtdw_yn[1] = '\\0';\n\n    ILOG(\"계좌ID(%ld), 영업일자(%s), 계좌정보갱신여부(%c), 자금대체출금여부(%c)\",\n         H_iacnt_id, H_ibsns_date, H_ia_acnt_ifnm_updt_yn[0], H_ia_funds_sbtt_wtdw_yn[0]);\n\n    BAM_RETURN_SUCC;\n}",
+          "function": null,
+          "docstring": null
+        },
+        {
+          "type": "function",
+          "name": "tlfb000m_aa03_outrec_assign",
+          "line_start": 811,
+          "line_end": 834,
+          "raw_content": "static int tlfb000m_aa03_outrec_assign(void)\n{\n    BAM_START;\n\n    p_out->ftrs_opts_wtdw_psbl_tamt      = H_oftrs_opts_wtdw_psbl_tamt;\n    p_out->ftrs_opts_wtdw_psbl_cash_amnt = H_oftrs_opts_wtdw_psbl_cash_amnt;\n    p_out->a_excp_ocrn_yn                = H_oa_excp_ocrn_yn[0];\n    p_out->a_sbtt_psbl_amnt              = H_oa_sbtt_psbl_amnt;\n    p_out->wthd_prev_blnc_amnt           = H_wthd_prev_blnc_amnt;\n    p_out->a_un_clam_samt                = H_oa_un_clam_samt;\n    p_out->funs_sbtt_rcny_amnt           = H_ofuns_sbtt_rcny_amnt;\n    COPYS(p_out->erro_msg_code, H_oerrno_msg_code);\n\n    ILOG(\"출금가능총액(%ld) 출금가능현금(%ld) 예외(%c) 대체가능(%ld) 미수합계(%ld) 자금대체입금(%ld) 오류코드(%s)\",\n         p_out->ftrs_opts_wtdw_psbl_tamt,\n         p_out->ftrs_opts_wtdw_psbl_cash_amnt,\n         p_out->a_excp_ocrn_yn,\n         p_out->a_sbtt_psbl_amnt,\n         p_out->a_un_clam_samt,\n         p_out->funs_sbtt_rcny_amnt,\n         p_out->erro_msg_code);\n\n    BAM_RETURN_VOID;\n}",
+          "function": null,
+          "docstring": null
+        }
+      ],
+      "bam_calls": [
+        {
+          "type": "bam_call",
+          "args": "mbe1210m, &s_mbe1210m_in, &s_mbe1210m_out",
+          "line_start": 635,
+          "line_end": 635,
+          "raw_content": "BAMCALL(mbe1210m, &s_mbe1210m_in, &s_mbe1210m_out);",
+          "function": "tlfb000m_c210_bamcall_mbe1210m"
+        },
+        {
+          "type": "bam_call",
+          "args": "mba0360m, &mba0360m_in, &mba0360m_out",
+          "line_start": 671,
+          "line_end": 671,
+          "raw_content": "BAMCALL(mba0360m, &mba0360m_in, &mba0360m_out);",
+          "function": "tlfb000m_c300_bamcall_mba0360m"
+        },
+        {
+          "type": "bam_call",
+          "args": "tlf9600m, &tlf9600m_in, &tlf9600m_out",
+          "line_start": 703,
+          "line_end": 703,
+          "raw_content": "BAMCALL(tlf9600m, &tlf9600m_in, &tlf9600m_out);",
+          "function": "tlfb000m_c400_bamcall_tlf9600m"
+        }
+      ]
+    },
+    "sql_relationships": []
+  },
+  "header_tree": {
+    "direct_includes": [
+      {
+        "header_name": "afc_bam.h",
+        "is_system_header": false,
+        "resolved_path": null,
+        "found": false,
+        "not_found_reason": "not_found",
+        "line_number": 22,
+        "content": null,
+        "nested_includes": []
+      },
+      {
+        "header_name": "tlfb000m.h",
+        "is_system_header": false,
+        "resolved_path": null,
+        "found": false,
+        "not_found_reason": "not_found",
+        "line_number": 23,
+        "content": null,
+        "nested_includes": []
+      },
+      {
+        "header_name": "mba0360m.h",
+        "is_system_header": false,
+        "resolved_path": null,
+        "found": false,
+        "not_found_reason": "not_found",
+        "line_number": 25,
+        "content": null,
+        "nested_includes": []
+      },
+      {
+        "header_name": "tlf9600m.h",
+        "is_system_header": false,
+        "resolved_path": null,
+        "found": false,
+        "not_found_reason": "not_found",
+        "line_number": 26,
+        "content": null,
+        "nested_includes": []
+      },
+      {
+        "header_name": "mbe1210m.h",
+        "is_system_header": false,
+        "resolved_path": null,
+        "found": false,
+        "not_found_reason": "not_found",
+        "line_number": 27,
+        "content": null,
+        "nested_includes": []
+      }
+    ],
+    "all_headers_flat": [
+      {
+        "header_name": "afc_bam.h",
+        "depth": 1,
+        "found": false,
+        "reason": "not_found"
+      },
+      {
+        "header_name": "tlfb000m.h",
+        "depth": 1,
+        "found": false,
+        "reason": "not_found"
+      },
+      {
+        "header_name": "mba0360m.h",
+        "depth": 1,
+        "found": false,
+        "reason": "not_found"
+      },
+      {
+        "header_name": "tlf9600m.h",
+        "depth": 1,
+        "found": false,
+        "reason": "not_found"
+      },
+      {
+        "header_name": "mbe1210m.h",
+        "depth": 1,
+        "found": false,
+        "reason": "not_found"
+      }
+    ]
+  },
+  "merged_definitions": {
+    "all_macros": {},
+    "all_structs": {},
+    "db_vars_info": {}
+  }
+}

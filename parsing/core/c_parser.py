@@ -2,6 +2,7 @@
 Tree-sitter를 사용하여 C 코드를 파싱하는 모듈입니다.
 함수 정의, 변수 선언, 구조체 정의, 함수 호출 등을 추출합니다.
 """
+import re
 import tree_sitter
 try:
     import tree_sitter_c
@@ -27,6 +28,7 @@ class CParser:
             return elements
 
         tree = self.parser.parse(bytes(source_code, "utf8"))
+        self._source_code = source_code  # Store source for comment extraction
         root_node = tree.root_node
         
         # 다양한 tree-sitter 버전 간의 호환성을 위해
@@ -73,6 +75,8 @@ class CParser:
                 # 변수 선언
                 var_info = self._get_variable_info(node)
                 if var_info and var_info.get('name'):
+                    # Extract trailing comment
+                    comment = self._extract_trailing_comment(node)
                     elements.append({
                         "type": "variable",
                         "name": var_info['name'],
@@ -80,6 +84,7 @@ class CParser:
                         "array_sizes": var_info.get('array_sizes', []),
                         "is_pointer": var_info.get('is_pointer', False),
                         "storage_class": var_info.get('storage_class'),
+                        "comment": comment,
                         "line_start": node.start_point.row + 1,
                         "line_end": node.end_point.row + 1,
                         "raw_content": node.text.decode('utf8'),
@@ -113,6 +118,38 @@ class CParser:
 
         for child in node.children:
             self._traverse(child, elements, current_function)
+
+    def _extract_trailing_comment(self, node):
+        """
+        변수 선언 뒤에 있는 주석을 추출합니다.
+        예: `static long H_iacnt_id;  /* 계좌ID */` → `계좌ID`
+        
+        Returns:
+            str: 주석 내용 (없으면 None)
+        """
+        if not hasattr(self, '_source_code'):
+            return None
+        
+        # 변수 선언이 있는 라인 가져오기
+        line_num = node.start_point.row
+        lines = self._source_code.split('\n')
+        
+        if line_num >= len(lines):
+            return None
+        
+        line = lines[line_num]
+        
+        # /* comment */ 패턴 추출
+        block_comment_match = re.search(r'/\*\s*(.+?)\s*\*/', line)
+        if block_comment_match:
+            return block_comment_match.group(1).strip()
+        
+        # // comment 패턴 추출
+        line_comment_match = re.search(r'//\s*(.+?)$', line)
+        if line_comment_match:
+            return line_comment_match.group(1).strip()
+        
+        return None
 
     def _get_function_name(self, node):
         # 자식: declarator -> function_declarator -> declarator -> identifier

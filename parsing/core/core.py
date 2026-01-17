@@ -19,11 +19,11 @@ import sys
 # 상위 디렉토리를 path에 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared_config.logger import logger
+from infra.config.logger import logger
 
 # SQL 관계 플러그인 (sql_extractor에서 import)
 try:
-    from sql_extractor.plugins import (
+    from parsing.sql.plugins import (
         CursorRelationshipPlugin,
         DynamicSQLRelationshipPlugin,
         TransactionRelationshipPlugin,
@@ -40,7 +40,7 @@ except ImportError:
 
 # sql_extractor 어댑터 (선택적 import)
 try:
-    from sql_extractor import ProcParserSQLAdapter
+    from parsing.sql import ProcParserSQLAdapter
     HAS_SQL_EXTRACTOR = True
 except ImportError:
     HAS_SQL_EXTRACTOR = False
@@ -106,7 +106,7 @@ class ProCParser:
         """SQL 변환 플러그인 초기화 (sql_extractor에서 로드)"""
         plugins = []
         try:
-            from sql_extractor.transform_plugins import CommentRemovalPlugin
+            from parsing.sql.transform_plugins import CommentRemovalPlugin
             plugins.append(CommentRemovalPlugin())
             logger.debug("CommentRemovalPlugin 로드 완료")
         except ImportError:
