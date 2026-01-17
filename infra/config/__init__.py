@@ -40,6 +40,11 @@ from .logger import (
     log_step,
 )
 
+from .artifact_config import (
+    ArtifactConfig,
+    ArtifactConfigLoader,
+)
+
 __all__ = [
     # type_mappings
     "C_TO_JAVA_TYPE_MAP",

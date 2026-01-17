@@ -19,6 +19,7 @@ Pro*C 파일을 분석하여 Java/MyBatis로 변환하는 전체 파이프라인
 11. [OMM/DBIO/DAO 아티팩트 생성](#11-ommdbio-아티팩트-생성)
 12. [Neo4j 그래프 내보내기](#12-neo4j-그래프-내보내기)
 13. [통합 메타데이터 생성](#13-통합-메타데이터-생성)
+14. [함수 컨텍스트 추출](#14-함수-컨텍스트-추출)
 
 ---
 
@@ -776,6 +777,69 @@ python generate_metadata.py ./proc_files ./output_dir
 
 ---
 
+## 14. 함수 컨텍스트 추출
+
+특정 함수에 대한 관련 정보(SQL, 변수, 매크로, 아티팩트)를 일괄 추출합니다.
+
+### 기본 사용법
+
+```python
+from generate_metadata import UnifiedMetadataGenerator
+from analysis.context import FunctionContextExtractor
+
+# 1. 메타데이터 생성
+generator = UnifiedMetadataGenerator()
+metadata = generator.generate("sample.pc")
+
+# 2. 추출기 생성
+extractor = FunctionContextExtractor(metadata)
+
+# 3. 함수 목록 확인
+print(extractor.list_functions())
+# ['main', 'process_data', 'save_result']
+
+# 4. 특정 함수 컨텍스트 추출
+ctx = extractor.extract("process_data")
+print(ctx.summary())
+# Function 'process_data' (10-50): SQL=3, LocalVars=5, GlobalVars=2
+```
+
+### 옵션별 추출
+
+```python
+ctx = extractor.extract(
+    "process_data",
+    include_sql=True,           # SQL 포함
+    include_variables=True,     # 변수 포함
+    include_macros=True,        # 매크로 포함
+    include_mybatis=True,       # MyBatis XML 생성
+    include_omm=True,           # OMM VO 생성
+    include_dbio=True,          # DBIO 클래스 생성
+    include_dao=True,           # DAO 인터페이스 생성
+)
+
+# 생성된 아티팩트 확인
+print(ctx.mybatis_xml)
+print(ctx.omm_code)
+print(ctx.dbio_code)
+print(ctx.dao_code)
+```
+
+### JSON 내보내기
+
+```python
+# 특정 함수
+extractor.export_function_json(
+    "process_data",
+    "process_data_context.json"
+)
+
+# 모든 함수
+extractor.export_all_json("all_functions_context.json")
+```
+
+---
+
 ## 📊 전체 파이프라인 예시
 
 ```python
@@ -807,6 +871,37 @@ tracker.build_links()
 cpg_builder.export_json(cpg, "cpg.json")
 with open("lineage.json", "w") as f:
     f.write(tracker.to_json())
+```
+
+---
+
+## ⚙️ 외부 설정 파일 (External Configuration)
+
+JSONL 설정 파일을 통해 아티팩트 생성(OMM, DBIO, DAO)에 필요한 패키지명, 명명 규칙 등을 외부에서 주입할 수 있습니다.
+
+### 설정 파일 형식
+`.jsonl` 파일을 생성하여 각 라인마다 소스 파일에 대한 설정을 JSON 객체로 정의합니다.
+
+```jsonl
+{"id": "original_source", "base_package": "com.bxm.sample", "dto_prefix": "Sample", "dao_name": "SampleDao"}
+{"id": "another_source", "base_package": "com.bxm.other", "datasource": "OtherDS"}
+```
+
+### 지원 필드
+- **id** (필수): 소스 파일명 (확장자 제외)
+- **base_package**: 기본 Java 패키지 (기본값: `com.example.dao`)
+- **dto_package**: DTO/OMM 패키지 (기본값: `{base_package}.dto`)
+- **dao_package**: DAO 인터페이스 패키지 (기본값: `{base_package}`)
+- **dao_name**: DAO 인터페이스 이름 (기본값: `GeneratedDao`)
+- **dto_prefix**: SQL DTO 클래스명 Prefix (예: `Select` -> `MyDtoSelect`)
+- **datasource**: DBIO 데이터소스 명
+- **context_vo_name**: ContextVO 클래스명
+
+### 사용 방법
+`--config` 또는 `-c` 옵션으로 설정 파일 경로를 지정합니다.
+
+```bash
+python generate_metadata.py sample.pc -o output.json --with-artifacts --config my_config.jsonl
 ```
 
 ---
@@ -851,9 +946,11 @@ NEO4J_PASSWORD=password
 
 | 모듈 | 상세 문서 |
 |------|----------|
-| SQL 추출 | [sql_extractor/USAGE.md](sql_extractor/USAGE.md) |
-| SQL 검증 | [sql_validator/USAGE.md](sql_validator/USAGE.md) |
-| CPG | [CPG/USAGE.md](CPG/USAGE.md) |
-| 변수 추적 | [variable_lineage/USAGE.md](variable_lineage/USAGE.md) |
-| 코드 병합 | [translation_merge/USAGE.md](translation_merge/USAGE.md) |
-| LLM 검증 | [llm_verifier/USAGE.md](llm_verifier/USAGE.md) |
+| Pro*C 파싱 | [parsing/core/USAGE.md](parsing/core/USAGE.md) |
+| SQL 추출 | [parsing/sql/USAGE.md](parsing/sql/USAGE.md) |
+| SQL 검증 | [validation/sql/USAGE.md](validation/sql/USAGE.md) |
+| CPG | [analysis/cpg/USAGE.md](analysis/cpg/USAGE.md) |
+| 변수 추적 | [analysis/lineage/USAGE.md](analysis/lineage/USAGE.md) |
+| 함수 컨텍스트 | [analysis/context/USAGE.md](analysis/context/USAGE.md) |
+| 코드 병합 | [generation/merge/USAGE.md](generation/merge/USAGE.md) |
+| LLM 검증 | [validation/llm/USAGE.md](validation/llm/USAGE.md) |

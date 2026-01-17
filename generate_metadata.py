@@ -19,9 +19,29 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from parsing.core.unified_metadata_generator import UnifiedMetadataGenerator
+try:
+    from infra.config import ArtifactConfigLoader
+except ImportError:
+    ArtifactConfigLoader = None
 
 
 def main():
+    # Redirect output to file for debugging
+    log_file = open('internal_log.txt', 'w', encoding='utf-8')
+    sys.stdout = log_file
+    sys.stderr = log_file
+    print("DEBUG: Script starting (internal log)...", flush=True)
+    try:
+        _real_main()
+    except Exception as e:
+        print(f"CRITICAL ERROR: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+    finally:
+        log_file.close()
+
+def _real_main():
     parser = argparse.ArgumentParser(
         description='Pro*C/SQC 파일에서 통합 메타데이터 생성',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -83,8 +103,14 @@ def main():
         action='store_true',
         help='상세 출력'
     )
+
+    parser.add_argument(
+        '-c', '--config',
+        help='아티팩트 설정 JSONL 파일 경로'
+    )
     
     args = parser.parse_args()
+    print(f"DEBUG: Arguments parsed. Source: {args.source_file}", flush=True)
     
     # 소스 경로 존재 확인
     if not os.path.exists(args.source_file):
@@ -139,10 +165,32 @@ def main():
     # -----------------------------------------------------------
     # Generator 인스턴스 생성 (캐시 공유를 위해 한 번만 생성)
     # -----------------------------------------------------------
+    # Config 로딩
+    artifact_configs = None
+    if args.config:
+        if not os.path.exists(args.config):
+             print(f"오류: 설정 파일을 찾을 수 없습니다: {args.config}")
+             sys.exit(1)
+        
+        if ArtifactConfigLoader:
+             try:
+                 artifact_configs = ArtifactConfigLoader.load(args.config)
+                 if args.verbose:
+                     print(f"설정 로드됨: {len(artifact_configs)}개 항목 ({args.config})")
+             except Exception as e:
+                 print(f"설정 파일 로드 실패: {e}")
+                 sys.exit(1)
+        else:
+             print("경고: ArtifactConfigLoader를 사용할 수 없어 설정을 무시합니다.")
+
+    # -----------------------------------------------------------
+    # Generator 인스턴스 생성 (캐시 공유를 위해 한 번만 생성)
+    # -----------------------------------------------------------
     generator = UnifiedMetadataGenerator(
         include_paths=include_paths,
         base_package=args.base_package,
-        generate_artifacts=args.with_artifacts
+        generate_artifacts=args.with_artifacts,
+        artifact_configs=artifact_configs
     )
 
     # -----------------------------------------------------------
