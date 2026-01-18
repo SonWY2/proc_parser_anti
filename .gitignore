@@ -82,3 +82,27 @@ test_prompts/functions/tlfb000m_c300_bamcall_mba0360m.md
 test_prompts/functions/tlfb000m_c400_bamcall_tlf9600m.md
 test_prompts/functions/tlfb000m_c500_update_meg_ftrs_wthd_blnc.md
 test_prompts/functions/tlfb000m_main.md
+(neo4j스키마)ProC-자바 자동 변환 지식 베이스.txt
+debug_conversion.py
+debug_import.py
+dup_output_2.json
+dup_output.json
+internal_log.txt
+original_source_dup_comment.sqc
+original_source.sqc
+output.json
+post_refactoring_snapshot.json
+pre_refactoring_snapshot.json
+sql_validator.log
+test_c000_vars.md
+test_config.jsonl
+test_fixed_skeleton.md
+test_func_fixed_tlfb000m_a000_initialize.md
+test_func_fixed_tlfb000m_a099_host_variable_init.md
+test_func_fixed_tlfb000m_main.md
+test_plugin_arch.py
+test_plugin_mode.py
+test_skeleton_fixed.md
+tlfb000m.h
+verify_header_refactoring.py
+verify_modularization.py
