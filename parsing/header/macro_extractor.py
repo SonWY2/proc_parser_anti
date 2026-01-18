@@ -23,10 +23,11 @@ class MacroExtractor:
     # #define NAME VALUE 패턴 (단순 상수 매크로)
     DEFINE_PATTERN = re.compile(
         r'^\s*#\s*define\s+'
-        r'(\w+)\s+'                   # 매크로 이름 + 공백
-        r'([^\n]+)',                  # 값 (줄 끝까지)
+        r'(\w+)[ \t]+'                 # 매크로 이름 + 공백
+        r'([^\n]+)',                   # 값 (줄 끝까지)
         re.MULTILINE
     )
+
     
     # 함수형 매크로 패턴 (추출 제외 대상)
     FUNCTION_MACRO_PATTERN = re.compile(
@@ -48,9 +49,12 @@ class MacroExtractor:
             매크로 딕셔너리 {"NAME": value, ...}
         """
         result = {}
-        
+
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
+
         # 함수형 매크로 이름 수집 (제외 대상)
         function_macros = set(self.FUNCTION_MACRO_PATTERN.findall(content))
+
         
         for match in self.DEFINE_PATTERN.finditer(content):
             name = match.group(1)

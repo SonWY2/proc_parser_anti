@@ -110,9 +110,7 @@ class PromptBuilder:
         if global_vars:
             lines.append("```c")
             for var in global_vars[:20]:  # 최대 20개
-                var_type = var.get("var_type", "unknown")
-                var_name = var.get("name", "unknown")
-                lines.append(f"{var_type} {var_name};")
+                lines.append(self._format_var_declaration(var))
             if len(global_vars) > 20:
                 lines.append(f"// ... and {len(global_vars) - 20} more variables")
             lines.append("```")
@@ -266,13 +264,12 @@ class PromptBuilder:
                 lines.append("```")
             lines.append("")
         
-        # 로컬 변수
+         # 로컬 변수
         if func_vars:
             lines.append("### Local Variables:")
             for var in func_vars[:10]:
-                var_type = var.get("var_type", "unknown")
-                var_name = var.get("name", "unknown")
-                lines.append(f"- `{var_type} {var_name}`")
+                declaration = self._format_var_declaration(var).rstrip(";")
+                lines.append(f"- `{declaration}`")
             if len(func_vars) > 10:
                 lines.append(f"- ... and {len(func_vars) - 10} more")
             lines.append("")
@@ -305,10 +302,20 @@ class PromptBuilder:
         
         return "\n".join(lines)
     
+    def _format_var_declaration(self, var: Dict[str, Any]) -> str:
+        var_type = var.get("data_type", "unknown")
+        var_name = var.get("name", "unknown")
+        array_sizes = var.get("resolved_array_sizes") or var.get("array_sizes", [])
+        if array_sizes:
+            suffix = "".join(f"[{'' if size is None else size}]" for size in array_sizes)
+            return f"{var_type} {var_name}{suffix};"
+        return f"{var_type} {var_name};"
+
     def _derive_class_name(self, source_file: str) -> str:
         """소스 파일명에서 Java 클래스명 추론"""
         # 파일명에서 확장자 제거
         name = Path(source_file).stem
+
         
         # snake_case → PascalCase
         parts = name.split('_')

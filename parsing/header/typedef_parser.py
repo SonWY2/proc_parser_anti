@@ -42,14 +42,14 @@ class TypedefStructParser:
         re.DOTALL
     )
     
-    # 필드 선언 패턴: type name[size]; //comment 또는 type name; //comment
+    # 필드 선언 패턴: type name[size]; //comment 또는 /* comment */ 또는 type name; //comment
     FIELD_PATTERN = re.compile(
         r'^\s*'
         r'(\w+(?:\s+\w+)?)\s+'               # 타입 (예: char, unsigned int)
         r'(\*?)(\w+)\s*'                      # 포인터 여부 + 필드명
         r'(?:\[\s*([^\]]+)\s*\])?'           # 배열 크기 (선택)
         r'\s*;'                               # 세미콜론
-        r'(?:\s*//(.*))?',                   # 주석 (선택)
+        r'(?:\s*(?:(//.*)|/\*(.*?)\*/))?',  # 주석 (C++ // 또는 C-style /* */)
         re.MULTILINE
     )
     
@@ -80,16 +80,16 @@ class TypedefStructParser:
                 is_pointer = bool(field_match.group(2))
                 field_name = field_match.group(3)
                 array_size = field_match.group(4)
-                comment = field_match.group(5)
-                
+                comment = field_match.group(5) or field_match.group(6)  # C++ // 또는 C-style /* */
+
                 # 배열 크기에서 공백 제거
                 if array_size:
                     array_size = array_size.strip()
-                
+
                 # 주석에서 앞뒤 공백 제거
                 if comment:
                     comment = comment.strip()
-                
+
                 field_info = FieldInfo(
                     name=field_name,
                     data_type=data_type,

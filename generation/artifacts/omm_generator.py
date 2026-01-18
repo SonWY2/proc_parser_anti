@@ -84,13 +84,17 @@ class OMMGenerator:
         lines.append(f"OMM {full_class_path}")
         lines.append(f'< logicalName= "{logical_name}" description="{description}"')
         lines.append(">")
-        lines.append("{")
-        
-        # 필드들
-        for field_name, field_info in db_vars_info.items():
+        lines.append("}")
+
+        # 필드들 (특정 구조체의 필드만 추출)
+        if struct_name not in db_vars_info:
+            raise ValueError(f"Struct '{struct_name}' not found in db_vars_info")
+
+        fields = db_vars_info[struct_name]
+        for field_name, field_info in fields.items():
             field_line = self._generate_field(field_name, field_info)
             lines.append(f"\t{field_line}")
-        
+
         lines.append("}")
         
         return "\r\n".join(lines)

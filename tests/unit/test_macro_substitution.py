@@ -6,6 +6,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from parsing.core import ProCParser
+from parsing.core.unified_metadata_generator import UnifiedMetadataGenerator
+
 
 def test_macro_substitution():
     """매크로 상수 치환 테스트"""
@@ -68,11 +70,21 @@ int undefined_macro[UNKNOWN_SIZE];
                 print(f"   ✗ 예상: {expected}")
         print()
         
+        print("4. UnifiedMetadataGenerator 매크로 치환 테스트:")
+        generator = UnifiedMetadataGenerator(include_paths=[os.path.dirname(temp_path)])
+        metadata = generator.generate(temp_path)
+        variables = metadata.get("source_analysis", {}).get("elements_by_type", {}).get("variables", [])
+        for v in variables:
+            if v.get("array_sizes"):
+                print(f"   {v['name']}: {v['array_sizes']} -> {v.get('resolved_array_sizes')}")
+        print()
+
         # 결과 확인
         print("=== 테스트 완료 ===")
         
     finally:
         os.unlink(temp_path)
+
 
 
 if __name__ == "__main__":

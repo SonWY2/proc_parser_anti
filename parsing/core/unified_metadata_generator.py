@@ -13,8 +13,10 @@ Pro*C/SQC 파일에서 모든 분석 정보와 재귀적 헤더 정보를 포함
 import os
 import sys
 import json
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+
 
 # 직접 실행 시 경로 설정
 _current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -215,26 +217,86 @@ class UnifiedMetadataGenerator:
     
     def _resolve_variable_sizes(self, variables: List[Dict], macro_table: Dict):
         """변수의 배열 크기 매크로 해석"""
+        macro_values = self._build_macro_value_map(macro_table)
         for var in variables:
-            if 'array_sizes' in var:
-                resolved = []
-                for size in var['array_sizes']:
-                    if isinstance(size, int):
-                        resolved.append(size)
-                    elif isinstance(size, str):
-                        if size.isdigit():
-                            resolved.append(int(size))
-                        elif size in macro_table:
-                            macro_val = macro_table[size]['value']
-                            try:
-                                resolved.append(int(macro_val))
-                            except (ValueError, TypeError):
-                                resolved.append(size)  # 해석 불가
-                        else:
-                            resolved.append(size)  # 미정의 매크로
-                    else:
-                        resolved.append(size)
-                var['resolved_array_sizes'] = resolved
+            array_sizes = var.get('array_sizes', [])
+            if not array_sizes:
+                var['resolved_array_sizes'] = []
+                continue
+            resolved = []
+            for size in array_sizes:
+                if size is None:
+                    resolved.append(None)
+                elif isinstance(size, int):
+                    resolved.append(size)
+                elif isinstance(size, float):
+                    resolved.append(int(size) if size.is_integer() else size)
+                elif isinstance(size, str):
+                    resolved.append(self._resolve_size_expression(size, macro_values))
+                else:
+                    resolved.append(size)
+            var['resolved_array_sizes'] = resolved
+
+    def _build_macro_value_map(self, macro_table: Dict[str, Any]) -> Dict[str, Any]:
+        macro_values = {}
+        for name, info in macro_table.items():
+            value = info.get('value') if isinstance(info, dict) else info
+            if isinstance(value, str):
+                value = self._sanitize_macro_value(value)
+                if value.isdigit():
+                    value = int(value)
+                else:
+                    evaluated = self._eval_safe_expression(value)
+                    if evaluated is not None:
+                        value = evaluated
+            if isinstance(value, (int, float)):
+                macro_values[name] = value
+        return macro_values
+
+    def _sanitize_macro_value(self, value: str) -> str:
+        cleaned = value.strip()
+        if cleaned.startswith("#define"):
+            parts = cleaned.split(None, 2)
+            if len(parts) >= 3:
+                return parts[2].strip()
+        return cleaned
+
+    def _resolve_size_expression(self, size_expr: str, macro_values: Dict[str, Any]) -> Any:
+        expr = size_expr.strip()
+        if not expr:
+            return size_expr
+        if expr.isdigit():
+            return int(expr)
+        replaced = self._replace_macro_tokens(expr, macro_values)
+        evaluated = self._eval_safe_expression(replaced)
+        if evaluated is not None:
+            return evaluated
+        return size_expr
+
+    def _replace_macro_tokens(self, expr: str, macro_values: Dict[str, Any]) -> str:
+        def replacer(match: re.Match) -> str:
+            token = match.group(0)
+            if token in macro_values:
+                return str(macro_values[token])
+            return token
+        return re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\b", replacer, expr)
+
+    def _eval_safe_expression(self, expr: str) -> Optional[Any]:
+        cleaned = expr.replace(' ', '')
+        if not cleaned:
+            return None
+        if not re.fullmatch(r"[0-9+\-*/%().]+", cleaned):
+            return None
+        try:
+            value = eval(cleaned, {"__builtins__": {}}, {})
+        except Exception:
+            return None
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, (int, float)):
+            return value
+        return None
+
     
     def _create_summary(self, elements_by_type: Dict) -> Dict:
         """요약 통계 생성"""
