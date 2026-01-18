@@ -1,0 +1,54 @@
+# ============================================================================
+# requirements.txt - Runtime Dependencies for proc_parser
+# ============================================================================
+# This file contains only the dependencies needed to RUN the application.
+# For development (testing, linting, type checking), use requirements_dev.txt.
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# Python Version: 3.7+ (recommended: 3.12+)
+# ============================================================================
+
+# ============================================================================
+# CORE PARSING DEPENDENCIES
+# ============================================================================
+
+# Tree-sitter for C/Pro*C parsing (used in parsing/core, parsing/sql)
+tree-sitter>=0.20.0
+tree-sitter-c>=0.20.0
+
+# SQL parsing (used in parsing/sql)
+pyparsing>=3.0.0
+
+# ============================================================================
+# HTTP & API DEPENDENCIES
+# ============================================================================
+
+# HTTP client
+requests>=2.28.0
+
+# ============================================================================
+# CONFIGURATION & LOGGING
+# ============================================================================
+
+# YAML configuration files
+PyYAML>=6.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Structured logging
+loguru>=0.7.0
+
+# ============================================================================
+# LLM & AGENT FRAMEWORK DEPENDENCIES (Optional)
+# ============================================================================
+# Uncomment if you need to use the LangGraph-based multi-agent system:
+
+# LangChain Core & LangGraph for agent orchestration
+# langchain-core>=0.2.0
+# langgraph>=0.2.0
+
+# OpenAI-compatible LLM API integration
+# langchain-openai>=0.1.0

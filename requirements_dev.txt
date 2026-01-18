@@ -1,0 +1,165 @@
+# ============================================================================
+# requirements_dev.txt - Development Dependencies for proc_parser
+# ============================================================================
+# This file includes both runtime dependencies and development tools.
+# For production/deployment, use requirements.txt (runtime only).
+#
+# Installation:
+#   pip install -r requirements_dev.txt
+#
+# Python Version: 3.7+ (recommended: 3.12+)
+# ============================================================================
+
+# ============================================================================
+# CORE PARSING DEPENDENCIES
+# ============================================================================
+
+# Tree-sitter for C/Pro*C parsing (used in parsing/core, parsing/sql)
+tree-sitter>=0.20.0
+tree-sitter-c>=0.20.0
+
+# SQL parsing (used in parsing/sql)
+pyparsing>=3.0.0
+
+# ============================================================================
+# HTTP & API DEPENDENCIES
+# ============================================================================
+
+# HTTP client (most restrictive version from all modules)
+requests>=2.28.0
+
+# ============================================================================
+# CONFIGURATION & LOGGING
+# ============================================================================
+
+# YAML configuration files (PyYAML is the canonical package name)
+PyYAML>=6.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Structured logging (used in validation modules)
+loguru>=0.7.0
+
+# ============================================================================
+# LLM & AGENT FRAMEWORK DEPENDENCIES (Optional)
+# ============================================================================
+# Uncomment if you need the LangGraph-based multi-agent system:
+
+# LangChain Core & LangGraph for agent orchestration
+# langchain-core>=0.2.0
+# langgraph>=0.2.0
+
+# OpenAI-compatible LLM API integration
+# langchain-openai>=0.1.0
+
+# ============================================================================
+# TESTING DEPENDENCIES
+# ============================================================================
+
+# Test framework (actively used in the project)
+pytest>=7.0.0
+
+# Enhanced pytest features (fixtures, parametrize, etc.)
+# pytest-cov>=4.0.0  # Uncomment for code coverage reporting
+
+# ============================================================================
+# CODE QUALITY TOOLS (Recommended)
+# ============================================================================
+# These tools help maintain consistent code quality across the project.
+# The codebase currently uses type hints (~80% coverage) and has pytest,
+# but lacks automated formatting, linting, and type checking.
+
+# Code formatter - enforces consistent code style (quick win, no config needed)
+black>=23.0.0
+
+# Import sorter - standardizes import ordering (works seamlessly with black)
+isort>=5.12.0
+
+# Type checker - leverages existing type hints to catch type errors early
+mypy>=1.0.0
+
+# Linter - comprehensive static analysis (alternative to flake8)
+pylint>=2.17.0
+
+# Pre-commit framework - runs code quality tools before commits
+pre-commit>=3.0.0
+
+basedpyright
+
+# ============================================================================
+# OPTIONAL: ADDITIONAL DEV TOOLS
+# ============================================================================
+# Uncomment these if you need them for your workflow:
+
+# Test coverage reporting
+# pytest-cov>=4.0.0
+
+# Rich test output formatting
+# pytest-xdist>=3.0.0  # Parallel test execution
+
+# Auto-generate type stubs for mypy
+# stubgen  # Built-in with Python 3.7+
+
+# Development server with auto-reload
+# watchmedo>=2.0.0  # Part of watchdog
+
+# ============================================================================
+# NOTES
+# ============================================================================
+#
+# Module Dependencies Summary:
+# - parsing/core: tree-sitter, tree-sitter-c
+# - parsing/sql: tree-sitter, tree-sitter-c, pyparsing
+# - conversion: requests
+# - generation/merge: (none - stdlib only)
+# - analysis/context: (none - stdlib only)
+# - analysis/cpg: (none - stdlib only)
+# - validation/llm: requests, python-dotenv, pyyaml, loguru
+# - validation/sql: loguru, python-dotenv, PyYAML, requests
+# - infra/api: requests, PyYAML
+# - infra/agents/base: requests, PyYAML
+# - infra/agents/langchain: langchain-core, langgraph, langchain-openai, python-dotenv
+#
+# Version Constraints:
+# - requests: >=2.28.0 (most restrictive, covers >=2.25.0 from conversion)
+# - Python 3.7+ minimum required for dataclasses usage
+# - Python 3.12+ recommended (actively tested with 3.12 and 3.13)
+#
+# Standard Library Only Modules:
+# The following modules use only Python stdlib:
+# - generation/merge (dataclasses, typing, re, pathlib, importlib, pkgutil, abc, enum)
+# - analysis/context (typing, re, os, sys, json, pathlib)
+# - analysis/cpg (dataclasses, typing, enum, re, os, sys, json, pathlib)
+# - analysis/lineage (no requirements.txt, likely stdlib only)
+#
+# Development Tools Usage:
+# - pytest: ACTIVELY USED (18+ test files, run_tests.py uses pytest.main())
+# - black: NOT CONFIGURED (recommended for consistent formatting)
+# - isort: NOT CONFIGURED (recommended for import ordering)
+# - mypy: NOT CONFIGURED (recommended to leverage existing 80% type hint coverage)
+# - pylint: NOT CONFIGURED (comprehensive linting)
+# - pre-commit: NOT CONFIGURED (automates code quality checks)
+#
+# Suggested pyproject.toml additions:
+# [tool.black]
+# line-length = 88
+# target-version = ['py38', 'py39', 'py310', 'py311']
+#
+# [tool.isort]
+# profile = "black"
+# line_length = 88
+#
+# [tool.mypy]
+# python_version = "3.8"
+# warn_return_any = true
+# warn_unused_configs = true
+# disallow_untyped_defs = false  # Gradual adoption
+#
+# [tool.pytest.ini_options]
+# testpaths = ["tests"]
+# python_files = ["test_*.py"]
+# python_classes = ["Test*"]
+# python_functions = ["test_*"]
+#
+# ============================================================================
