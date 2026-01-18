@@ -6,21 +6,26 @@ Pro*C 변수의 변환 경로를 추적하는 메인 클래스입니다.
 
 import json
 import re
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 from .types import LineageNode, LineageLink, LineageGraph, NodeType, LinkType
+from .plugin_interface import NameTransformPlugin, TransformationResult
+
+if TYPE_CHECKING:
+    from .plugins import PrefixRemovalPlugin, SnakeToCamelPlugin
 
 
 @dataclass
 class LineageConfig:
     """Lineage Tracker 설정"""
-    # Prefix 제거 목록 (HostVariableNamingPlugin과 동일)
-    prefixes: List[str] = field(default_factory=lambda: ['H_o_', 'H_i_', 'H_', 'W_'])
     # 대소문자 무시 매칭
     case_insensitive: bool = True
     # 최소 매칭 신뢰도
     min_confidence: float = 0.5
+    # Deprecated: prefixes는 이제 PrefixRemovalPlugin으로 처리됨
+    # 하위 호환성을 위해 유지. None이면 Plugin의 기본값을 사용함.
+    prefixes: Optional[List[str]] = None
 
 
 class VariableLineageTracker:
@@ -45,12 +50,59 @@ class VariableLineageTracker:
         result = tracker.to_json()
     """
     
-    def __init__(self, config: Optional[LineageConfig] = None, source_file: str = ""):
+    def __init__(self, config: Optional[LineageConfig] = None, source_file: str = "", 
+                 plugins: Optional[List[NameTransformPlugin]] = None):
         self.config = config or LineageConfig()
         self.graph = LineageGraph(source_file=source_file)
         
-        # prefix 정렬 (긴 것 먼저)
-        self.config.prefixes.sort(key=len, reverse=True)
+        # 플러그인 초기화
+        self._name_transform_plugins: List[NameTransformPlugin] = []
+        
+        if plugins is not None:
+            # 명시적 플러그인 사용
+            for p in plugins:
+                self.register_plugin(p)
+        else:
+            # 기본 플러그인 로드 (backward compatibility)
+            self._load_default_plugins()
+    
+    def _load_default_plugins(self) -> None:
+        """기본 플러그인 로드 (backward compatibility)"""
+        from .plugins import PrefixRemovalPlugin, SnakeToCamelPlugin
+        
+        # config.prefixes가 커스텀 설정되었으면 그것을 사용
+        self.register_plugin(PrefixRemovalPlugin(prefixes=self.config.prefixes))
+        self.register_plugin(SnakeToCamelPlugin())
+    
+    def register_plugin(self, plugin: NameTransformPlugin) -> None:
+        """이름 변환 플러그인 등록"""
+        if not isinstance(plugin, NameTransformPlugin):
+            raise TypeError(f"Plugin must inherit from NameTransformPlugin, got {type(plugin)}")
+        self._name_transform_plugins.append(plugin)
+    
+    def get_plugins(self) -> List[NameTransformPlugin]:
+        """등록된 플러그인 목록 반환"""
+        return self._name_transform_plugins.copy()
+    
+    def _apply_name_transforms(self, name: str) -> tuple:
+        """
+        플러그인 체인을 통해 이름 변환
+        
+        Args:
+            name: 변환할 이름
+            
+        Returns:
+            tuple: (변환된 이름, 적용된 변환 규칙 리스트)
+        """
+        all_transformations = []
+        current_name = name
+        
+        for plugin in self._name_transform_plugins:
+            result = plugin.transform(current_name)
+            current_name = result.name
+            all_transformations.extend(result.transformations)
+        
+        return current_name, all_transformations
     
     # ===== 노드 추가 메서드 =====
     
@@ -565,21 +617,8 @@ class VariableLineageTracker:
         proc_vars = [n for n in self.graph.nodes.values() if n.node_type == NodeType.PROC_VARIABLE]
         
         for proc_var in proc_vars:
-            # 변환 적용
-            java_name = proc_var.name
-            transformations = []
-            
-            # Prefix 제거
-            for prefix in self.config.prefixes:
-                if java_name.startswith(prefix):
-                    java_name = java_name[len(prefix):]
-                    transformations.append(f"prefix_removed:{prefix}")
-                    break
-            
-            # snake_case → camelCase
-            if '_' in java_name:
-                java_name = self._snake_to_camel(java_name)
-                transformations.append("snake_to_camel")
+            # 플러그인 체인을 통해 변환 적용
+            java_name, transformations = self._apply_name_transforms(proc_var.name)
             
             # Java 변수 노드 생성 (없으면) 또는 기존 노드에 소스 추가
             java_node_id = f"java_var_{java_name}"
@@ -729,7 +768,7 @@ class VariableLineageTracker:
         """
         두 이름이 매칭되는지 확인
         
-        변환 규칙을 적용하여 매칭 여부와 적용된 변환을 반환합니다.
+        플러그인 체인을 통해 변환 규칙을 적용하여 매칭 여부와 적용된 변환을 반환합니다.
         
         Returns:
             {
@@ -738,8 +777,6 @@ class VariableLineageTracker:
                 'transformations': List[str]
             }
         """
-        transformations = []
-        
         # 정확히 일치
         if source_name == target_name:
             return {'matched': True, 'confidence': 1.0, 'transformations': []}
@@ -748,35 +785,17 @@ class VariableLineageTracker:
         if self.config.case_insensitive and source_name.lower() == target_name.lower():
             return {'matched': True, 'confidence': 0.95, 'transformations': ['case_normalized']}
         
-        # Prefix 제거 후 매칭
-        stripped_source = source_name
-        for prefix in self.config.prefixes:
-            if stripped_source.startswith(prefix):
-                stripped_source = stripped_source[len(prefix):]
-                transformations.append(f"prefix_removed:{prefix}")
-                break
+        # 플러그인 체인을 통해 변환 적용
+        transformed_source, transformations = self._apply_name_transforms(source_name)
         
-        # snake_case → camelCase 매칭
-        source_camel = self._snake_to_camel(stripped_source)
-        target_normalized = target_name
-        
-        if source_camel == target_normalized:
-            transformations.append("snake_to_camel")
+        # 변환된 이름으로 매칭
+        if transformed_source == target_name:
             return {'matched': True, 'confidence': 0.9, 'transformations': transformations}
         
-        # 대소문자 무시로 camelCase 매칭
-        if self.config.case_insensitive and source_camel.lower() == target_normalized.lower():
-            transformations.append("snake_to_camel")
-            transformations.append("case_normalized")
-            return {'matched': True, 'confidence': 0.85, 'transformations': transformations}
-        
-        # Stripped source와 target 직접 비교
-        if stripped_source == target_name:
-            return {'matched': True, 'confidence': 0.9, 'transformations': transformations}
-        
-        if self.config.case_insensitive and stripped_source.lower() == target_name.lower():
-            transformations.append("case_normalized")
-            return {'matched': True, 'confidence': 0.85, 'transformations': transformations}
+        # 대소문자 무시로 변환된 이름 매칭
+        if self.config.case_insensitive and transformed_source.lower() == target_name.lower():
+            transformations_with_case = transformations + ['case_normalized']
+            return {'matched': True, 'confidence': 0.85, 'transformations': transformations_with_case}
         
         return {'matched': False, 'confidence': 0.0, 'transformations': []}
     

@@ -3,11 +3,11 @@ Variable Lineage Tracker 테스트
 """
 import pytest
 import json
-from variable_lineage import (
+from analysis.lineage import (
     LineageNode, LineageLink, LineageGraph, 
-    NodeType, LinkType, VariableLineageTracker
+    NodeType, LinkType, VariableLineageTracker,
+    LineageConfig
 )
-from variable_lineage.tracker import LineageConfig
 
 
 class TestLineageTypes:

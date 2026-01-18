@@ -3,14 +3,18 @@
 
 Pro*C/SQC 파일에서 모든 분석 정보와 재귀적 헤더 정보를 포함한
 통합 메타데이터 파일을 생성합니다.
+
+이 모듈은 Main Logic + Processor 패턴을 따릅니다:
+- UnifiedMetadataGenerator: 메인 오케스트레이터
+- HeaderProcessor: 헤더 처리
+- SQLProcessor: SQL 처리
+- ArtifactProcessor: 아티팩트 생성
 """
 import os
 import sys
 import json
-import re
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Set
-from dataclasses import dataclass, field, asdict
+from typing import Dict, List, Optional, Any
 
 # 직접 실행 시 경로 설정
 _current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,86 +29,37 @@ if _parent_dir not in sys.path:
 # proc_parser 내부 모듈 import (모듈/직접 실행 모두 지원)
 try:
     from .core import ProCParser
-    from .c_parser import CParser
-    from .sql_converter import SQLConverter
 except ImportError:
     from parsing.core.core import ProCParser
-    from parsing.core.c_parser import CParser
-    from parsing.core.sql_converter import SQLConverter
 
-# CPG 모듈
+# 프로세서 모듈
 try:
-    from analysis.cpg import HeaderAnalyzer
+    from .processors import HeaderProcessor, SQLProcessor, ArtifactProcessor
+    from .processors.header_processor import HeaderEntry
 except ImportError:
-    from analysis.cpg.header_analyzer import HeaderAnalyzer
-
-# header_parser 모듈
-try:
-    from parsing.header import HeaderParser, MacroExtractor, STPParser
-except ImportError:
-    from parsing.header.header_parser import HeaderParser
-    from parsing.header.macro_extractor import MacroExtractor
-    from parsing.header.stp_parser import STPParser
-
-# OMM/DBIO/DAO 생성기
-try:
-    from generation.artifacts import OMMGenerator, DBIOGenerator, DAOGenerator
-except ImportError:
-    OMMGenerator = None
-    DBIOGenerator = None
-    DAOGenerator = None
+    from parsing.core.processors import HeaderProcessor, SQLProcessor, ArtifactProcessor
+    from parsing.core.processors.header_processor import HeaderEntry
 
 # infra.config
 try:
-    from infra.config import snake_to_camel, get_jdbc_type, ArtifactConfig, ArtifactConfigLoader
+    from infra.config import ArtifactConfig, ArtifactConfigLoader
 except ImportError:
-    def snake_to_camel(s): 
-        parts = s.split('_')
-        return parts[0] + ''.join(p.capitalize() for p in parts[1:])
-    def get_jdbc_type(t): 
-        return "VARCHAR"
     ArtifactConfig = None
     ArtifactConfigLoader = None
-
-
-@dataclass
-class HeaderEntry:
-    """헤더 정보 엔트리"""
-    header_name: str
-    is_system_header: bool = False
-    resolved_path: Optional[str] = None
-    found: bool = False
-    not_found_reason: Optional[str] = None
-    line_number: int = 0
-    content: Optional[Dict] = None
-    nested_includes: List['HeaderEntry'] = field(default_factory=list)
-    
-    def to_dict(self) -> Dict:
-        return {
-            "header_name": self.header_name,
-            "is_system_header": self.is_system_header,
-            "resolved_path": self.resolved_path,
-            "found": self.found,
-            "not_found_reason": self.not_found_reason,
-            "line_number": self.line_number,
-            "content": self.content,
-            "nested_includes": [h.to_dict() for h in self.nested_includes]
-        }
 
 
 class UnifiedMetadataGenerator:
     """
     Pro*C/SQC 파일에서 통합 메타데이터를 생성하는 클래스
     
-    기존 모듈 활용:
-    - ProCParser: 소스 코드 요소 추출
-    - HeaderAnalyzer: 헤더 재귀 탐색 및 경로 해결
-    - HeaderParser: 헤더 내용 파싱 (db_vars_info, structs 등)
-    - MacroExtractor: 매크로 추출
-    - OMMGenerator/DBIOGenerator: 아티팩트 생성 (선택)
+    이 클래스는 오케스트레이터 역할을 하며, 실제 처리는 
+    각 전문 프로세서에게 위임합니다:
+    - HeaderProcessor: 헤더 재귀 탐색 및 매크로 수집
+    - SQLProcessor: MyBatis 변환, 중복 감지, 관계 수집
+    - ArtifactProcessor: OMM/DBIO/DAO 생성
     """
     
-    VERSION = "1.0"
+    VERSION = "1.1"
     
     def __init__(
         self, 
@@ -127,20 +82,11 @@ class UnifiedMetadataGenerator:
         
         # 파서 초기화
         self.proc_parser = ProCParser()
-        self.header_analyzer = HeaderAnalyzer(include_paths)
-        self.header_parser = HeaderParser()
-        self.macro_extractor = MacroExtractor()
-        self.stp_parser = STPParser()
         
-        # 아티팩트 생성기는 _generate_artifacts에서 동적으로 생성합니다.
-
-        
-        # 분석 중 방문한 헤더 추적 (순환 참조 방지)
-        self._visited_headers: Set[str] = set()
-        # 병합된 매크로 테이블
-        self._macro_table: Dict[str, Any] = {}
-        # 헤더 파싱 결과 캐시 (경로 -> 파싱 결과)
-        self._header_cache: Dict[str, Dict] = {}
+        # 프로세서 초기화
+        self.header_processor = HeaderProcessor(include_paths)
+        self.sql_processor = SQLProcessor()
+        self.artifact_processor = ArtifactProcessor(base_package)
     
     def generate(self, source_file: str) -> Dict:
         """
@@ -152,9 +98,6 @@ class UnifiedMetadataGenerator:
         Returns:
             통합 메타데이터 딕셔너리
         """
-        self._visited_headers.clear()
-        self._macro_table.clear()
-        
         source_file = os.path.abspath(source_file)
         source_dir = os.path.dirname(source_file)
         
@@ -164,48 +107,59 @@ class UnifiedMetadataGenerator:
         # 2. elements 유형별 정리
         elements_by_type = self._organize_elements_by_type(elements)
         
-        # 3. 소스 파일의 매크로 추출하여 테이블에 추가
+        # 3. 소스 파일 내용 읽기
         with open(source_file, 'r', encoding='utf-8', errors='ignore') as f:
             source_content = f.read()
-        source_macros = self.macro_extractor.extract(source_content)
-        self._update_macro_table(source_macros, source_file)
         
-        # 4. include 정보에서 헤더 트리 구축
+        # 4. 헤더 처리 (HeaderProcessor)
         includes = [e for e in elements if e['type'] == 'include']
-        header_tree = self._build_header_tree(includes, source_dir)
+        header_result = self.header_processor.process({
+            'includes': includes,
+            'source_dir': source_dir,
+            'source_content': source_content,
+            'source_file': source_file
+        })
+        
+        header_tree = header_result['header_tree']
+        macro_table = header_result['macro_table']
+        merged_definitions = header_result['merged_definitions']
         
         # 5. 변수 크기 매크로 해석
         if 'variables' in elements_by_type:
-            self._resolve_variable_sizes(elements_by_type['variables'])
+            self._resolve_variable_sizes(elements_by_type['variables'], macro_table)
         
-        # 6. SQL에 MyBatis 형식 추가 및 중복 감지
+        # 6. SQL 처리 (SQLProcessor)
+        sql_result = {"sql_elements": [], "sql_relationships": []}
         if 'sql' in elements_by_type:
-            self._add_mybatis_sql(elements_by_type['sql'])
-            self._detect_sql_duplicates(elements_by_type['sql'])
+            sql_result = self.sql_processor.process({
+                'sql_elements': elements_by_type['sql']
+            })
         
-        # 6.5. SQL 관계 수집 (Cursor, Dynamic SQL 등)
-        sql_relationships = []
-        if 'sql' in elements_by_type:
-            sql_relationships = self._collect_sql_relationships(elements_by_type['sql'])
-
-        # 7. 병합된 정의 수집
-        merged_definitions = self._collect_merged_definitions(header_tree)
+        sql_relationships = sql_result.get('sql_relationships', [])
         
-        # 8. 아티팩트 생성 (선택)
+        # 7. 아티팩트 생성 (ArtifactProcessor) - 선택
         generated_artifacts = {}
         if self.generate_artifacts:
-            generated_artifacts = self._generate_artifacts(
-                merged_definitions.get('db_vars_info', {}),
-                elements_by_type.get('sql', []),
-                elements_by_type.get('variables', []),
-                source_file
-            )
+            # Config 결정
+            file_id = os.path.splitext(os.path.basename(source_file))[0]
+            config = self.artifact_configs.get(file_id)
+            if config is None and ArtifactConfig:
+                config = ArtifactConfig(id=file_id, base_package=self.base_package)
+            
+            artifact_result = self.artifact_processor.process({
+                'db_vars_info': merged_definitions.get('db_vars_info', {}),
+                'sql_elements': elements_by_type.get('sql', []),
+                'global_variables': elements_by_type.get('variables', []),
+                'source_file_name': source_file,
+                'artifact_config': config
+            })
+            generated_artifacts = artifact_result.get('artifacts', {})
         
-        # 9. 요약 통계
+        # 8. 요약 통계
         summary = self._create_summary(elements_by_type)
         summary['total_relationships'] = len(sql_relationships)
         
-        # 10. 결과 조립
+        # 9. 결과 조립
         result = {
             "metadata": {
                 "version": self.VERSION,
@@ -220,7 +174,7 @@ class UnifiedMetadataGenerator:
             },
             "header_tree": {
                 "direct_includes": [h.to_dict() for h in header_tree],
-                "all_headers_flat": self._flatten_header_tree(header_tree)
+                "all_headers_flat": header_result['all_headers_flat']
             },
             "merged_definitions": merged_definitions
         }
@@ -259,118 +213,7 @@ class UnifiedMetadataGenerator:
         
         return by_type
     
-    def _build_header_tree(
-        self, 
-        includes: List[Dict], 
-        source_dir: str
-    ) -> List[HeaderEntry]:
-        """재귀적 헤더 트리 구축"""
-        result = []
-        
-        for inc in includes:
-            header_name = inc.get('path', '')
-            is_system = inc.get('is_system', False)
-            line_number = inc.get('line_start', 0)
-            
-            entry = HeaderEntry(
-                header_name=header_name,
-                is_system_header=is_system,
-                line_number=line_number
-            )
-            
-            if is_system:
-                # 시스템 헤더는 탐색하지 않음
-                entry.found = False
-                entry.not_found_reason = "system_header"
-            else:
-                # 로컬 헤더 경로 해결
-                resolved = self.header_analyzer.resolve_header_path(header_name, source_dir)
-                
-                if resolved and os.path.exists(resolved):
-                    # 순환 참조 확인
-                    if resolved in self._visited_headers:
-                        entry.found = False
-                        entry.not_found_reason = "circular_reference"
-                    else:
-                        self._visited_headers.add(resolved)
-                        entry.resolved_path = resolved
-                        entry.found = True
-                        
-                        # 헤더 내용 파싱
-                        entry.content = self._parse_header_content(resolved)
-                        
-                        # 매크로 테이블 업데이트
-                        if entry.content and 'macros' in entry.content:
-                            self._update_macro_table(entry.content['macros'], header_name)
-                        
-                        # 중첩 includes 재귀 처리
-                        nested_includes = entry.content.get('includes', []) if entry.content else []
-                        if nested_includes:
-                            header_dir = os.path.dirname(resolved)
-                            entry.nested_includes = self._build_header_tree(
-                                nested_includes, header_dir
-                            )
-                else:
-                    entry.found = False
-                    entry.not_found_reason = "not_found"
-            
-            result.append(entry)
-        
-        return result
-    
-    def _parse_header_content(self, header_path: str) -> Dict:
-        """헤더 파일 내용 파싱 (캐시 지원)"""
-        # 캐시 확인
-        if header_path in self._header_cache:
-            return self._header_cache[header_path]
-        
-        try:
-            with open(header_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-            
-            # 매크로 추출
-            macros = self.macro_extractor.extract(content)
-            
-            # STP 데이터 추출
-            stp_data = self.stp_parser.parse(content)
-            
-            # db_vars_info (구조체 + STP)
-            db_vars_info = self.header_parser.parse(content)
-            
-            # include 문 추출 (재귀용)
-            includes = []
-            include_infos = self.header_analyzer.extract_includes(content, header_path)
-            for inc in include_infos:
-                includes.append({
-                    'type': 'include',
-                    'path': inc.header_name,
-                    'is_system': inc.is_system_header,
-                    'line_start': inc.line_number
-                })
-            
-            result = {
-                "macros": macros,
-                "stp_data": stp_data,
-                "db_vars_info": db_vars_info,
-                "includes": includes
-            }
-            
-            # 캐시에 저장
-            self._header_cache[header_path] = result
-            return result
-        except Exception as e:
-            return {"error": str(e)}
-    
-    def _update_macro_table(self, macros: Dict, source: str):
-        """매크로 테이블 업데이트"""
-        for name, value in macros.items():
-            if name not in self._macro_table:
-                self._macro_table[name] = {
-                    "value": value,
-                    "source": source
-                }
-    
-    def _resolve_variable_sizes(self, variables: List[Dict]):
+    def _resolve_variable_sizes(self, variables: List[Dict], macro_table: Dict):
         """변수의 배열 크기 매크로 해석"""
         for var in variables:
             if 'array_sizes' in var:
@@ -381,8 +224,8 @@ class UnifiedMetadataGenerator:
                     elif isinstance(size, str):
                         if size.isdigit():
                             resolved.append(int(size))
-                        elif size in self._macro_table:
-                            macro_val = self._macro_table[size]['value']
+                        elif size in macro_table:
+                            macro_val = macro_table[size]['value']
                             try:
                                 resolved.append(int(macro_val))
                             except (ValueError, TypeError):
@@ -392,528 +235,6 @@ class UnifiedMetadataGenerator:
                     else:
                         resolved.append(size)
                 var['resolved_array_sizes'] = resolved
-    
-    def _add_mybatis_sql(self, sql_elements: List[Dict]):
-        """SQL에 MyBatis 형식 추가"""
-        import re
-        
-        # 헬퍼 함수 정의
-        def snake_to_camel(name):
-            components = name.split('_')
-            return components[0].lower() + ''.join(x.title() for x in components[1:])
-            
-        def get_jdbc_type(c_type):
-            # 간단한 매핑 (필요 시 확장)
-            return "VARCHAR"
-        
-        IGNORE_TYPES = {'BEGIN', 'END', 'INCLUDE', 'VAR', 'TYPE', 'WHENEVER'}
-        
-        for sql in sql_elements:
-            # 1. 불필요한 SQL 필터링 (MyBatis 변환 제외)
-            sql_type = sql.get('sql_type', '').upper()
-            raw_content = sql.get('raw_content', '').upper()
-            
-            if sql_type in IGNORE_TYPES or 'DECLARE SECTION' in raw_content:
-                 sql['mybatis_sql'] = None
-                 continue
-
-            normalized = sql.get('normalized_sql', '')
-            if normalized:
-                # :host_var → #{hostVar, jdbcType=VARCHAR}
-                def replace_host_var(match):
-                    var_name = match.group(1)
-                    camel_name = snake_to_camel(var_name)
-                    jdbc_type = get_jdbc_type("char")
-                    return "#{" + camel_name + ", jdbcType=" + jdbc_type + "}"
-                
-                mybatis_sql = re.sub(r':(\w+)', replace_host_var, normalized)
-                sql['mybatis_sql'] = mybatis_sql
-    
-    def _detect_sql_duplicates(self, sql_elements: List[Dict]):
-        """
-        SQL 중복 감지 - normalized_sql 완전 일치 기준
-        
-        각 SQL에 다음 필드 추가:
-        - is_duplicate: 중복 여부
-        - duplicate_group_id: 중복 그룹 ID (dup_001, dup_002, ...)
-        - call_sites: 동일 SQL의 모든 호출 위치 목록
-        """
-        from collections import defaultdict
-        
-        # 1. normalized_sql 기준으로 그룹화
-        sql_groups: Dict[str, List[Dict]] = defaultdict(list)
-        
-        for sql in sql_elements:
-            normalized = sql.get('normalized_sql', '')
-            if normalized:
-                sql_groups[normalized].append(sql)
-        
-        # 2. 중복 그룹에 ID 할당 및 필드 추가
-        dup_group_counter = 0
-        
-        for normalized_sql, group in sql_groups.items():
-            is_duplicate = len(group) > 1
-            
-            if is_duplicate:
-                dup_group_counter += 1
-                group_id = f"dup_{dup_group_counter:03d}"
-                
-                # 모든 호출 위치 수집
-                call_sites = []
-                for sql in group:
-                    call_sites.append({
-                        "sql_id": sql.get('sql_id'),
-                        "function": sql.get('function'),
-                        "line_start": sql.get('line_start'),
-                        "line_end": sql.get('line_end')
-                    })
-                
-                # 각 SQL에 중복 정보 추가
-                for sql in group:
-                    sql['is_duplicate'] = True
-                    sql['duplicate_group_id'] = group_id
-                    sql['duplicate_count'] = len(group)
-                    sql['call_sites'] = call_sites
-                
-                if self.generate_artifacts:
-                    # 중복된 SQL의 경우 동일한 SQL ID 공유 필요성 검토
-                    # 현재는 개별 SQL로 처리하되, 향후 개선 가능
-                    pass
-            else:
-                # 중복이 아닌 경우
-                for sql in group:
-                    sql['is_duplicate'] = False
-                    sql['duplicate_group_id'] = None
-                    sql['duplicate_count'] = 1
-                    sql['call_sites'] = [{
-                        "sql_id": sql.get('sql_id'),
-                        "function": sql.get('function'),
-                        "line_start": sql.get('line_start'),
-                        "line_end": sql.get('line_end')
-                    }]
-    
-    def _collect_sql_relationships(self, sql_elements: List[Dict]) -> List[Dict]:
-        """
-        SQL 요소에서 관계 정보를 수집 (중복 제거)
-        ProCParser가 이미 relationship 필드를 채웠다고 가정
-        """
-        relationships = {}
-        
-        for sql in sql_elements:
-            rel = sql.get('relationship')
-            if rel:
-                rel_id = rel.get('relationship_id')
-                if rel_id and rel_id not in relationships:
-                    # 원본 관계 메타데이터 복원
-                    relationships[rel_id] = {
-                        "relationship_id": rel_id,
-                        "relationship_type": rel.get('relationship_type'),
-                        "metadata": rel.get('metadata'),
-                        # sql_ids는 메타데이터에 없으므로 여기서 재구성하거나, 
-                        # ProCParser가 넣어준 total_in_group 등을 활용
-                    }
-        
-        # SQL ID 목록 재구성 (선택적)
-        # relationship 필드에는 sql_ids 목록이 없으므로, 다시 순회하며 구성
-        for rel_id in relationships:
-            relationships[rel_id]['sql_ids'] = []
-            
-        for sql in sql_elements:
-            rel = sql.get('relationship')
-            if rel:
-                rel_id = rel.get('relationship_id')
-                if rel_id in relationships:
-                    relationships[rel_id]['sql_ids'].append(sql.get('sql_id'))
-        
-        # Dictionary -> List 변환
-        return list(relationships.values())
-
-    def _collect_merged_definitions(self, header_tree: List[HeaderEntry]) -> Dict:
-        """모든 헤더에서 정의 병합"""
-        all_macros = dict(self._macro_table)
-        all_structs = {}
-        all_db_vars_info = {}
-        
-        def collect_recursive(headers: List[HeaderEntry]):
-            for h in headers:
-                if h.content:
-                    # structs (db_vars_info에서 추출)
-                    if 'db_vars_info' in h.content:
-                        for struct_name, struct_info in h.content['db_vars_info'].items():
-                            if struct_name not in all_db_vars_info:
-                                all_db_vars_info[struct_name] = struct_info
-                                all_structs[struct_name] = {
-                                    "source": h.header_name,
-                                    "fields": struct_info
-                                }
-                
-                # 재귀
-                if h.nested_includes:
-                    collect_recursive(h.nested_includes)
-        
-        collect_recursive(header_tree)
-        
-        return {
-            "all_macros": all_macros,
-            "all_structs": all_structs,
-            "db_vars_info": all_db_vars_info
-        }
-    
-    def _flatten_header_tree(self, headers: List[HeaderEntry], depth: int = 1) -> List[Dict]:
-        """헤더 트리를 평탄화"""
-        result = []
-        
-        for h in headers:
-            entry = {
-                "header_name": h.header_name,
-                "depth": depth,
-                "found": h.found
-            }
-            if not h.found and h.not_found_reason:
-                entry["reason"] = h.not_found_reason
-            result.append(entry)
-            
-            # 재귀
-            if h.nested_includes:
-                result.extend(self._flatten_header_tree(h.nested_includes, depth + 1))
-        
-        return result
-    
-    def _generate_artifacts(
-        self, 
-        db_vars_info: Dict, 
-        sql_elements: List[Dict],
-        global_variables: List[Dict] = None,
-        source_file_name: str = ""
-    ) -> Dict:
-        """OMM/DBIO/DAO 아티팩트 생성
-        
-        Args:
-            db_vars_info: 헤더 파일의 구조체 정보
-            sql_elements: SQL 요소 목록
-            global_variables: 전역 변수 목록 (ContextVO 생성용)
-            source_file_name: 소스 파일명 (ContextVO 클래스명 생성용)
-        """
-        artifacts = {}
-        
-        # 0. 설정 결정
-        file_id = os.path.splitext(os.path.basename(source_file_name))[0]
-        
-        # Config 로딩 (없으면 기본값)
-        if self.artifact_configs and file_id in self.artifact_configs:
-            config = self.artifact_configs[file_id]
-        elif ArtifactConfig: 
-             # __init__에서 받은 base_package를 기본값으로 사용
-             config = ArtifactConfig(id=file_id, base_package=self.base_package)
-        else:
-             # Fallback (import 실패 등)
-             return {}
-
-        # 패키지 및 이름 설정
-        dto_package = config.get_dto_package()
-        dao_package = config.get_dao_package()
-        dao_name = config.get_dao_name()
-        dto_prefix = config.dto_prefix or ""
-        context_vo_name = config.context_vo_name
-        
-        # 생성기 인스턴스화
-        omm_gen = None
-        dbio_gen = None
-        dao_gen = None
-        
-        if self.generate_artifacts:
-            if OMMGenerator:
-                omm_gen = OMMGenerator(base_package=dto_package)
-            if DBIOGenerator:
-                dbio_gen = DBIOGenerator(base_package=dao_package, datasource=config.datasource)
-            if DAOGenerator:
-                dao_gen = DAOGenerator(base_package=dao_package)
-        
-        # 1. Header 구조체 OMM 생성
-        if omm_gen and db_vars_info:
-            omm_artifacts = {}
-            for struct_name, struct_info in db_vars_info.items():
-                try:
-                    content = omm_gen.generate(struct_info, struct_name)
-                    omm_artifacts[struct_name] = {
-                        "content": content,
-                        "class_name": struct_name.replace('_t', '').title().replace('_', ''),
-                        "package": dto_package,
-                        "source": "header_struct"
-                    }
-                except Exception as e:
-                    omm_artifacts[struct_name] = {"error": str(e)}
-            artifacts["omm"] = omm_artifacts
-        else:
-            artifacts["omm"] = {}
-        
-        # 2. SQL Input/Output OMM 생성
-        if omm_gen and sql_elements:
-            sql_omm_artifacts = {}
-            for sql in sql_elements:
-                sql_id = sql.get('sql_id', '')
-                if not sql_id:
-                    continue
-                
-                # 불필요한 SQL 타입 제외
-                if sql.get('mybatis_sql') is None:
-                    continue
-                
-                input_vars = sql.get('input_host_vars', [])
-                output_vars = sql.get('output_host_vars', [])
-                
-                # Input OMM 생성 ({SqlId}In)
-                base_name = dto_prefix + self._get_base_name_from_sql(sql_id, sql)
-                
-                if input_vars:
-                    in_class_name = base_name + "In"
-                    in_db_vars = self._vars_to_db_vars_info(input_vars, sql)
-                    try:
-                        content = omm_gen.generate(in_db_vars, in_class_name)
-                        sql_omm_artifacts[in_class_name] = {
-                            "content": content,
-                            "class_name": in_class_name,
-                            "package": dto_package,
-                            "source": "sql_input",
-                            "sql_id": sql_id,
-                            "sql_type": sql.get('sql_type')
-                        }
-                        
-                        # SQL 요소에 매핑 정보 추가
-                        if 'omm_info' not in sql:
-                            sql['omm_info'] = {}
-                        sql['omm_info']['input_omm_class'] = in_class_name
-                        sql['omm_info']['input_omm_package'] = dto_package
-                        
-                    except Exception as e:
-                        sql_omm_artifacts[in_class_name] = {"error": str(e)}
-                
-                # Output OMM 생성 ({SqlId}Out)
-                if output_vars:
-                    out_class_name = base_name + "Out"
-                    out_db_vars = self._vars_to_db_vars_info(output_vars, sql)
-                    try:
-                        content = omm_gen.generate(out_db_vars, out_class_name)
-                        sql_omm_artifacts[out_class_name] = {
-                            "content": content,
-                            "class_name": out_class_name,
-                            "package": dto_package,
-                            "source": "sql_output",
-                            "sql_id": sql_id,
-                            "sql_type": sql.get('sql_type')
-                        }
-                        
-                        # SQL 요소에 매핑 정보 추가
-                        if 'omm_info' not in sql:
-                            sql['omm_info'] = {}
-                        sql['omm_info']['output_omm_class'] = out_class_name
-                        sql['omm_info']['output_omm_package'] = dto_package
-                        
-                    except Exception as e:
-                        sql_omm_artifacts[out_class_name] = {"error": str(e)}
-            
-            if sql_omm_artifacts:
-                artifacts["omm"].update(sql_omm_artifacts)
-        
-        # 3. ContextVO OMM 생성 (전역변수만)
-        if omm_gen and global_variables:
-            # 전역변수만 필터링 (function이 None이거나 scope가 global인 것)
-            global_only = [
-                v for v in global_variables 
-                if v.get('function') is None or v.get('scope') == 'global'
-            ]
-            
-            if global_only:
-                # 소스 파일명에서 클래스명 생성
-                if context_vo_name:
-                    context_class_name = context_vo_name
-                elif source_file_name:
-                    base_name = os.path.splitext(os.path.basename(source_file_name))[0]
-                    context_class_name = self._to_pascal_case(base_name) + "ContextVO"
-                else:
-                    context_class_name = "ContextVO"
-                
-                context_db_vars = self._global_vars_to_db_vars_info(global_only)
-                try:
-                    content = omm_gen.generate(
-                        context_db_vars, 
-                        context_class_name,
-                        logical_name=f"{context_class_name} - 전역변수",
-                        description=f"소스 파일 전역변수 ({len(global_only)}개)"
-                    )
-                    artifacts["omm"][context_class_name] = {
-                        "content": content,
-                        "class_name": context_class_name,
-                        "package": dto_package,
-                        "source": "context_vo",
-                        "variable_count": len(global_only)
-                    }
-                except Exception as e:
-                    artifacts["omm"][context_class_name] = {"error": str(e)}
-        
-        # DBIO (XML) & DAO (Java) 생성
-        if dbio_gen and dao_gen and sql_elements:
-            try:
-                # SQL 요소를 변환
-                sql_calls = []
-                # DTO 매핑 정보 생성 (For DBIO/DAO)
-                id_to_path_map = {}
-                
-                for i, sql in enumerate(sql_elements):
-                    sql_id = sql.get('sql_id', f'sql_{i+1}')
-                    sql_calls.append({
-                        "name": sql_id,
-                        "sql_type": sql.get('sql_type', 'select').lower(),
-                        "parsed_sql": sql.get('normalized_sql', sql.get('raw_sql', '')),
-                        "input_vars": sql.get('input_host_vars', []),
-                        "output_vars": sql.get('output_host_vars', [])
-                    })
-                    
-                    # DTO 경로 매핑 (artifacts OMM 정보 등에서 가져옴)
-                    if 'omm_info' in sql:
-                        if 'input_omm_class' in sql['omm_info']:
-                            id_to_path_map[f"{sql_id}In"] = f"{dto_package}.{sql['omm_info']['input_omm_class']}"
-                        if 'output_omm_class' in sql['omm_info']:
-                            id_to_path_map[f"{sql_id}Out"] = f"{dto_package}.{sql['omm_info']['output_omm_class']}"
-                
-                # DBIO 생성
-                dbio_content = dbio_gen.generate(sql_calls, id_to_path_map, dao_name)
-                artifacts["dbio"] = {
-                    "content": dbio_content,
-                    "namespace": f"{dao_package}.{dao_name}"
-                }
-                
-                # DAO 생성
-                dao_content = dao_gen.generate(sql_calls, id_to_path_map, dao_name)
-                artifacts["dao"] = {
-                    "content": dao_content,
-                    "interface_name": dao_name,
-                    "package": dao_package
-                }
-                
-            except Exception as e:
-                artifacts["dbio"] = {"error": str(e)}
-                artifacts["dao"] = {"error": str(e)}
-        
-        return artifacts
-    
-    def _get_base_name_from_sql(self, sql_id: str, sql_info: Dict) -> str:
-        """SQL ID와 타입에서 적절한 기본 이름 생성 (예: Select003)"""
-        sql_type = sql_info.get('sql_type', 'Sql').capitalize()
-        
-        # ID에서 숫자 추출 (Sql003 -> 003)
-        match = re.search(r'(\d+)$', sql_id)
-        if match:
-            number = match.group(1)
-            return f"{sql_type}{number}"
-        
-        # 숫자가 없으면 ID 활용 (SqlMyQuery -> SelectMyQuery)
-        clean_id = self._to_pascal_case(sql_id)
-        if clean_id.startswith('Sql'):
-            clean_id = clean_id[3:]
-            
-        return f"{sql_type}{clean_id}"
-    
-    def _to_pascal_case(self, name: str) -> str:
-        """snake_case를 PascalCase로 변환"""
-        if not name:
-            return ""
-        components = name.replace('-', '_').split('_')
-        return ''.join(x.title() for x in components)
-    
-    def _vars_to_db_vars_info(self, var_names: List[str], sql_context: Dict) -> Dict:
-        """호스트 변수 목록을 db_vars_info 형식으로 변환
-        
-        Args:
-            var_names: 호스트 변수명 목록 (예: [':acnt_id', ':acnt_no'])
-            sql_context: SQL 정보 (추가 컨텍스트용)
-        
-        Returns:
-            db_vars_info 형식의 딕셔너리
-        """
-        result = {}
-        for var_name in var_names:
-            # 콜론 제거
-            clean_name = var_name.lstrip(':').strip()
-            # camelCase로 변환
-            camel_name = self._snake_to_camel(clean_name)
-            
-            result[camel_name] = {
-                "dtype": "String",  # 기본 타입 (실제로는 변수 정의에서 추론해야 함)
-                "size": 100,
-                "decimal": 0,
-                "description": clean_name
-            }
-        return result
-    
-    def _global_vars_to_db_vars_info(self, variables: List[Dict]) -> Dict:
-        """전역변수 목록을 db_vars_info 형식으로 변환
-        
-        Args:
-            variables: 변수 요소 목록
-        
-        Returns:
-            db_vars_info 형식의 딕셔너리
-        """
-        result = {}
-        for var in variables:
-            var_name = var.get('name', '')
-            if not var_name:
-                continue
-            
-            camel_name = self._snake_to_camel(var_name)
-            c_type = var.get('data_type', 'char')
-            array_sizes = var.get('resolved_array_sizes') or var.get('array_sizes', [])
-            comment = var.get('comment', '')
-            
-            # C 타입 → Java 타입 및 사이즈 결정
-            java_type, size, decimal = self._c_type_to_omm_info(c_type, array_sizes)
-            
-            result[camel_name] = {
-                "dtype": java_type,
-                "size": size,
-                "decimal": decimal,
-                "description": comment or var_name
-            }
-        return result
-    
-    def _snake_to_camel(self, name: str) -> str:
-        """snake_case를 camelCase로 변환"""
-        components = name.split('_')
-        return components[0].lower() + ''.join(x.title() for x in components[1:])
-    
-    def _c_type_to_omm_info(self, c_type: str, array_sizes: List = None) -> tuple:
-        """C 타입을 OMM 정보로 변환
-        
-        Returns:
-            (java_type, size, decimal)
-        """
-        c_type_lower = c_type.lower().strip()
-        
-        # 배열 사이즈 결정
-        if array_sizes:
-            try:
-                size = int(array_sizes[0])
-            except (ValueError, TypeError):
-                size = 100
-        else:
-            size = 9
-        
-        # 타입 매핑
-        if 'char' in c_type_lower:
-            return ("String", size, 0)
-        elif 'double' in c_type_lower:
-            return ("BigDecimal", 18, 6)
-        elif 'float' in c_type_lower:
-            return ("BigDecimal", 12, 4)
-        elif 'long' in c_type_lower:
-            return ("Long", 18, 0)
-        elif 'int' in c_type_lower:
-            return ("Integer", 9, 0)
-        elif 'short' in c_type_lower:
-            return ("Short", 5, 0)
-        else:
-            return ("String", size, 0)
     
     def _create_summary(self, elements_by_type: Dict) -> Dict:
         """요약 통계 생성"""
@@ -990,4 +311,3 @@ if __name__ == "__main__":
         print("\n=== 메타데이터 미리보기 ===")
         print(json.dumps(metadata.get("metadata", {}), ensure_ascii=False, indent=2))
         print("\n(전체 출력은 -o 옵션으로 파일 저장 필요)")
-
