@@ -48,3 +48,20 @@ tests/fixtures/test_metadata_with_dup.json
 tests/fixtures/test_metadata.json
 
 ./original_source.sqc
+prompts/00_skeleton.md
+prompts/README.md
+prompts/functions/tlfb000m_a000_initialize.md
+prompts/functions/tlfb000m_a099_host_variable_init.md
+prompts/functions/tlfb000m_a500_input_check.md
+prompts/functions/tlfb000m_aa00_inrec_init.md
+prompts/functions/tlfb000m_aa01_inrec_assign.md
+prompts/functions/tlfb000m_aa02_outrec_init.md
+prompts/functions/tlfb000m_aa03_outrec_assign.md
+prompts/functions/tlfb000m_c000_event_process.md
+prompts/functions/tlfb000m_c100_update_meg_ftrs_wthd_blnc.md
+prompts/functions/tlfb000m_c200_select_meg_ftrs_wthd_blnc.md
+prompts/functions/tlfb000m_c210_bamcall_mbe1210m.md
+prompts/functions/tlfb000m_c300_bamcall_mba0360m.md
+prompts/functions/tlfb000m_c400_bamcall_tlf9600m.md
+prompts/functions/tlfb000m_c500_update_meg_ftrs_wthd_blnc.md
+prompts/functions/tlfb000m_main.md
