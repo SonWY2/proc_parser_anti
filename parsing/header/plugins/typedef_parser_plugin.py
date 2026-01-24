@@ -44,14 +44,14 @@ class TypedefParserPlugin(HeaderParserPlugin):
         re.DOTALL
     )
     
-    # 필드 선언 패턴: type name[size]; //comment 또는 type name; //comment
+    # 필드 선언 패턴: type name[size]; 주석 (// 또는 /* */ 스타일)
     FIELD_PATTERN = re.compile(
         r'^\s*'
         r'(\w+(?:\s+\w+)?)\s+'               # 타입 (예: char, unsigned int)
         r'(\*?)(\w+)\s*'                      # 포인터 여부 + 필드명
         r'(?:\[\s*([^\]]+)\s*\])?'           # 배열 크기 (선택)
         r'\s*;'                               # 세미콜론
-        r'(?:\s*//(.*))?',                   # 주석 (선택)
+        r'(?:\s*(?://(.*)|\s*/\*\s*(.*?)\s*\*/))?',  # 주석 (// 또는 /* */ 스타일)
         re.MULTILINE
     )
     
@@ -85,7 +85,8 @@ class TypedefParserPlugin(HeaderParserPlugin):
                 is_pointer = bool(field_match.group(2))
                 field_name = field_match.group(3)
                 array_size = field_match.group(4)
-                comment = field_match.group(5)
+                # 그룹 5: // 스타일 주석, 그룹 6: /* */ 스타일 주석
+                comment = field_match.group(5) or field_match.group(6)
                 
                 # 배열 크기에서 공백 제거
                 if array_size:
