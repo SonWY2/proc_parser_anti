@@ -259,6 +259,125 @@ class UnifiedMetadataGenerator:
                 yaml.dump(metadata, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         except ImportError:
             raise ImportError("PyYAML이 설치되어 있지 않습니다. 'pip install pyyaml' 실행 필요")
+    
+    def save_jsonl(self, metadata: Dict, output_dir: str):
+        """
+        메타데이터를 유형별 JSONL 파일로 저장
+        
+        Args:
+            metadata: generate()에서 생성된 메타데이터 딕셔너리
+            output_dir: JSONL 파일들을 저장할 디렉토리 경로
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 소스 파일 정보를 각 항목에 추가하기 위한 메타 정보
+        source_info = metadata.get('metadata', {})
+        source_file = source_info.get('source_file', '')
+        source_file_path = source_info.get('source_file_path', '')
+        
+        # 저장할 데이터 매핑: (파일명, 데이터 경로)
+        elements_by_type = metadata.get('source_analysis', {}).get('elements_by_type', {})
+        
+        export_mapping = {
+            'variables': elements_by_type.get('variables', []),
+            'functions': elements_by_type.get('functions', []),
+            'sql': elements_by_type.get('sql', []),
+            'includes': elements_by_type.get('includes', []),
+            'macros': elements_by_type.get('macros', []),
+            'structs': elements_by_type.get('structs', []),
+            'comments': elements_by_type.get('comments', []),
+            'function_prototypes': elements_by_type.get('function_prototypes', []),
+            'preprocessor_directives': elements_by_type.get('preprocessor_directives', []),
+            'headers': metadata.get('header_tree', {}).get('all_headers_flat', []),
+        }
+        
+        # 각 유형별로 JSONL 파일 생성
+        for type_name, items in export_mapping.items():
+            if not items:
+                continue
+                
+            output_path = os.path.join(output_dir, f'{type_name}.jsonl')
+            with open(output_path, 'w', encoding='utf-8') as f:
+                for item in items:
+                    # 각 항목에 소스 파일 정보 추가
+                    enriched_item = {
+                        '_source_file': source_file,
+                        '_source_file_path': source_file_path,
+                        **item
+                    }
+                    f.write(json.dumps(enriched_item, ensure_ascii=False) + '\n')
+        
+        # 추출된 소스 파일 생성 (_extracted.c)
+        self._save_extracted_source(metadata, output_dir)
+    
+    def _save_extracted_source(self, metadata: Dict, output_dir: str):
+        """
+        분석 완료된 요소들을 공백으로 치환한 소스 파일 생성
+        
+        Args:
+            metadata: generate()에서 생성된 메타데이터 딕셔너리
+            output_dir: 출력 디렉토리 경로
+        """
+        source_info = metadata.get('metadata', {})
+        source_file = source_info.get('source_file', '')
+        source_file_path = source_info.get('source_file_path', '')
+        
+        if not source_file_path or not os.path.exists(source_file_path):
+            return
+        
+        # 원본 소스 읽기
+        with open(source_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            source_content = f.read()
+        
+        # 문자 배열로 변환 (수정 가능)
+        content_chars = list(source_content)
+        
+        # 모든 요소에서 byte_start/byte_end 또는 line_start/line_end 수집
+        elements_by_type = metadata.get('source_analysis', {}).get('elements_by_type', {})
+        
+        # 라인 인덱스 계산
+        line_indices = [0]
+        for i, char in enumerate(source_content):
+            if char == '\n':
+                line_indices.append(i + 1)
+        
+        def blank_out_range(start_idx: int, end_idx: int):
+            """범위를 공백으로 치환 (줄바꿈 유지)"""
+            for i in range(start_idx, min(end_idx, len(content_chars))):
+                if content_chars[i] != '\n':
+                    content_chars[i] = ' '
+        
+        # 각 요소 유형별로 공백 처리
+        # functions, structs는 제외 - 내부에 파싱되지 않은 요소를 확인할 수 있도록
+        exclude_from_blanking = {'unknown', 'functions', 'structs'}
+        for type_name, items in elements_by_type.items():
+            if type_name in exclude_from_blanking:
+                continue
+            
+            for item in items:
+                # byte_start/byte_end가 있으면 사용
+                if item.get('byte_start') is not None and item.get('byte_end') is not None:
+                    blank_out_range(item['byte_start'], item['byte_end'])
+                # 없으면 line_start/line_end로 계산
+                elif item.get('line_start') is not None and item.get('line_end') is not None:
+                    start_line = item['line_start'] - 1  # 0-indexed
+                    end_line = item['line_end'] - 1
+                    
+                    if start_line < len(line_indices):
+                        start_idx = line_indices[start_line]
+                        end_idx = (line_indices[end_line + 1] 
+                                   if end_line + 1 < len(line_indices) 
+                                   else len(source_content))
+                        blank_out_range(start_idx, end_idx)
+        
+        # 파일명 생성
+        source_name = os.path.splitext(source_file)[0]
+        extracted_filename = f"{source_name}_extracted.c"
+        output_path = os.path.join(output_dir, extracted_filename)
+        
+        # 저장
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(''.join(content_chars))
 
 
 if __name__ == "__main__":

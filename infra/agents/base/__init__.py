@@ -40,6 +40,12 @@ from .cli import InteractiveCLI, run_cli
 from .gui import WorkflowGUI, run_gui
 from .self_improve import SelfImprovingChecklist, Issue, ChecklistItem
 
+# v3: 모니터링
+from .monitoring import (
+    AgentMonitor, AgentEvent, AgentStats, EventType,
+    get_global_monitor, set_global_monitor
+)
+
 
 __all__ = [
     # 에이전트 로더
@@ -89,5 +95,10 @@ __all__ = [
     
     # v3: 자가개선
     'SelfImprovingChecklist', 'Issue', 'ChecklistItem',
+    
+    # v3: 모니터링
+    'AgentMonitor', 'AgentEvent', 'AgentStats', 'EventType',
+    'get_global_monitor', 'set_global_monitor',
 ]
+
 

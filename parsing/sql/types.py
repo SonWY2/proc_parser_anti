@@ -160,6 +160,8 @@ class ExtractedSQL:
             "output_host_vars": self.output_host_vars,
             "line_start": self.line_start,
             "line_end": self.line_end,
+            "byte_start": self.byte_start,
+            "byte_end": self.byte_end,
             "function": self.function,
             "relationship": self.relationship,
         }

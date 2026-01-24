@@ -6,13 +6,16 @@
 
 import concurrent.futures
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 from .agent_loader import AgentLoader, AgentDefinition
 from .tools import ToolRegistry
 from .subagent import Subagent
 from .result import SubagentResult
 from .llm_client import LLMClient, LLMConfig
+
+if TYPE_CHECKING:
+    from .monitoring import AgentMonitor
 
 
 class Orchestrator:
@@ -27,17 +30,20 @@ class Orchestrator:
         self, 
         agent_dirs: Optional[List[Path]] = None,
         llm_config: Optional[LLMConfig] = None,
-        max_parallel: int = 5
+        max_parallel: int = 5,
+        monitor: Optional['AgentMonitor'] = None
     ):
         """
         Args:
             agent_dirs: 에이전트 정의 파일 디렉토리 목록
             llm_config: LLM 설정
             max_parallel: 최대 병렬 실행 수
+            monitor: 에이전트 모니터 (선택)
         """
         self.agent_dirs = agent_dirs or []
         self.llm_config = llm_config
         self.max_parallel = max_parallel
+        self._monitor = monitor
         
         self.loader = AgentLoader()
         self.registry = ToolRegistry()
@@ -116,17 +122,40 @@ class Orchestrator:
         Returns:
             SubagentResult: 실행 결과
         """
+        # 모니터링: 호출 기록
+        if self._monitor:
+            self._monitor.log_invoke(agent_name, task)
+        
         subagent = self._subagents.get(agent_name)
         if not subagent:
+            error_msg = f"에이전트를 찾을 수 없습니다: {agent_name}"
+            if self._monitor:
+                self._monitor.log_error(agent_name, task, error_msg)
             return SubagentResult(
                 success=False,
                 output="",
                 agent_name=agent_name,
                 execution_time=0,
-                error=f"에이전트를 찾을 수 없습니다: {agent_name}"
+                error=error_msg
             )
         
-        return subagent.run(task)
+        result = subagent.run(task)
+        
+        # 모니터링: 완료/오류 기록
+        if self._monitor:
+            if result.success:
+                tool_names = [tc.tool_name for tc in result.tool_calls]
+                self._monitor.log_complete(
+                    agent_name, 
+                    task,
+                    execution_time_ms=result.execution_time * 1000,
+                    output=result.output,
+                    tool_calls=tool_names
+                )
+            else:
+                self._monitor.log_error(agent_name, task, result.error or "Unknown error")
+        
+        return result
     
     def auto_delegate(self, user_request: str) -> Optional[SubagentResult]:
         """
@@ -287,3 +316,12 @@ class Orchestrator:
     def available_tools(self) -> List[str]:
         """사용 가능한 도구 목록"""
         return self.registry.available_tools
+    
+    @property
+    def monitor(self) -> Optional['AgentMonitor']:
+        """에이전트 모니터"""
+        return self._monitor
+    
+    def set_monitor(self, monitor: 'AgentMonitor') -> None:
+        """에이전트 모니터 설정"""
+        self._monitor = monitor

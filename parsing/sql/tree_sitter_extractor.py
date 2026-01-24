@@ -75,13 +75,14 @@ class TreeSitterSQLExtractor:
     ) -> List[SQLBlock]:
         """소스 코드에서 모든 EXEC SQL 블록 추출
         
-        tree-sitter ERROR 노드 방식을 먼저 시도하고,
-        결과가 없으면 정규식 기반 추출로 fallback합니다.
+        tree-sitter ERROR 노드 방식과 정규식 방식을 모두 사용하고
+        결과를 병합하여 누락을 방지합니다.
         
         개선사항:
         - C 주석 내 EXEC SQL 제외
         - 문자열 리터럴 내 세미콜론 고려
         - 멀티라인 SQL 정확한 추출
+        - tree-sitter와 정규식 결과 병합 (중복 제거)
         
         Args:
             source_code: Pro*C 소스 코드
@@ -102,44 +103,70 @@ class TreeSitterSQLExtractor:
         logger.debug(f"Found {len(exec_sql_nodes)} EXEC SQL nodes via tree-sitter")
         
         sql_blocks = []
+        seen_positions = set()  # 중복 방지용: (start_byte, end_byte)
         
-        if exec_sql_nodes:
-            # tree-sitter 방식
-            for node in exec_sql_nodes:
-                try:
-                    # 주석 내에 있는지 확인
-                    if self._is_in_comment(node.start_byte, comment_ranges):
-                        logger.debug(f"Skipping EXEC SQL in comment at byte {node.start_byte}")
-                        continue
-                    
-                    # 문자열 리터럴을 고려하여 세미콜론까지 확장
-                    start, end = self._expand_sql_boundary_safe(node, source_bytes)
-                    text = source_bytes[start:end].decode('utf8')
-                    
-                    if not text.strip():
-                        continue
-                    
-                    func_name = None
-                    if functions:
-                        func_name = self._determine_containing_function(node, functions)
-                    
-                    sql_blocks.append(SQLBlock(
-                        text=text,
-                        start_byte=start,
-                        end_byte=end,
-                        start_line=node.start_point.row + 1,
-                        end_line=source_code[:end].count('\n') + 1,
-                        containing_function=func_name
-                    ))
-                except Exception as e:
-                    logger.warning(f"Failed to extract SQL block: {e}")
+        # tree-sitter 결과 처리
+        for node in exec_sql_nodes:
+            try:
+                # 주석 내에 있는지 확인
+                if self._is_in_comment(node.start_byte, comment_ranges):
+                    logger.debug(f"Skipping EXEC SQL in comment at byte {node.start_byte}")
                     continue
+                
+                # 문자열 리터럴을 고려하여 세미콜론까지 확장
+                start, end = self._expand_sql_boundary_safe(node, source_bytes)
+                text = source_bytes[start:end].decode('utf8')
+                
+                if not text.strip():
+                    continue
+                
+                # 중복 체크
+                pos_key = (start, end)
+                if pos_key in seen_positions:
+                    continue
+                seen_positions.add(pos_key)
+                
+                func_name = None
+                if functions:
+                    func_name = self._determine_containing_function(node, functions)
+                
+                sql_blocks.append(SQLBlock(
+                    text=text,
+                    start_byte=start,
+                    end_byte=end,
+                    start_line=node.start_point.row + 1,
+                    end_line=source_code[:end].count('\n') + 1,
+                    containing_function=func_name
+                ))
+            except Exception as e:
+                logger.warning(f"Failed to extract SQL block: {e}")
+                continue
         
-        # 3. 정규식 fallback (tree-sitter가 결과 없을 때)
-        if not sql_blocks:
-            logger.debug("No SQL blocks from tree-sitter, using regex fallback")
-            sql_blocks = self._extract_sql_blocks_regex(source_code, functions, comment_ranges)
+        # 3. 정규식으로 추가 추출 (tree-sitter가 놓친 것 찾기)
+        regex_blocks = self._extract_sql_blocks_regex(source_code, functions, comment_ranges)
         
+        for block in regex_blocks:
+            pos_key = (block.start_byte, block.end_byte)
+            # 기존 결과와 겹치는지 확인 (시작 위치가 이미 처리된 범위에 포함되면 스킵)
+            is_duplicate = False
+            for existing_start, existing_end in seen_positions:
+                # 겹침 체크: 새 블록의 시작이 기존 블록 범위 내에 있으면 중복
+                if existing_start <= block.start_byte < existing_end:
+                    is_duplicate = True
+                    break
+                # 또는 기존 블록의 시작이 새 블록 범위 내에 있으면 중복
+                if block.start_byte <= existing_start < block.end_byte:
+                    is_duplicate = True
+                    break
+            
+            if not is_duplicate:
+                seen_positions.add(pos_key)
+                sql_blocks.append(block)
+        
+        # 시작 위치로 정렬
+        sql_blocks.sort(key=lambda x: x.start_byte)
+        
+        logger.debug(f"Total SQL blocks found: {len(sql_blocks)} (tree-sitter + regex merged)")
         return sql_blocks
     
     def _find_comment_ranges(self, source_code: str) -> List[tuple]:
