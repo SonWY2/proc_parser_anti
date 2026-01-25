@@ -109,6 +109,11 @@ def _real_main():
         help='아티팩트 설정 JSONL 파일 경로'
     )
     
+    parser.add_argument(
+        '--jsonl-dir',
+        help='메타데이터를 유형별 JSONL 파일로 저장할 디렉토리 경로 (예: variables.jsonl, functions.jsonl)'
+    )
+    
     args = parser.parse_args()
     print(f"DEBUG: Arguments parsed. Source: {args.source_file}", flush=True)
     
@@ -208,6 +213,19 @@ def _real_main():
                 generator.save_yaml(metadata, output_path)
             else:
                 generator.save_json(metadata, output_path, indent=args.indent)
+            
+            # JSONL 저장 (옵션)
+            if args.jsonl_dir:
+                # 디렉토리 모드인 경우 하위 폴더 생성
+                if is_directory:
+                    rel_dir = os.path.dirname(os.path.relpath(source_path, os.path.abspath(args.source_file)))
+                    jsonl_output_dir = os.path.join(args.jsonl_dir, rel_dir) if rel_dir else args.jsonl_dir
+                else:
+                    jsonl_output_dir = args.jsonl_dir
+                
+                generator.save_jsonl(metadata, jsonl_output_dir)
+                if args.verbose:
+                    print(f"  JSONL 저장됨: {jsonl_output_dir}")
             
             if args.verbose:
                 print(f"저장 완료: {output_path}")

@@ -1,0 +1,19 @@
+name: SQL Extraction Verification
+description: Pro*C에서 SQL 추출 및 코드 대체 결과 검증
+
+llm_checks:
+  - id: all_exec_sql_found
+    question: "원본 코드의 모든 EXEC SQL 구문이 추출되었나요?"
+    severity: error
+    
+  - id: proper_replacement
+    question: "추출된 SQL이 원본 위치에서 적절한 주석(/* SQL: ID */)으로 대체되었나요?"
+    severity: error
+    
+  - id: sql_id_mapping
+    question: "각 SQL ID가 해당 함수와 올바르게 연결되었나요?"
+    severity: warning
+    
+  - id: local_vars_preserved
+    question: "추출된 코드(_extracted.c)에 함수의 로컬 변수 선언이 그대로 유지되었나요?"
+    severity: error

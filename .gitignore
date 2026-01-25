@@ -65,3 +65,15 @@ prompts/functions/tlfb000m_c300_bamcall_mba0360m.md
 prompts/functions/tlfb000m_c400_bamcall_tlf9600m.md
 prompts/functions/tlfb000m_c500_update_meg_ftrs_wthd_blnc.md
 prompts/functions/tlfb000m_main.md
+testoutput/comments.jsonl
+testoutput/function_prototypes.jsonl
+testoutput/functions.jsonl
+testoutput/headers.jsonl
+testoutput/includes.jsonl
+testoutput/macros.jsonl
+testoutput/original_source_dup_comment_extracted.c
+testoutput/preprocessor_directives.jsonl
+testoutput/sql.jsonl
+testoutput/variables.jsonl
+tests/unit/test_column_alias_mapper.py
+tests/unit/test_jsonl_export.py

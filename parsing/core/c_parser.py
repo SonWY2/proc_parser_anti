@@ -35,7 +35,106 @@ class CParser:
         # 쿼리 대신 수동 순회 사용
         self._traverse(root_node, elements)
         
+        # 변수 사용 추적 (선언 이후에 수행)
+        self._track_variable_usages(root_node, elements)
+        
         return elements
+    
+    def _track_variable_usages(self, root_node, elements):
+        """
+        변수 선언과 사용을 추적하여 usages 필드를 추가합니다.
+        
+        각 변수에 usages 필드가 추가됩니다:
+        [{"function": str|None, "line": int, "usage_type": "declaration"|"read"|"write"}]
+        """
+        # 변수 선언 수집 (이름 -> 변수 요소 매핑)
+        variables = [e for e in elements if e['type'] == 'variable']
+        var_names = {v['name'] for v in variables}
+        
+        if not var_names:
+            return
+        
+        # 각 변수에 usages 필드 초기화 (선언 정보 포함)
+        for var in variables:
+            var['usages'] = [{
+                'function': var.get('function'),
+                'line': var['line_start'],
+                'usage_type': 'declaration'
+            }]
+        
+        # 함수들 수집 (범위 내 identifier 사용 추적용)
+        functions = [e for e in elements if e['type'] == 'function']
+        
+        # 모든 identifier 노드 찾기
+        identifiers = []
+        self._collect_identifiers(root_node, identifiers, current_function=None)
+        
+        # identifier가 변수 사용인지 확인하고 usages에 추가
+        for ident in identifiers:
+            name = ident['name']
+            if name not in var_names:
+                continue
+            
+            # 선언 위치는 제외
+            for var in variables:
+                if var['name'] == name:
+                    # 선언 라인인지 확인
+                    if ident['line'] == var['line_start']:
+                        continue
+                    
+                    # 같은 스코프인지 확인 (전역 변수는 모든 곳에서, 지역 변수는 해당 함수 내에서만)
+                    if var.get('function') is not None:
+                        # 지역 변수: 같은 함수 내에서만 사용 추적
+                        if ident.get('function') != var.get('function'):
+                            continue
+                    
+                    var['usages'].append({
+                        'function': ident.get('function'),
+                        'line': ident['line'],
+                        'usage_type': ident.get('usage_type', 'read')
+                    })
+    
+    def _collect_identifiers(self, node, identifiers, current_function=None):
+        """
+        모든 identifier 노드를 수집합니다.
+        """
+        if node.type == 'function_definition':
+            func_name = self._get_function_name(node)
+            if func_name:
+                current_function = func_name
+        
+        if node.type == 'identifier':
+            # 부모 노드를 확인하여 용도 파악
+            parent = node.parent
+            usage_type = 'read'
+            
+            if parent:
+                # 할당문의 왼쪽인 경우 write
+                if parent.type == 'assignment_expression':
+                    left_child = parent.child_by_field_name('left')
+                    if left_child and left_child.id == node.id:
+                        usage_type = 'write'
+                # 증감 연산자
+                elif parent.type in ('update_expression', 'unary_expression'):
+                    usage_type = 'write'
+                # 선언문에서의 identifier는 제외 (이미 declaration에서 처리)
+                elif parent.type in ('declarator', 'init_declarator', 'array_declarator', 
+                                      'pointer_declarator', 'parameter_declaration'):
+                    # 선언 관련은 건너뛰기
+                    pass
+                # 함수 선언자의 이름도 제외
+                elif parent.type == 'function_declarator':
+                    pass
+                else:
+                    identifiers.append({
+                        'name': node.text.decode('utf8'),
+                        'line': node.start_point.row + 1,
+                        'function': current_function,
+                        'usage_type': usage_type
+                    })
+        
+        for child in node.children:
+            self._collect_identifiers(child, identifiers, current_function)
 
     def _traverse(self, node, elements, current_function=None):
         # 재귀적 순회

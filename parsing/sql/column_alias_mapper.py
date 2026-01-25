@@ -384,21 +384,36 @@ class StatementParser:
         return paren_depth > 0
     
     def _skip_cte(self, tokens: List[SqlToken]) -> int:
-        """CTE (WITH) 절을 건너뛰고 메인 쿼리 시작 인덱스 반환"""
+        """CTE (WITH) 절을 건너뛰고 메인 쿼리 시작 인덱스 반환
+        
+        주의: START WITH (Oracle CONNECT BY)와 CTE WITH를 구분해야 함
+        CTE WITH는 문장 시작 부분에만 나타남
+        """
+        # 첫 번째 non-whitespace 토큰 찾기
+        first_keyword_idx = -1
         for i, token in enumerate(tokens):
+            if token.type == TokenType.WHITESPACE or token.type == TokenType.COMMENT:
+                continue
             if token.type == TokenType.KEYWORD and token.value.upper() == 'WITH':
-                # CTE 끝까지 건너뛰기
-                paren_depth = 0
-                for j, t in enumerate(tokens[i+1:], start=i+1):
-                    if t.type == TokenType.LPAREN:
-                        paren_depth += 1
-                    elif t.type == TokenType.RPAREN:
-                        paren_depth -= 1
-                    elif paren_depth == 0 and t.type == TokenType.KEYWORD:
-                        if t.value.upper() in ('SELECT', 'INSERT', 'UPDATE', 'DELETE'):
-                            return j
-                return i  # WITH만 있고 끝나지 않은 경우
-        return 0
+                first_keyword_idx = i
+            break  # 첫 번째 유의미한 토큰에서 중단
+        
+        # WITH가 첫 번째 키워드가 아니면 CTE 없음
+        if first_keyword_idx < 0:
+            return 0
+        
+        # CTE 끝까지 건너뛰기 - 메인 쿼리 시작점 찾기
+        paren_depth = 0
+        for j, t in enumerate(tokens[first_keyword_idx+1:], start=first_keyword_idx+1):
+            if t.type == TokenType.LPAREN:
+                paren_depth += 1
+            elif t.type == TokenType.RPAREN:
+                paren_depth -= 1
+            elif paren_depth == 0 and t.type == TokenType.KEYWORD:
+                if t.value.upper() in ('SELECT', 'INSERT', 'UPDATE', 'DELETE'):
+                    return j
+        
+        return first_keyword_idx  # WITH만 있고 끝나지 않은 경우
     
     def _find_top_level_select(self, tokens: List[SqlToken], start_idx: int = 0) -> int:
         """괄호 depth=0인 최상위 SELECT 인덱스 반환"""
@@ -898,8 +913,9 @@ class ColumnAliasMapper:
                 current_tokens.append(token)
             elif token.type == TokenType.COMMA and paren_depth == 0 and case_depth == 0:
                 # 컬럼 구분자
-                col_str = self._tokenizer.rebuild_sql(current_tokens).strip()
-                if col_str:
+                col_str = self._tokenizer.rebuild_sql(current_tokens)
+                # 공백만으로 이루어진 컬럼은 추가하지 않음
+                if col_str.strip():
                     columns.append(col_str)
                 current_tokens = []
             else:
@@ -907,8 +923,9 @@ class ColumnAliasMapper:
         
         # 마지막 컬럼
         if current_tokens:
-            col_str = self._tokenizer.rebuild_sql(current_tokens).strip()
-            if col_str:
+            col_str = self._tokenizer.rebuild_sql(current_tokens)
+            # 공백만으로 이루어진 컬럼은 추가하지 않음
+            if col_str.strip():
                 columns.append(col_str)
         
         return columns

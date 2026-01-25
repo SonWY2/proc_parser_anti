@@ -1,0 +1,19 @@
+name: SQL Metadata Verification
+description: SQL 분석 결과(호스트 변수, 마이바티스 변환) 검증
+
+llm_checks:
+  - id: input_vars_complete
+    question: "SQL 내의 모든 입력 호스트 변수(:var)가 input_host_vars 목록에 포함되었나요?"
+    severity: error
+    
+  - id: output_vars_complete
+    question: "INTO 절의 모든 출력 호스트 변수가 output_host_vars 목록에 포함되었나요?"
+    severity: error
+    
+  - id: mybatis_translation
+    question: "호스트 변수가 MyBatis 형식(#{name})으로 정확하게 변환되었나요? 카멜케이스 규칙이 적용되었나요?"
+    severity: warning
+    
+  - id: alias_analysis
+    question: "SELECT 컬럼의 Alias가 정확하게 분석되었나요?"
+    severity: info

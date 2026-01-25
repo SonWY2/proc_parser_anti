@@ -1,0 +1,3 @@
+{"name": "in_cust_id", "type": "char", "array_size": "MAX_ID_LEN", "scope": "global", "line": 8}
+{"name": "out_cust_name", "type": "int", "array_size": "51", "scope": "global", "line": 9}
+{"name": "result", "type": "int", "scope": "local", "function": "get_customer_info", "line": 14}

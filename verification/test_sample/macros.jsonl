@@ -1,0 +1,2 @@
+{"name": "MAX_ID_LEN", "value": "10", "params": null, "line_start": 4, "line_end": 4, "raw_content": "#define MAX_ID_LEN 10"}
+{"name": "SUCCESS_CODE", "value": "0", "params": null, "line_start": 5, "line_end": 5, "raw_content": "#define SUCCESS_CODE 0"}

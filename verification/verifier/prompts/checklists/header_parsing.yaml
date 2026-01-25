@@ -1,0 +1,23 @@
+name: Header Parsing Verification
+description: 헤더 파일(.h) 및 DECLARE SECTION 파싱 결과 검증
+
+llm_checks:
+  - id: all_structs_found
+    question: "원본 헤더의 모든 구조체가 추출되었나요?"
+    severity: error
+    
+  - id: field_types_correct
+    question: "필드 타입(char, int, long 등)이 올바르게 파싱되었나요?"
+    severity: warning
+    
+  - id: array_sizes_correct
+    question: "배열 크기가 정확하게 파싱되었나요? 매크로 상수가 올바르게 적용되었나요?"
+    severity: warning
+    
+  - id: macro_definitions
+    question: "모든 #define 매크로가 이름과 값 모두 정확하게 추출되었나요?"
+    severity: error
+    
+  - id: include_statements
+    question: "모든 #include 문이 누락 없이 추출되었나요?"
+    severity: warning

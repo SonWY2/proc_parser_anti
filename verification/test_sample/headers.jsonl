@@ -1,0 +1,2 @@
+{"type": "include", "path": "stdio.h", "is_system": true, "line_start": 1, "line_end": 1, "raw_content": "#include <stdio.h>"}
+{"type": "include", "path": "sqlca.h", "is_system": true, "line_start": 2, "line_end": 2, "raw_content": "#include <sqlca.h>"}

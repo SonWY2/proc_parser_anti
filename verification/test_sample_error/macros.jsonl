@@ -1,0 +1,2 @@
+{"name": "MAX_ID_LEN", "value": "20", "params": null, "line_start": 4, "line_end": 4, "raw_content": "#define MAX_ID_LEN 10"}
+{"name": "WRONG_MACRO", "value": "999", "params": null, "line_start": 99, "line_end": 99, "raw_content": "#define WRONG_MACRO 999"}

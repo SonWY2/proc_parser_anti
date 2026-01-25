@@ -1,0 +1,1 @@
+{"name": "get_customer_info", "return_type": "int", "params": [{"name": "cust_id", "type": "char *"}], "sql_ids": ["sql_001", "sql_002", "sql_003"], "line_start": 13, "line_end": 35}

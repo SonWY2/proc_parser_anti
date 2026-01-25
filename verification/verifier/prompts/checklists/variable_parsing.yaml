@@ -1,0 +1,23 @@
+name: Variable Verification
+description: 전역 및 지역 변수 파싱 결과 검증
+
+llm_checks:
+  - id: all_variables_found
+    question: "원본 선언부의 모든 변수가 추출되었나요?"
+    severity: error
+    
+  - id: type_accuracy
+    question: "변수의 데이터 타입과 포인터 여부가 정확하게 파싱되었나요?"
+    severity: error
+    
+  - id: scope_correct
+    question: "변수의 스코프(global/local)가 올바르게 판명되었나요?"
+    severity: warning
+    
+  - id: host_var_direction
+    question: "호스트 변수의 방향(input/output)이 이름 규칙(in_/out_)에 맞게 설정되었나요?"
+    severity: warning
+    
+  - id: indicator_identification
+    question: "인디케이터 변수(ind_)가 올바르게 식별되었나요?"
+    severity: info

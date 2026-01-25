@@ -1,0 +1,37 @@
+#include <stdio.h>
+#include <sqlca.h>
+
+#define MAX_ID_LEN 10
+#define SUCCESS_CODE 0
+
+EXEC SQL BEGIN DECLARE SECTION;
+    char in_cust_id[MAX_ID_LEN];
+    char out_cust_name[51];
+    short ind_cust_name;
+EXEC SQL END DECLARE SECTION;
+
+int get_customer_info(char *cust_id) {
+    int result = SUCCESS_CODE;
+    
+    // Copy input
+    strncpy(in_cust_id, cust_id, MAX_ID_LEN);
+
+    /* Get customer name */
+    EXEC SQL SELECT CUST_NM
+             INTO :out_cust_name :ind_cust_name
+             FROM CUSTOMER
+             WHERE CUST_ID = :in_cust_id;
+
+    if (sqlca.sqlcode != 0) {
+        return -1;
+    }
+
+    /* Update last login */
+    EXEC SQL UPDATE CUSTOMER
+             SET LAST_LOGIN = SYSDATE
+             WHERE CUST_ID = :in_cust_id;
+
+    EXEC SQL COMMIT;
+
+    return result;
+}

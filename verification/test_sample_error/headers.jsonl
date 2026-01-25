@@ -1,0 +1,1 @@
+{"type": "include", "path": "stdio.h", "is_system": true, "line_start": 1, "line_end": 1, "raw_content": "#include <stdio.h>"}

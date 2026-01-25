@@ -388,6 +388,49 @@ class ProCParser:
                 else:
                     resolved.append(size)
             el['resolved_array_sizes'] = resolved
+        
+        # 매크로 사용 함수 추적
+        self._track_macro_usages(elements, functions, content)
+
+    def _track_macro_usages(self, elements, functions, content):
+        """
+        매크로가 어떤 함수에서 사용되는지 추적합니다.
+        
+        각 매크로에 used_in_functions 필드가 추가됩니다.
+        """
+        macros = [e for e in elements if e['type'] == 'macro']
+        
+        if not macros or not functions:
+            # used_in_functions 필드 초기화만 수행
+            for macro in macros:
+                macro['used_in_functions'] = []
+            return
+        
+        # 각 매크로에 대해 함수별 사용 여부 확인
+        for macro in macros:
+            macro_name = macro.get('name', '')
+            if not macro_name:
+                macro['used_in_functions'] = []
+                continue
+            
+            used_in = []
+            
+            # 각 함수의 raw_content에서 매크로 사용 여부 검색
+            for func in functions:
+                func_content = func.get('raw_content', '')
+                func_name = func.get('name', '')
+                
+                if not func_content or not func_name:
+                    continue
+                
+                # 단어 경계를 사용하여 매크로 이름 검색 (정확히 매칭)
+                # 예: MAX_SIZE가 MAX_SIZE_EXTRA와 매칭되지 않도록
+                import re
+                pattern = r'\b' + re.escape(macro_name) + r'\b'
+                if re.search(pattern, func_content):
+                    used_in.append(func_name)
+            
+            macro['used_in_functions'] = used_in
 
     def _extract_sql_relationships(self, elements):
         """SQL 요소 간의 관계 분석"""
