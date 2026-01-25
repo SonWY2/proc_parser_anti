@@ -294,64 +294,75 @@ result = verifier.verify_sql_metadata(
 | `aliases` | SELECT 컬럼 alias가 올바르게 분석되었는지 확인 |
 ---
 
-## 4. LLM 기반 SQL 검증
+## 4. LLM 기반 검증 (전체 단계)
 
-LLM(`gpt-4o-mini` 등)을 사용하여 **입력/출력 변수, Alias, MyBatis 변환 결과**를 정밀하게 검증합니다. 복잡한 SQL 문법이나 문맥 파악이 필요한 경우에 권장됩니다.
+LLM을 사용하여 **모든 검증 단계**(헤더/매크로/변수, SQL 추출, SQL 메타데이터)를 정밀하게 수행합니다.
 
 ### 환경 설정
-
-LLM 기능을 사용하려면 `OPENAI_API_KEY` 환경변수가 설정되어 있어야 합니다.
 
 ```bash
 set OPENAI_API_KEY=your-api-key-here
 ```
 
+또는 테스트 스크립트(`test_llm_verifier.py`) 상단에서 직접 설정:
+```python
+API_KEY = "your-api-key"
+MODEL_NAME = "gpt-4o-mini"
+ENDPOINT = "https://api.openai.com/v1"
+```
+
+### LLM 검증기 목록
+
+| 플러그인 | 검증 항목 | 용도 |
+|---------|----------|------|
+| `LLMHeaderVerifier` | 매크로, 헤더, 변수 선언 | 1) 헤더 섹션 파싱 검증 |
+| `LLMSQLExtractionVerifier` | SQL 추출, 함수 매핑, 로컬 변수 | 2) 함수/SQL 추출 검증 |
+| `LLMSQLMetadataVerifier` | Input/Output 변수, Alias, MyBatis | 3) SQL 메타데이터 검증 |
+
 ### 사용 예제
 
 ```python
+from verification.verifier.llm_client import LLMClient
+from verification.verifier.plugins.llm_header_verifier import LLMHeaderVerifier
+from verification.verifier.plugins.llm_sql_extraction_verifier import LLMSQLExtractionVerifier
 from verification.verifier.plugins.llm_sql_metadata_verifier import LLMSQLMetadataVerifier
 from verification.verifier.types import VerificationInput, VerificationType
 
-# 1. LLM 검증기 플러그인 생성
-# 내부적으로 LLMClient를 생성하여 API와 통신합니다.
-llm_verifier = LLMSQLMetadataVerifier()
+# LLM 클라이언트 생성
+llm_client = LLMClient(api_key="your-key", model="gpt-4o-mini")
 
-# 2. 검증 입력 구성
-raw_sql = "SELECT CUST_NM AS name INTO :out_name FROM CUST WHERE ID = :in_id"
-metadata = {
-    "sql_id": "sql_001",
-    "input_host_vars": [":in_id"],
-    "output_host_vars": [":out_name"],
-    "aliases": [{"column": "CUST_NM", "alias": "name"}],
-    "mybatis_sql": "SELECT CUST_NM AS name FROM CUST WHERE ID = #{inId}"
-}
+# 1) 헤더 섹션 검증
+header_verifier = LLMHeaderVerifier(llm_client)
+result = header_verifier.verify(VerificationInput(
+    verification_type=VerificationType.HEADER,
+    original_source=header_source,
+    analysis_result={"macros": [...], "includes": [...], "variables": [...]}
+))
 
-input_data = VerificationInput(
+# 2) SQL 추출 검증
+extraction_verifier = LLMSQLExtractionVerifier(llm_client)
+result = extraction_verifier.verify(VerificationInput(
+    verification_type=VerificationType.SQL_EXTRACTION,
+    original_source=extracted_code,
+    analysis_result={"functions": [...], "sql_ids": [...]}
+))
+
+# 3) SQL 메타데이터 검증
+metadata_verifier = LLMSQLMetadataVerifier(llm_client)
+result = metadata_verifier.verify(VerificationInput(
     verification_type=VerificationType.SQL_METADATA,
     original_source=raw_sql,
-    analysis_result=metadata
-)
-
-# 3. LLM 검증 수행
-result = llm_verifier.verify(input_data)
-
-# 4. 결과 확인
-print(f"Status: {result.status.value}")
-if result.has_errors():
-    for issue in result.get_errors():
-        print(f"❌ {issue.message}")
-        print(f"   Expected: {issue.expected}")
-        print(f"   Actual: {issue.actual}")
-
-# LLM이 판단한 근거(원본 응답) 확인
-print(result.details.get("raw_response"))
+    analysis_result={"input_host_vars": [...], "output_host_vars": [...], "mybatis_sql": "..."}
+))
 ```
 
-### 검증 특징
+### 통합 테스트
 
-- **자연어 판단**: 정규식으로 처리하기 힘든 복잡한 서브쿼리나 CASE 문 내의 변수/Alias도 정확히 판별합니다.
-- **MyBatis 규칙 검증**: 변수 이름이 관례(CamelCase)에 맞게 변환되었는지, `INTO` 절이 적절히 제거되었는지 등을 논리적으로 확인합니다.
-- **상세 피드백**: 검증 실패 시 LLM이 판단한 구체적인 이유와 수정 가이드를 제공합니다.
+```bash
+python test_llm_verifier.py
+```
+
+모든 LLM 검증기를 한번에 테스트하며, 의도적으로 오류가 포함된 샘플 데이터로 에러 탐지를 확인합니다.
 
 
 ---
