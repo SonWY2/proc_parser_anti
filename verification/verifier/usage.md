@@ -8,7 +8,8 @@
 
 1. [헤더 섹션 검증](#1-헤더-섹션-검증) - 변수/매크로/헤더 파싱 검증
 2. [함수 및 메타데이터 검증](#2-함수-및-메타데이터-검증) - 변수/SQL 추출 검증
-3. [SQL 메타데이터 검증](#3-sql-메타데이터-검증) - input/output/alias 검증
+3. [SQL 메타데이터 검증 (규칙 기반)](#3-sql-메타데이터-검증-규칙-기반) - 정규식 기반 검증
+4. [LLM 기반 SQL 검증](#4-llm-기반-sql-검증) - LLM을 이용한 정밀 검증
 
 ---
 
@@ -291,7 +292,66 @@ result = verifier.verify_sql_metadata(
 | `output_host_vars` | INTO 절의 모든 출력 변수(`:out_xxx`) 추출 확인 |
 | `indicator_vars` | 인디케이터 변수(`:ind_xxx`) 매핑 확인 |
 | `aliases` | SELECT 컬럼 alias가 올바르게 분석되었는지 확인 |
-| `mybatis_sql` | 호스트 변수가 `#{varName, jdbcType=...}` 형식으로 올바르게 변환되었는지 확인 |
+---
+
+## 4. LLM 기반 SQL 검증
+
+LLM(`gpt-4o-mini` 등)을 사용하여 **입력/출력 변수, Alias, MyBatis 변환 결과**를 정밀하게 검증합니다. 복잡한 SQL 문법이나 문맥 파악이 필요한 경우에 권장됩니다.
+
+### 환경 설정
+
+LLM 기능을 사용하려면 `OPENAI_API_KEY` 환경변수가 설정되어 있어야 합니다.
+
+```bash
+set OPENAI_API_KEY=your-api-key-here
+```
+
+### 사용 예제
+
+```python
+from verification.verifier.plugins.llm_sql_metadata_verifier import LLMSQLMetadataVerifier
+from verification.verifier.types import VerificationInput, VerificationType
+
+# 1. LLM 검증기 플러그인 생성
+# 내부적으로 LLMClient를 생성하여 API와 통신합니다.
+llm_verifier = LLMSQLMetadataVerifier()
+
+# 2. 검증 입력 구성
+raw_sql = "SELECT CUST_NM AS name INTO :out_name FROM CUST WHERE ID = :in_id"
+metadata = {
+    "sql_id": "sql_001",
+    "input_host_vars": [":in_id"],
+    "output_host_vars": [":out_name"],
+    "aliases": [{"column": "CUST_NM", "alias": "name"}],
+    "mybatis_sql": "SELECT CUST_NM AS name FROM CUST WHERE ID = #{inId}"
+}
+
+input_data = VerificationInput(
+    verification_type=VerificationType.SQL_METADATA,
+    original_source=raw_sql,
+    analysis_result=metadata
+)
+
+# 3. LLM 검증 수행
+result = llm_verifier.verify(input_data)
+
+# 4. 결과 확인
+print(f"Status: {result.status.value}")
+if result.has_errors():
+    for issue in result.get_errors():
+        print(f"❌ {issue.message}")
+        print(f"   Expected: {issue.expected}")
+        print(f"   Actual: {issue.actual}")
+
+# LLM이 판단한 근거(원본 응답) 확인
+print(result.details.get("raw_response"))
+```
+
+### 검증 특징
+
+- **자연어 판단**: 정규식으로 처리하기 힘든 복잡한 서브쿼리나 CASE 문 내의 변수/Alias도 정확히 판별합니다.
+- **MyBatis 규칙 검증**: 변수 이름이 관례(CamelCase)에 맞게 변환되었는지, `INTO` 절이 적절히 제거되었는지 등을 논리적으로 확인합니다.
+- **상세 피드백**: 검증 실패 시 LLM이 판단한 구체적인 이유와 수정 가이드를 제공합니다.
 
 
 ---

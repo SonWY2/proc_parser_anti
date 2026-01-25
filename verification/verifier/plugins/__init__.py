@@ -6,7 +6,8 @@
 - HeaderVerifier: 헤더 선언부 검증
 - VariableVerifier: 변수 선언 검증
 - SQLExtractionVerifier: SQL 추출 검증
-- SQLMetadataVerifier: SQL 메타데이터 검증
+- SQLMetadataVerifier: SQL 메타데이터 검증 (규칙 기반)
+- LLMSQLMetadataVerifier: SQL 메타데이터 검증 (LLM 기반)
 """
 
 from typing import List
@@ -18,6 +19,7 @@ from .header_verifier import HeaderVerifier
 from .variable_verifier import VariableVerifier
 from .sql_extraction_verifier import SQLExtractionVerifier
 from .sql_metadata_verifier import SQLMetadataVerifier
+from .llm_sql_metadata_verifier import LLMSQLMetadataVerifier
 
 
 def get_all_plugins() -> List[VerifierPlugin]:
@@ -28,6 +30,7 @@ def get_all_plugins() -> List[VerifierPlugin]:
         VariableVerifier(),
         SQLExtractionVerifier(),
         SQLMetadataVerifier(),
+        LLMSQLMetadataVerifier(),
     ]
 
 
@@ -47,4 +50,5 @@ __all__ = [
     'VariableVerifier',
     'SQLExtractionVerifier',
     'SQLMetadataVerifier',
+    'LLMSQLMetadataVerifier',
 ]
