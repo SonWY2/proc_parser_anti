@@ -110,6 +110,10 @@ class DynamicSQLRelationshipPlugin(SQLRelationshipPlugin):
             elif all_elements:
                 # 호스트 변수인 경우 C 코드에서 SQL 재구성 시도
                 var_name = sql_source[1:] # 선행 콜론 제거
+                # MyBatis 별칭 제거 (예: :var AS varName -> var)
+                if ' AS ' in var_name:
+                    var_name = var_name.split(' AS ')[0]
+
                 reconstructed_sql = self._reconstruct_sql_from_c_code(
                     var_name, prepare_el['line_start'], all_elements, prepare_el.get('function')
                 )
@@ -182,11 +186,15 @@ class DynamicSQLRelationshipPlugin(SQLRelationshipPlugin):
             # raw content에서 args 추출: func(arg1, arg2)
             arg_str_match = re.search(r'\w+\s*\((.*)\)', raw_content, re.DOTALL)
             if not arg_str_match:
-                continue
-            
-            arg_str = arg_str_match.group(1)
-            # 따옴표와 괄호를 존중하여 쉼표로 args 분할
-            parsed_args = self._parse_c_args(arg_str)
+                # Fallback: try to construct from args if available
+                if args:
+                     parsed_args = args
+                else:
+                     continue
+            else:
+                arg_str = arg_str_match.group(1)
+                # 따옴표와 괄호를 존중하여 쉼표로 args 분할
+                parsed_args = self._parse_c_args(arg_str)
             
             if not parsed_args:
                 continue
