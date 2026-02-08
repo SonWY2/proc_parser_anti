@@ -70,6 +70,71 @@ class DynamicAgentState(TypedDict, total=False):
     final_output: Optional[str]     # 최종 출력
 
 
+class MigrationState(TypedDict, total=False):
+    """
+    Pro*C 마이그레이션 파이프라인 상태
+    
+    5개 Subagent가 데이터를 이어달리기하듯 처리하는 상태입니다.
+    각 에이전트는 특정 필드를 읽고 특정 필드를 업데이트합니다.
+    
+    데이터 흐름:
+        Parser → Critic → Draftsman → SQL Specialist → BXM Designer
+    """
+    # ===== 1. 초기 입력 =====
+    filename: str                   # 원본 파일명
+    source_code: str                # Pro*C 소스 코드
+    
+    # ===== 2. Parser Agent 산출물 =====
+    ast_data: dict                  # {headers, host_vars, sql_blocks, functions}
+    
+    # ===== 3. Critic Agent 산출물 =====
+    validation_errors: list[str]    # 검증 에러 목록 (비어있으면 통과)
+    
+    # ===== 4. Draftsman Agent 산출물 =====
+    draft_xmls: list[dict]          # [{id, xml, confidence, original_sql}]
+    
+    # ===== 5. SQL Specialist Agent 산출물 =====
+    refined_sqls: list[dict]        # [{id, final_xml, changes}]
+    
+    # ===== 6. BXM Designer Agent 산출물 =====
+    java_code: str                  # 생성된 Java Service 코드
+    mapper_xml: str                 # 생성된 MyBatis Mapper XML
+    
+    # ===== 제어 필드 =====
+    current_agent: str              # 현재 실행 중인 에이전트
+    is_complete: bool               # 파이프라인 완료 여부
+    errors: list[str]               # 실행 중 발생한 에러
+
+
+def create_migration_state(
+    source_code: str,
+    filename: str = "unknown.pc"
+) -> dict:
+    """
+    마이그레이션 파이프라인 초기 상태 생성
+    
+    Args:
+        source_code: Pro*C 소스 코드
+        filename: 원본 파일명
+        
+    Returns:
+        초기화된 MigrationState 딕셔너리
+    """
+    return {
+        "filename": filename,
+        "source_code": source_code,
+        "ast_data": {},
+        "validation_errors": [],
+        "draft_xmls": [],
+        "refined_sqls": [],
+        "java_code": "",
+        "mapper_xml": "",
+        "current_agent": "",
+        "is_complete": False,
+        "errors": [],
+    }
+
+
 def create_initial_state(
     task: str,
     context: dict[str, Any] = None,

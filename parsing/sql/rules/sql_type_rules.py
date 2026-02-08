@@ -66,6 +66,11 @@ class DeclareSectionEndRule(SQLTypeRule):
 class DeclareCursorRule(SQLTypeRule):
     """DECLARE CURSOR 규칙"""
     
+    # 커서 이름 추출 패턴
+    _cursor_name_pattern = re.compile(
+        r'DECLARE\s+(\w+)\s+CURSOR', re.IGNORECASE
+    )
+    
     @property
     def name(self) -> str:
         return "declare_cursor"
@@ -80,10 +85,28 @@ class DeclareCursorRule(SQLTypeRule):
             r'EXEC\s+SQL\s+DECLARE\s+\w+\s+CURSOR\s+FOR', 
             re.IGNORECASE
         )
+    
+    def match(self, sql_text: str) -> RuleMatch:
+        if self.pattern.search(sql_text):
+            cursor_name = None
+            name_match = self._cursor_name_pattern.search(sql_text)
+            if name_match:
+                cursor_name = name_match.group(1)
+            return RuleMatch(
+                matched=True, 
+                value=self.name,
+                metadata={'cursor_name': cursor_name} if cursor_name else {}
+            )
+        return RuleMatch(matched=False)
 
 
 class OpenCursorRule(SQLTypeRule):
     """OPEN CURSOR 규칙"""
+    
+    # 커서 이름 추출 패턴
+    _cursor_name_pattern = re.compile(
+        r'OPEN\s+(\w+)', re.IGNORECASE
+    )
     
     @property
     def name(self) -> str:
@@ -96,10 +119,28 @@ class OpenCursorRule(SQLTypeRule):
     @property
     def pattern(self) -> re.Pattern:
         return re.compile(r'EXEC\s+SQL\s+OPEN\s+\w+', re.IGNORECASE)
+    
+    def match(self, sql_text: str) -> RuleMatch:
+        if self.pattern.search(sql_text):
+            cursor_name = None
+            name_match = self._cursor_name_pattern.search(sql_text)
+            if name_match:
+                cursor_name = name_match.group(1)
+            return RuleMatch(
+                matched=True, 
+                value=self.name,
+                metadata={'cursor_name': cursor_name} if cursor_name else {}
+            )
+        return RuleMatch(matched=False)
 
 
 class CloseCursorRule(SQLTypeRule):
     """CLOSE CURSOR 규칙"""
+    
+    # 커서 이름 추출 패턴
+    _cursor_name_pattern = re.compile(
+        r'CLOSE\s+(\w+)', re.IGNORECASE
+    )
     
     @property
     def name(self) -> str:
@@ -112,10 +153,28 @@ class CloseCursorRule(SQLTypeRule):
     @property
     def pattern(self) -> re.Pattern:
         return re.compile(r'EXEC\s+SQL\s+CLOSE\s+\w+', re.IGNORECASE)
+    
+    def match(self, sql_text: str) -> RuleMatch:
+        if self.pattern.search(sql_text):
+            cursor_name = None
+            name_match = self._cursor_name_pattern.search(sql_text)
+            if name_match:
+                cursor_name = name_match.group(1)
+            return RuleMatch(
+                matched=True, 
+                value=self.name,
+                metadata={'cursor_name': cursor_name} if cursor_name else {}
+            )
+        return RuleMatch(matched=False)
 
 
 class FetchIntoRule(SQLTypeRule):
     """FETCH INTO 규칙"""
+    
+    # 커서 이름 추출 패턴
+    _cursor_name_pattern = re.compile(
+        r'FETCH\s+(\w+)', re.IGNORECASE
+    )
     
     @property
     def name(self) -> str:
@@ -131,6 +190,19 @@ class FetchIntoRule(SQLTypeRule):
             r'EXEC\s+SQL\s+FETCH\s+[\s\S]*?INTO', 
             re.IGNORECASE
         )
+    
+    def match(self, sql_text: str) -> RuleMatch:
+        if self.pattern.search(sql_text):
+            cursor_name = None
+            name_match = self._cursor_name_pattern.search(sql_text)
+            if name_match:
+                cursor_name = name_match.group(1)
+            return RuleMatch(
+                matched=True, 
+                value=self.name,
+                metadata={'cursor_name': cursor_name} if cursor_name else {}
+            )
+        return RuleMatch(matched=False)
 
 
 class SelectRule(SQLTypeRule):

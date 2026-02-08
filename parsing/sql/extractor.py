@@ -198,6 +198,7 @@ class SQLExtractor:
                 "host_variables": [v.get('raw', '') for v in host_vars],
                 "input_vars": [v.get('raw', '') for v in input_vars],
                 "output_vars": [v.get('raw', '') for v in output_vars],
+                "cursor_name": result.metadata.get('cursor_name') if result.metadata else None,
                 "metadata": result.metadata if result.metadata else {},
             })
             

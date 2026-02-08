@@ -81,7 +81,10 @@ class CursorRelationshipPlugin(SQLRelationshipPlugin):
             # 병합된 SQL 생성
             merged_sql = cursor_query
             if all_output_vars:
-                into_clause = "INTO " + ", ".join([f":{v}" for v in all_output_vars])
+                # output_host_vars는 이미 :variable 형식이므로 콜론 추가 불필요
+                # 만약 콜론이 없는 변수가 있으면 추가
+                formatted_vars = [v if v.startswith(':') else f":{v}" for v in all_output_vars]
+                into_clause = "INTO " + ", ".join(formatted_vars)
                 from_match = re.search(r'\bFROM\b', merged_sql, re.IGNORECASE)
                 if from_match:
                     merged_sql = merged_sql[:from_match.start()] + into_clause + " " + merged_sql[from_match.start():]

@@ -15,20 +15,19 @@ class LangChainOrchestrator:
     """
     LangGraph 기반 멀티 에이전트 오케스트레이터
     
-    두 가지 모드 지원:
+    세 가지 모드 지원:
     - Dynamic: Reflection + Self-Evolve 기반 동적 오케스트레이션
     - Static: 미리 정의된 워크플로우 기반 실행
+    - Migration: 5개 Subagent 파이프라인 (Parser→Critic→Draftsman→Specialist→Designer)
     
     사용 예시:
     ```python
+    # 마이그레이션 모드 (권장)
+    orch = LangChainOrchestrator(mode="migration")
+    result = orch.run_migration(source_code="...", filename="order.pc")
+    
     # 동적 모드
     orch = LangChainOrchestrator(mode="dynamic")
-    result = orch.run("Pro*C 파일 변환", context={"target_dir": "./src"})
-    
-    # 정적 모드
-    from lang_chain_agents import PROC_TO_JAVA_WORKFLOW
-    orch = LangChainOrchestrator(mode="static")
-    orch.set_workflow(PROC_TO_JAVA_WORKFLOW)
     result = orch.run("Pro*C 파일 변환", context={"target_dir": "./src"})
     ```
     """
@@ -147,8 +146,10 @@ class LangChainOrchestrator:
         오케스트레이션 모드 변경
         
         Args:
-            mode: "dynamic" 또는 "static"
+            mode: "dynamic", "static", 또는 "migration"
         """
+        if mode not in ("dynamic", "static", "migration"):
+            raise ValueError(f"지원하지 않는 모드: {mode}")
         self.mode = mode
         self.config.orchestrator.mode = mode
         self._graph = None
@@ -158,7 +159,11 @@ class LangChainOrchestrator:
         """그래프 빌드"""
         llm = self._get_llm()
         
-        if self.mode == "dynamic":
+        if self.mode == "migration":
+            from .orchestration.migration_graph import build_migration_graph
+            self._graph = build_migration_graph(llm)
+            
+        elif self.mode == "dynamic":
             from .orchestration.manager import DynamicManager
             
             manager = DynamicManager(
@@ -180,6 +185,37 @@ class LangChainOrchestrator:
             )
         
         return self
+    
+    def run_migration(
+        self,
+        source_code: str,
+        filename: str = "unknown.pc",
+        thread_id: str = "default"
+    ) -> dict:
+        """
+        마이그레이션 파이프라인 실행
+        
+        Args:
+            source_code: Pro*C 소스 코드
+            filename: 원본 파일명
+            thread_id: 체크포인트용 스레드 ID
+            
+        Returns:
+            MigrationState 딕셔너리 (java_code, mapper_xml 포함)
+        """
+        # 마이그레이션 모드로 전환
+        if self.mode != "migration":
+            self.set_mode("migration")
+        
+        if not self._graph:
+            self.build()
+        
+        from .state import create_migration_state
+        
+        initial_state = create_migration_state(source_code, filename)
+        config = {"configurable": {"thread_id": thread_id}}
+        
+        return self._graph.invoke(initial_state, config)
     
     def run(
         self,

@@ -77,3 +77,24 @@ testoutput/sql.jsonl
 testoutput/variables.jsonl
 tests/unit/test_column_alias_mapper.py
 tests/unit/test_jsonl_export.py
+agent_workspace/conversation_log.json
+agent_workspace/data/metadata_summary.json
+agent_workspace/data/metadata.json
+agent_workspace/data/order.pc
+agent_workspace/messages/0001_System_to_Orchestrator.json
+agent_workspace/messages/0002_Orchestrator_to_Parser.json
+agent_workspace/messages/0003_Parser_to_Skill
+agent_workspace/messages/0004_Skill
+agent_workspace/messages/0005_Parser_to_Orchestrator.json
+agent_workspace/messages/0006_Orchestrator_to_System.json
+agent_workspace/data/llm_critic_response.json
+agent_workspace/data/mybatis_xmls.json
+agent_workspace/data/sample.pc
+agent_workspace/data/validation_result.json
+agent_workspace/messages/0001_Orchestrator_to_Parser.json
+agent_workspace/messages/0001_Orchestrator_to_System.json
+agent_workspace/messages/0001_Parser_to_Orchestrator.json
+agent_workspace/messages/0001_Parser_to_Skill
+agent_workspace/messages/0001_SQL Agent_to_Critic.json
+agent_workspace/messages/0001_SQL Critic_to_Fixer.json
+agent_workspace/messages/0002_Skill

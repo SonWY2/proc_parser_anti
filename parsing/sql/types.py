@@ -96,6 +96,7 @@ class ExtractedSQL:
     
     # === 컨텍스트 ===
     function: Optional[str] = None         # 포함된 함수명
+    cursor_name: Optional[str] = None      # 커서 관련 SQL의 경우 커서 이름
     
     # === 관계 정보 (플러그인에 의해 채워짐) ===
     relationship: Optional[Dict[str, Any]] = None    # 커서/트랜잭션/동적SQL 관계
@@ -163,6 +164,7 @@ class ExtractedSQL:
             "byte_start": self.byte_start,
             "byte_end": self.byte_end,
             "function": self.function,
+            "cursor_name": self.cursor_name,
             "relationship": self.relationship,
         }
         # 선택적 필드
