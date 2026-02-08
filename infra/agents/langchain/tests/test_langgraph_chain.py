@@ -56,6 +56,10 @@ class ParserPipelineState(TypedDict, total=False):
     # 분류된 메타데이터
     metadata: Dict[str, List]
     
+    # tree-sitter 추출 결과
+    extern_region: Dict  # {"code": str, "line_ranges": [...], "elements": {...}}
+    parsed_functions: List[Dict]  # [{"name": str, "line_start": int, "line_end": int}]
+    
     # SQL Agent 결과 (MyBatis XML)
     mybatis_xmls: List[Dict]  # [{sql_id, original, converted, confidence}]
     
@@ -298,10 +302,32 @@ def parser_classify_node(state: ParserPipelineState) -> Dict[str, Any]:
     summary = {k: len(v) for k, v in metadata.items()}
     workspace.save_data("metadata_summary", summary, from_agent="Parser")
     
+    # tree-sitter로 extern 영역과 함수 추출
+    extern_region = {}
+    parsed_functions = []
+    
+    try:
+        from parsing.sql.tree_sitter_extractor import get_tree_sitter_extractor
+        extractor = get_tree_sitter_extractor()
+        
+        if extractor:
+            source_code = state.get("source_code", "")
+            extern_region = extractor.get_extern_region(source_code)
+            parsed_functions = extractor.get_functions(source_code)
+            
+            workspace.save_data("extern_region", extern_region, from_agent="Parser")
+            workspace.save_data("parsed_functions", parsed_functions, from_agent="Parser")
+            
+            logger.info(f"🌳 [tree-sitter] extern: {len(extern_region.get('elements', {}))} elements, functions: {len(parsed_functions)}")
+    except Exception as e:
+        logger.warning(f"tree-sitter 추출 실패: {e}")
+    
     logger.info(f"📝 [Parser] 분류 완료: {summary}")
     
     return {
         "metadata": metadata,
+        "extern_region": extern_region,
+        "parsed_functions": parsed_functions,
         "current_node": "parser_classify",
         "messages": [{
             "from": "Parser",
@@ -310,6 +336,480 @@ def parser_classify_node(state: ParserPipelineState) -> Dict[str, Any]:
             "content": f"Classified: {summary}"
         }]
     }
+
+
+# ============================================================
+# Parser Critic Agent (asyncio 병렬 검증)
+# ============================================================
+
+def parser_critic_node(state: ParserPipelineState) -> Dict[str, Any]:
+    """
+    Parser Critic Agent: 파싱 결과 검증 (ThreadPool 병렬 처리)
+    
+    - 미분석 검증: 추출 안 된 요소 탐지
+    - 오분석 검증: 잘못 추출된 결과 탐지
+    - 타입 오분류 시 재분류 요청
+    """
+    logger.info("🔍 [Parser Critic] 파싱 결과 검증 시작")
+    
+    workspace = AgentWorkspace(state["workspace_path"])
+    source_code = state.get("source_code", "")
+    metadata = state.get("metadata", {})
+    
+    # State에서 tree-sitter 추출 결과 사용
+    extern_region = state.get("extern_region", {})
+    parsed_functions = state.get("parsed_functions", [])
+    
+    if not source_code or not metadata:
+        logger.warning("🔍 [Parser Critic] 검증할 데이터 없음")
+        return {
+            "current_node": "parser_critic",
+            "messages": [{
+                "from": "Parser Critic",
+                "to": "SQL Agent",
+                "type": "data",
+                "content": "No data to validate"
+            }]
+        }
+    
+    # 1. 청킹: State의 extern_region, parsed_functions 활용
+    chunks = _split_by_scope_from_state(source_code, metadata, extern_region, parsed_functions)
+    logger.info(f"🔍 [Parser Critic] {len(chunks)}개 청크로 분할")
+    
+    # 2. ThreadPool 병렬 검증
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    max_workers = 1
+    results = _validate_all_chunks_threaded(chunks, workspace, max_workers)
+    
+    # 3. 결과 집계
+    all_missing = []
+    all_wrong = []
+    all_reclassifications = []
+    
+    for result in results:
+        all_missing.extend(result.get("missing_issues", []))
+        all_wrong.extend(result.get("wrong_issues", []))
+        all_reclassifications.extend(result.get("reclassifications", []))
+    
+    # 4. 검증 결과 저장
+    validation_result = {
+        "total_chunks": len(chunks),
+        "missing_count": len(all_missing),
+        "wrong_count": len(all_wrong),
+        "reclassification_count": len(all_reclassifications),
+        "missing_issues": all_missing,
+        "wrong_issues": all_wrong,
+        "reclassifications": all_reclassifications
+    }
+    
+    workspace.save_data("parser_critic_result", validation_result, from_agent="Parser Critic")
+    
+    # 5. 타입 재분류 처리
+    if all_reclassifications:
+        updated_metadata = _handle_reclassifications(metadata, all_reclassifications)
+        workspace.save_data("metadata_reclassified", updated_metadata, from_agent="Parser Critic")
+        metadata = updated_metadata
+    
+    logger.info(f"🔍 [Parser Critic] 검증 완료: 미분석 {len(all_missing)}, 오분석 {len(all_wrong)}, 재분류 {len(all_reclassifications)}")
+    
+    return {
+        "metadata": metadata,
+        "current_node": "parser_critic",
+        "messages": [{
+            "from": "Parser Critic",
+            "to": "SQL Agent",
+            "type": "validation",
+            "content": f"Missing: {len(all_missing)}, Wrong: {len(all_wrong)}, Reclassified: {len(all_reclassifications)}"
+        }]
+    }
+
+
+def _split_by_scope_from_state(
+    source_code: str, 
+    metadata: Dict, 
+    extern_region: Dict, 
+    parsed_functions: List[Dict]
+) -> List[Dict]:
+    """
+    State에서 미리 추출된 extern_region, parsed_functions를 활용한 청킹
+    
+    Args:
+        source_code: 원본 소스 코드
+        metadata: 분류된 메타데이터
+        extern_region: tree-sitter로 추출된 extern 영역 (parser_classify_node에서)
+        parsed_functions: tree-sitter로 추출된 함수 목록
+    
+    Returns:
+        [{"scope": "extern"|"function_xxx", "code": "...", "elements": [...]}]
+    """
+    chunks = []
+    
+    # State에서 이미 추출된 데이터가 있으면 사용
+    if extern_region.get("code") or parsed_functions:
+        # extern 청크
+        if extern_region.get("code"):
+            extern_elements = extern_region.get("elements", {})
+            all_extern_elements = []
+            for category, items in extern_elements.items():
+                if isinstance(items, list):
+                    for item in items:
+                        all_extern_elements.append({**item, "category": category})
+            
+            chunks.append({
+                "scope": "extern",
+                "code": extern_region["code"],
+                "elements": all_extern_elements,
+                "line_ranges": extern_region.get("line_ranges", [])
+            })
+        
+        # 함수별 청크
+        lines = source_code.split("\n")
+        for func in parsed_functions:
+            start_idx = max(0, func["line_start"] - 1)
+            end_idx = min(len(lines), func["line_end"])
+            func_code = "\n".join(lines[start_idx:end_idx])
+            func_elements = _get_elements_in_range(metadata, func["line_start"], func["line_end"])
+            
+            chunks.append({
+                "scope": f"function_{func['name']}",
+                "code": func_code,
+                "elements": func_elements,
+                "line_range": (func["line_start"], func["line_end"])
+            })
+        
+        logger.info(f"📦 [State] extern + {len(parsed_functions)}개 함수로 분할 (캐시 사용)")
+        return chunks
+    
+    # State에 데이터가 없으면 fallback (tree-sitter 직접 호출)
+    return _split_by_scope(source_code, metadata)
+
+
+def _split_by_scope(source_code: str, metadata: Dict) -> List[Dict]:
+    """
+    소스 코드를 extern 영역과 함수 단위로 분할 (tree-sitter 사용)
+    
+    Returns:
+        [{"scope": "extern"|"function_xxx", "code": "...", "elements": [...]}]
+    """
+    chunks = []
+    
+    # tree-sitter 사용 시도
+    try:
+        from parsing.sql.tree_sitter_extractor import get_tree_sitter_extractor
+        extractor = get_tree_sitter_extractor()
+        
+        if extractor:
+            # tree-sitter로 정확한 extern 영역 추출
+            extern_data = extractor.get_extern_region(source_code)
+            functions = extractor.get_functions(source_code)
+            
+            # extern 청크
+            if extern_data.get("code"):
+                extern_elements = extern_data.get("elements", {})
+                all_extern_elements = []
+                for category, items in extern_elements.items():
+                    for item in items:
+                        all_extern_elements.append({**item, "category": category})
+                
+                chunks.append({
+                    "scope": "extern",
+                    "code": extern_data["code"],
+                    "elements": all_extern_elements,
+                    "line_ranges": extern_data.get("line_ranges", [])
+                })
+            
+            # 함수별 청크
+            lines = source_code.split("\n")
+            for func in functions:
+                start_idx = max(0, func["line_start"] - 1)
+                end_idx = min(len(lines), func["line_end"])
+                func_code = "\n".join(lines[start_idx:end_idx])
+                func_elements = _get_elements_in_range(metadata, func["line_start"], func["line_end"])
+                
+                chunks.append({
+                    "scope": f"function_{func['name']}",
+                    "code": func_code,
+                    "elements": func_elements,
+                    "line_range": (func["line_start"], func["line_end"])
+                })
+            
+            logger.info(f"🌳 [tree-sitter] extern + {len(functions)}개 함수로 분할")
+            return chunks
+    
+    except Exception as e:
+        logger.warning(f"tree-sitter 분할 실패, 폴백 사용: {e}")
+    
+    # 폴백: metadata 기반 분할
+    return _split_by_scope_fallback(source_code, metadata)
+
+
+def _split_by_scope_fallback(source_code: str, metadata: Dict) -> List[Dict]:
+    """tree-sitter 없을 때 폴백 분할"""
+    chunks = []
+    functions = metadata.get("functions", [])
+    lines = source_code.split("\n")
+    
+    # 함수 위치 수집
+    func_ranges = []
+    covered_lines = set()
+    
+    for func in functions:
+        start = func.get("line_start", 0)
+        end = func.get("line_end", start + 50)
+        func_ranges.append({"name": func.get("name", "unknown"), "start": start, "end": end})
+        for i in range(start - 1, min(end, len(lines))):
+            covered_lines.add(i)
+    
+    # extern 영역
+    extern_lines = [(i + 1, line) for i, line in enumerate(lines) if i not in covered_lines]
+    
+    if extern_lines:
+        extern_code = "\n".join([line for _, line in extern_lines])
+        extern_elements = _get_elements_in_range(metadata, 0, max(i for i, _ in extern_lines) + 1)
+        chunks.append({
+            "scope": "extern",
+            "code": extern_code,
+            "elements": extern_elements,
+            "line_range": (1, max(i for i, _ in extern_lines) + 1)
+        })
+    
+    # 함수별 청크
+    for fr in func_ranges:
+        start_idx = max(0, fr["start"] - 1)
+        end_idx = min(len(lines), fr["end"])
+        func_code = "\n".join(lines[start_idx:end_idx])
+        func_elements = _get_elements_in_range(metadata, fr["start"], fr["end"])
+        
+        chunks.append({
+            "scope": f"function_{fr['name']}",
+            "code": func_code,
+            "elements": func_elements,
+            "line_range": (fr["start"], fr["end"])
+        })
+    
+    return chunks
+
+
+def _get_elements_in_range(metadata: Dict, start: int, end: int) -> List[Dict]:
+    """특정 라인 범위 내의 요소들 수집"""
+    elements = []
+    
+    for category, items in metadata.items():
+        if isinstance(items, list):
+            for item in items:
+                item_start = item.get("line_start", 0)
+                item_end = item.get("line_end", item_start)
+                if start <= item_start <= end or start <= item_end <= end:
+                    elements.append({**item, "category": category})
+    
+    return elements
+
+
+def _validate_all_chunks_threaded(chunks: List[Dict], workspace: 'AgentWorkspace', max_workers: int = 3) -> List[Dict]:
+    """모든 청크 병렬 검증 (ThreadPoolExecutor)"""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    results = []
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_chunk = {
+            executor.submit(_validate_chunk_sync, chunk, workspace): chunk
+            for chunk in chunks
+        }
+        
+        for future in as_completed(future_to_chunk):
+            chunk = future_to_chunk[future]
+            try:
+                result = future.result()
+                results.append(result)
+            except Exception as e:
+                logger.error(f"청크 {chunk['scope']} 검증 실패: {e}")
+                results.append({
+                    "chunk_id": chunk["scope"],
+                    "missing_issues": [],
+                    "wrong_issues": [],
+                    "reclassifications": [],
+                    "error": str(e)
+                })
+    
+    return results
+
+
+def _validate_chunk_sync(chunk: Dict, workspace: 'AgentWorkspace') -> Dict:
+    """단일 청크 동기 검증 (requests 사용)"""
+    import requests
+    import os
+    import json
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    
+    endpoint = os.getenv("LLM_API_ENDPOINT")
+    api_key = os.getenv("LLM_API_KEY")
+    model = os.getenv("LLM_MODEL", "gpt-4")
+    temperature = float(os.getenv("LLM_TEMPERATURE", "0.7"))
+    
+    if not endpoint or not api_key:
+        # LLM 설정 없으면 룰 기반 폴백
+        return _rule_based_parser_validation(chunk)
+    
+    result = {
+        "chunk_id": chunk["scope"],
+        "missing_issues": [],
+        "wrong_issues": [],
+        "reclassifications": []
+    }
+    
+    # 1. 오분석 검증 (추출된 요소가 있는 경우만)
+    if chunk.get("elements"):
+        wrong_prompt = _load_parser_critic_prompt("wrong")
+        wrong_prompt = wrong_prompt.replace("{chunk_code}", chunk["code"][:3000])
+        wrong_prompt = wrong_prompt.replace("{extracted_json}", json.dumps(chunk["elements"][:20], ensure_ascii=False, indent=2))
+        
+        try:
+            wrong_result = _call_llm_sync(endpoint, api_key, model, temperature, wrong_prompt)
+            if wrong_result:
+                result["wrong_issues"] = wrong_result.get("issues", [])
+                result["reclassifications"] = wrong_result.get("reclassifications", [])
+        except Exception as e:
+            logger.warning(f"오분석 검증 실패: {e}")
+    
+    return result
+
+
+def _call_llm_sync(endpoint: str, api_key: str, model: str, temperature: float, prompt: str) -> Dict:
+    """동기 LLM 호출 (requests)"""
+    import requests
+    import json
+    import re
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": temperature
+    }
+    
+    response = requests.post(
+        f"{endpoint}/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=120
+    )
+    response.raise_for_status()
+    result = response.json()
+    
+    content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    
+    # JSON 파싱
+    try:
+        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
+        if json_match:
+            content = json_match.group(1)
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {}
+
+
+def _load_parser_critic_prompt(prompt_type: str) -> str:
+    """Parser Critic MD 파일에서 프롬프트 로드"""
+    import re
+    
+    md_path = LANGCHAIN_DIR / "subagents" / "definitions" / "parser_critic_agent.md"
+    
+    if not md_path.exists():
+        # 폴백 프롬프트
+        if prompt_type == "missing":
+            return "분석되지 않은 코드를 확인하세요.\n{remaining_code}"
+        else:
+            return "추출 결과를 검증하세요.\n원본:\n{chunk_code}\n추출:\n{extracted_json}"
+    
+    content = md_path.read_text(encoding="utf-8")
+    
+    # 해당 타입의 System Prompt 추출
+    if prompt_type == "missing":
+        pattern = r'## System Prompt - 미분석 검증\s+```\n?([\s\S]*?)```'
+    else:  # wrong
+        pattern = r'## System Prompt - 오분석 검증\s+```\n?([\s\S]*?)```'
+    
+    match = re.search(pattern, content)
+    if match:
+        return match.group(1).strip()
+    
+    return ""
+
+
+def _rule_based_parser_validation(chunk: Dict) -> Dict:
+    """룰 기반 파서 검증 (폴백)"""
+    import re
+    
+    result = {
+        "chunk_id": chunk["scope"],
+        "missing_issues": [],
+        "wrong_issues": [],
+        "reclassifications": []
+    }
+    
+    code = chunk.get("code", "")
+    elements = chunk.get("elements", [])
+    
+    # 간단한 미분석 체크: EXEC SQL이 추출되지 않은 경우
+    exec_sql_count = len(re.findall(r'EXEC\s+SQL', code, re.IGNORECASE))
+    sql_elements = [e for e in elements if e.get("category") == "sql_blocks"]
+    
+    if exec_sql_count > len(sql_elements):
+        result["missing_issues"].append({
+            "type": "SQL",
+            "content": f"EXEC SQL {exec_sql_count}개 중 {len(sql_elements)}개만 추출됨",
+            "line": 0
+        })
+    
+    return result
+
+
+def _handle_reclassifications(metadata: Dict, reclassifications: List[Dict]) -> Dict:
+    """타입 재분류 처리"""
+    updated = {k: list(v) for k, v in metadata.items() if isinstance(v, list)}
+    
+    for reclass in reclassifications:
+        element_id = reclass.get("element_id")
+        from_type = reclass.get("from_type", "").lower()
+        to_type = reclass.get("to_type", "").lower()
+        
+        # 타입 매핑
+        type_to_key = {
+            "sql": "sql_blocks",
+            "variable": "host_vars",
+            "function": "functions",
+            "macro": "macros",
+            "struct": "structs"
+        }
+        
+        from_key = type_to_key.get(from_type)
+        to_key = type_to_key.get(to_type)
+        
+        if not from_key or not to_key:
+            continue
+        
+        # 해당 요소 찾기 및 이동
+        from_list = updated.get(from_key, [])
+        to_list = updated.get(to_key, [])
+        
+        for i, elem in enumerate(from_list):
+            if elem.get("sql_id") == element_id or elem.get("name") == element_id:
+                moved_elem = from_list.pop(i)
+                moved_elem["reclassified_from"] = from_type
+                to_list.append(moved_elem)
+                logger.info(f"🔄 재분류: {element_id} ({from_type} → {to_type})")
+                break
+    return updated
 
 
 def sql_convert_node(state: ParserPipelineState) -> Dict[str, Any]:
@@ -1148,6 +1648,7 @@ def build_parser_pipeline() -> StateGraph:
     workflow.add_node("orch_delegate", orchestrator_delegate_node)
     workflow.add_node("parser_parse", parser_parse_node)
     workflow.add_node("parser_classify", parser_classify_node)
+    workflow.add_node("parser_critic", parser_critic_node)  # Parser Critic 추가
     workflow.add_node("sql_convert", sql_convert_node)
     workflow.add_node("critic_validate", critic_validate_node)
     workflow.add_node("fixer", fixer_node)  # Fixer Agent 추가
@@ -1158,7 +1659,8 @@ def build_parser_pipeline() -> StateGraph:
     workflow.add_edge("orch_receive", "orch_delegate")
     workflow.add_edge("orch_delegate", "parser_parse")
     workflow.add_edge("parser_parse", "parser_classify")
-    workflow.add_edge("parser_classify", "sql_convert")
+    workflow.add_edge("parser_classify", "parser_critic")  # Parser Critic 경유
+    workflow.add_edge("parser_critic", "sql_convert")  # Critic 후 SQL 변환
     workflow.add_edge("sql_convert", "critic_validate")
     
     # 조건부 엣지: 검증 결과에 따라 분기

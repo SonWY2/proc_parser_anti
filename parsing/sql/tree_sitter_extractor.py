@@ -530,6 +530,141 @@ class TreeSitterSQLExtractor:
         
         return functions
     
+    def get_extern_region(self, source_code: str) -> dict:
+        """소스 코드에서 extern 영역 추출 (함수 외부 코드)
+        
+        tree-sitter로 함수 정의 영역을 파악하고, 그 외의 영역을
+        extern 영역으로 추출합니다.
+        
+        Args:
+            source_code: Pro*C 소스 코드
+        
+        Returns:
+            {
+                "code": extern 영역 코드,
+                "line_ranges": [(start, end), ...],
+                "elements": {
+                    "includes": [...],
+                    "macros": [...],
+                    "globals": [...],  # 전역 변수
+                    "typedefs": [...],
+                    "structs": [...],
+                    "prototypes": [...]  # 함수 프로토타입
+                }
+            }
+        """
+        source_bytes = source_code.encode('utf8')
+        tree = self.parser.parse(source_bytes)
+        lines = source_code.split('\n')
+        
+        # 1. 함수 정의 영역 수집
+        functions = self.get_functions(source_code)
+        func_lines = set()
+        for func in functions:
+            for line in range(func['line_start'] - 1, func['line_end']):
+                func_lines.add(line)
+        
+        # 2. extern 영역 라인 수집
+        extern_lines = []
+        extern_ranges = []
+        range_start = None
+        
+        for i, line in enumerate(lines):
+            if i not in func_lines:
+                extern_lines.append(line)
+                if range_start is None:
+                    range_start = i + 1
+            else:
+                if range_start is not None:
+                    extern_ranges.append((range_start, i))
+                    range_start = None
+        
+        if range_start is not None:
+            extern_ranges.append((range_start, len(lines)))
+        
+        extern_code = '\n'.join(extern_lines)
+        
+        # 3. extern 영역 내 요소 추출
+        elements = self._extract_extern_elements(tree.root_node, source_bytes, func_lines)
+        
+        return {
+            "code": extern_code,
+            "line_ranges": extern_ranges,
+            "elements": elements
+        }
+    
+    def _extract_extern_elements(self, root_node, source_bytes: bytes, func_lines: set) -> dict:
+        """extern 영역 내의 요소들 추출"""
+        elements = {
+            "includes": [],
+            "macros": [],
+            "globals": [],
+            "typedefs": [],
+            "structs": [],
+            "prototypes": []
+        }
+        
+        for child in root_node.children:
+            line_num = child.start_point.row
+            
+            # 함수 내부면 스킵
+            if line_num in func_lines:
+                continue
+            
+            if child.type == 'preproc_include':
+                elements["includes"].append({
+                    "type": "include",
+                    "text": child.text.decode('utf8'),
+                    "line_start": line_num + 1,
+                    "line_end": child.end_point.row + 1
+                })
+            
+            elif child.type == 'preproc_def':
+                elements["macros"].append({
+                    "type": "macro",
+                    "text": child.text.decode('utf8'),
+                    "line_start": line_num + 1,
+                    "line_end": child.end_point.row + 1
+                })
+            
+            elif child.type == 'type_definition':
+                elements["typedefs"].append({
+                    "type": "typedef",
+                    "text": child.text.decode('utf8'),
+                    "line_start": line_num + 1,
+                    "line_end": child.end_point.row + 1
+                })
+            
+            elif child.type == 'struct_specifier':
+                elements["structs"].append({
+                    "type": "struct",
+                    "text": child.text.decode('utf8')[:200],
+                    "line_start": line_num + 1,
+                    "line_end": child.end_point.row + 1
+                })
+            
+            elif child.type == 'declaration':
+                # 전역 변수 또는 함수 프로토타입 구분
+                text = child.text.decode('utf8')
+                
+                # 함수 프로토타입: 세미콜론으로 끝나고 괄호가 있음
+                if '(' in text and text.rstrip().endswith(';'):
+                    elements["prototypes"].append({
+                        "type": "prototype",
+                        "text": text,
+                        "line_start": line_num + 1,
+                        "line_end": child.end_point.row + 1
+                    })
+                else:
+                    elements["globals"].append({
+                        "type": "global",
+                        "text": text,
+                        "line_start": line_num + 1,
+                        "line_end": child.end_point.row + 1
+                    })
+        
+        return elements
+    
     def _find_functions(
         self, 
         node, 
