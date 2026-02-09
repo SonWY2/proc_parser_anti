@@ -188,3 +188,91 @@ class SubagentLoader:
     def reload(self) -> Dict[str, SubagentConfig]:
         """Subagent 설정 다시 로드"""
         return self.load_all()
+    
+    def get_prompt(self, agent_name: str) -> str:
+        """
+        에이전트의 전체 시스템 프롬프트 반환
+        
+        Args:
+            agent_name: 에이전트 이름 (확장자 제외)
+            
+        Returns:
+            시스템 프롬프트 문자열
+            
+        Raises:
+            FileNotFoundError: MD 파일이 없는 경우
+        """
+        md_path = self.agents_dir / f"{agent_name}.md"
+        if not md_path.exists():
+            raise FileNotFoundError(f"Agent MD 파일을 찾을 수 없습니다: {md_path}")
+        
+        config = self.load_one(md_path)
+        return config.system_prompt if config else ""
+    
+    def get_prompt_section(
+        self, 
+        agent_name: str, 
+        section_name: str,
+        fallback: str = ""
+    ) -> str:
+        """
+        에이전트 MD 파일에서 특정 섹션의 프롬프트 추출
+        
+        ## System Prompt - {section_name} 형식의 섹션에서
+        ``` ``` 코드 블록 내용을 추출합니다.
+        
+        Args:
+            agent_name: 에이전트 이름 (확장자 제외)
+            section_name: 섹션 이름 (예: "미분석 검증", "오분석 검증")
+            fallback: 섹션을 찾지 못한 경우 반환할 값
+            
+        Returns:
+            섹션의 프롬프트 내용
+            
+        Example:
+            loader = SubagentLoader()
+            prompt = loader.get_prompt_section(
+                "parser_critic_agent", 
+                "미분석 검증"
+            )
+        """
+        md_path = self.agents_dir / f"{agent_name}.md"
+        if not md_path.exists():
+            logger.warning(f"Agent MD 파일 없음: {md_path}")
+            return fallback
+        
+        content = md_path.read_text(encoding="utf-8")
+        
+        # 섹션 패턴: ## System Prompt - {section_name} 다음의 코드 블록
+        pattern = rf'## System Prompt\s*-\s*{re.escape(section_name)}\s+```\n?([\s\S]*?)```'
+        match = re.search(pattern, content)
+        
+        if match:
+            prompt = match.group(1).strip()
+            logger.debug(f"섹션 프롬프트 추출: {agent_name}/{section_name} ({len(prompt)} chars)")
+            return prompt
+        
+        # 폴백: ## {section_name} 형식으로도 시도
+        fallback_pattern = rf'## {re.escape(section_name)}\s+```\n?([\s\S]*?)```'
+        fallback_match = re.search(fallback_pattern, content)
+        
+        if fallback_match:
+            prompt = fallback_match.group(1).strip()
+            logger.debug(f"섹션 프롬프트 추출 (폴백): {agent_name}/{section_name} ({len(prompt)} chars)")
+            return prompt
+        
+        logger.warning(f"섹션을 찾을 수 없음: {agent_name}/{section_name}")
+        return fallback
+
+
+# 싱글톤 인스턴스
+_default_loader: Optional[SubagentLoader] = None
+
+
+def get_subagent_loader(agents_dir: Optional[Path] = None) -> SubagentLoader:
+    """기본 SubagentLoader 인스턴스 반환"""
+    global _default_loader
+    if _default_loader is None or agents_dir is not None:
+        _default_loader = SubagentLoader(agents_dir)
+    return _default_loader
+

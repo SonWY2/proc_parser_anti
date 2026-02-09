@@ -1,0 +1,1 @@
+python -m infra.agents.langchain.pipelines.parsing_pipeline --debug

@@ -33,10 +33,72 @@ from workspace import AgentWorkspace
 # 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    format="%(asctime)s [%(levelname)s] %(funcName)s - %(message)s",
     datefmt="%H:%M:%S"
 )
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# 상수 정의 (Magic Numbers 제거)
+# ============================================================
+
+class Config:
+    """파이프라인 설정 상수"""
+    
+    # 타임아웃 (초)
+    LLM_REQUEST_TIMEOUT = 360       # LLM API 요청 타임아웃
+    THREADPOOL_TOTAL_TIMEOUT = 400  # ThreadPool 전체 작업 타임아웃
+    FUTURE_RESULT_TIMEOUT = 10      # 개별 Future 결과 대기 타임아웃
+    
+    # 배치 처리 (청킹용 - 반복 처리를 위한 단위)
+    BATCH_SIZE_ELEMENTS = 20        # 요소 배치 크기 (반복 처리)
+    BATCH_SIZE_CODE_CHARS = 3000    # 코드 배치 크기 (chars, 반복 처리)
+    
+    # 로깅/표시 전용 (데이터 손실 없음)
+    LOG_PREVIEW_LENGTH = 200        # 로그 출력 미리보기 길이
+    PROMPT_PREVIEW_LENGTH = 100     # 프롬프트 미리보기 길이
+    MESSAGE_PREVIEW_LENGTH = 50     # 메시지 미리보기 길이
+    
+    # 기본값
+    DEFAULT_FUNC_LINE_RANGE = 50    # 함수 라인 범위 기본값
+    DEFAULT_CONFIDENCE_BOOST = 0.75 # Fixer 후 신뢰도 향상값
+    
+    # 병렬 처리
+    MAX_WORKERS = 3                 # ThreadPoolExecutor 워커 수
+    
+    # 출력 포맷
+    SEPARATOR_WIDTH = 60            # 구분선 너비
+
+
+# ============================================================
+# 유틸리티: 청킹 함수
+# ============================================================
+
+def chunk_list(items: list, batch_size: int):
+    """리스트를 배치 크기로 분할 (제너레이터)"""
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
+
+
+def chunk_text(text: str, batch_size: int):
+    """텍스트를 배치 크기로 분할 (줄 단위 유지)"""
+    lines = text.split('\n')
+    current_chunk = []
+    current_size = 0
+    
+    for line in lines:
+        line_size = len(line) + 1  # +1 for newline
+        if current_size + line_size > batch_size and current_chunk:
+            yield '\n'.join(current_chunk)
+            current_chunk = [line]
+            current_size = line_size
+        else:
+            current_chunk.append(line)
+            current_size += line_size
+    
+    if current_chunk:
+        yield '\n'.join(current_chunk)
 
 
 # ============================================================
@@ -556,7 +618,7 @@ def _split_by_scope_fallback(source_code: str, metadata: Dict) -> List[Dict]:
     
     for func in functions:
         start = func.get("line_start", 0)
-        end = func.get("line_end", start + 50)
+        end = func.get("line_end", start + Config.DEFAULT_FUNC_LINE_RANGE)  # 기본 라인 범위
         func_ranges.append({"name": func.get("name", "unknown"), "start": start, "end": end})
         for i in range(start - 1, min(end, len(lines))):
             covered_lines.add(i)
@@ -608,36 +670,66 @@ def _get_elements_in_range(metadata: Dict, start: int, end: int) -> List[Dict]:
 
 def _validate_all_chunks_threaded(chunks: List[Dict], workspace: 'AgentWorkspace', max_workers: int = 3) -> List[Dict]:
     """모든 청크 병렬 검증 (ThreadPoolExecutor)"""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
+    import signal
     
     results = []
+    cancelled = False
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_chunk = {
-            executor.submit(_validate_chunk_sync, chunk, workspace): chunk
-            for chunk in chunks
-        }
-        
-        for future in as_completed(future_to_chunk):
-            chunk = future_to_chunk[future]
-            try:
-                result = future.result()
-                results.append(result)
-            except Exception as e:
-                logger.error(f"청크 {chunk['scope']} 검증 실패: {e}")
-                results.append({
-                    "chunk_id": chunk["scope"],
-                    "missing_issues": [],
-                    "wrong_issues": [],
-                    "reclassifications": [],
-                    "error": str(e)
-                })
+    def signal_handler(signum, frame):
+        nonlocal cancelled
+        cancelled = True
+        logger.warning("⚠️ Ctrl+C 감지, 작업 취소 중...")
+        raise KeyboardInterrupt()
+    
+    # Windows에서는 SIGINT만 지원
+    original_handler = signal.signal(signal.SIGINT, signal_handler)
+    
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_chunk = {
+                executor.submit(_validate_chunk_sync, chunk, workspace): chunk
+                for chunk in chunks
+            }
+            
+            for future in as_completed(future_to_chunk, timeout=Config.THREADPOOL_TOTAL_TIMEOUT):
+                if cancelled:
+                    break
+                    
+                chunk = future_to_chunk[future]
+                try:
+                    result = future.result(timeout=Config.FUTURE_RESULT_TIMEOUT)
+                    results.append(result)
+                except FuturesTimeoutError:
+                    logger.warning(f"⏰ 청크 {chunk['scope']} 결과 대기 타임아웃")
+                    results.append({
+                        "chunk_id": chunk["scope"],
+                        "missing_issues": [],
+                        "wrong_issues": [],
+                        "reclassifications": [],
+                        "error": "timeout"
+                    })
+                except Exception as e:
+                    logger.error(f"청크 {chunk['scope']} 검증 실패: {e}")
+                    results.append({
+                        "chunk_id": chunk["scope"],
+                        "missing_issues": [],
+                        "wrong_issues": [],
+                        "reclassifications": [],
+                        "error": str(e)
+                    })
+    except KeyboardInterrupt:
+        logger.warning("🛑 사용자가 작업을 취소했습니다")
+    except FuturesTimeoutError:
+        logger.error("⏰ 전체 작업 타임아웃")
+    finally:
+        signal.signal(signal.SIGINT, original_handler)
     
     return results
 
 
 def _validate_chunk_sync(chunk: Dict, workspace: 'AgentWorkspace') -> Dict:
-    """단일 청크 동기 검증 (requests 사용)"""
+    """단일 청크 동기 검증 (requests 사용) - 배치 반복 처리"""
     import requests
     import os
     import json
@@ -661,20 +753,37 @@ def _validate_chunk_sync(chunk: Dict, workspace: 'AgentWorkspace') -> Dict:
         "reclassifications": []
     }
     
-    # 1. 오분석 검증 (추출된 요소가 있는 경우만)
-    if chunk.get("elements"):
+    # 오분석 검증 (추출된 요소가 있는 경우만)
+    elements = chunk.get("elements", [])
+    if not elements:
+        return result
+    
+    # 전체 코드는 그대로 전달 (함수 단위 청킹은 이미 되어 있음)
+    code = chunk.get("code", "")
+    
+    # 요소가 많으면 배치 단위로 반복 처리
+    all_wrong_issues = []
+    all_reclassifications = []
+    
+    for batch_idx, element_batch in enumerate(chunk_list(elements, Config.BATCH_SIZE_ELEMENTS)):
+        logger.info(f"📦 [{chunk['scope']}] 요소 배치 {batch_idx + 1} 검증 ({len(element_batch)}개)")
+        
         wrong_prompt = _load_parser_critic_prompt("wrong")
-        wrong_prompt = wrong_prompt.replace("{chunk_code}", chunk["code"][:3000])
-        wrong_prompt = wrong_prompt.replace("{extracted_json}", json.dumps(chunk["elements"][:20], ensure_ascii=False, indent=2))
+        wrong_prompt = wrong_prompt.replace("{chunk_code}", code)
+        wrong_prompt = wrong_prompt.replace("{extracted_json}", json.dumps(element_batch, ensure_ascii=False, indent=2))
         
         try:
             wrong_result = _call_llm_sync(endpoint, api_key, model, temperature, wrong_prompt)
             if wrong_result:
-                result["wrong_issues"] = wrong_result.get("issues", [])
-                result["reclassifications"] = wrong_result.get("reclassifications", [])
+                all_wrong_issues.extend(wrong_result.get("issues", []))
+                all_reclassifications.extend(wrong_result.get("reclassifications", []))
         except Exception as e:
-            logger.warning(f"오분석 검증 실패: {e}")
+            logger.warning(f"오분석 검증 실패 (배치 {batch_idx + 1}): {e}")
     
+    result["wrong_issues"] = all_wrong_issues
+    result["reclassifications"] = all_reclassifications
+    
+    logger.info(f"✅ [{chunk['scope']}] 총 {len(elements)}개 요소 검증 완료")
     return result
 
 
@@ -683,6 +792,7 @@ def _call_llm_sync(endpoint: str, api_key: str, model: str, temperature: float, 
     import requests
     import json
     import re
+    import time
     
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -697,16 +807,33 @@ def _call_llm_sync(endpoint: str, api_key: str, model: str, temperature: float, 
         "temperature": temperature
     }
     
-    response = requests.post(
-        f"{endpoint}/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=120
-    )
-    response.raise_for_status()
-    result = response.json()
+    prompt_preview = prompt[:Config.PROMPT_PREVIEW_LENGTH].replace('\n', ' ')
+    logger.info(f"🌐 LLM 요청 시작 (모델: {model}, 프롬프트: {len(prompt)} chars) - {prompt_preview}...")
+    
+    start_time = time.time()
+    try:
+        response = requests.post(
+            f"{endpoint}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=Config.LLM_REQUEST_TIMEOUT
+        )
+        elapsed = time.time() - start_time
+        logger.info(f"✅ LLM 응답 수신 ({elapsed:.1f}초, 상태: {response.status_code})")
+        
+        response.raise_for_status()
+        result = response.json()
+    except requests.exceptions.Timeout:
+        elapsed = time.time() - start_time
+        logger.error(f"⏰ LLM 타임아웃 ({elapsed:.1f}초 경과)")
+        raise
+    except requests.exceptions.RequestException as e:
+        elapsed = time.time() - start_time
+        logger.error(f"❌ LLM 요청 실패 ({elapsed:.1f}초): {e}")
+        raise
     
     content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    logger.info(f"📝 LLM 응답 길이: {len(content)} chars")
     
     # JSON 파싱
     try:
@@ -715,6 +842,7 @@ def _call_llm_sync(endpoint: str, api_key: str, model: str, temperature: float, 
             content = json_match.group(1)
         return json.loads(content)
     except json.JSONDecodeError:
+        logger.warning(f"⚠️ JSON 파싱 실패, 원본: {content[:Config.LOG_PREVIEW_LENGTH]}...")
         return {}
 
 
@@ -1277,12 +1405,13 @@ def _call_llm_critic(mybatis_xmls: List[Dict], workspace: 'AgentWorkspace') -> D
         raise ValueError("LLM_API_ENDPOINT 또는 LLM_API_KEY가 설정되지 않았습니다.")
     
     # 검토 대상 준비 (변환 성공한 SQL만, DECLARE SECTION 제외)
+    # SQL 절단 없이 전체 내용 포함 (검증 정확도를 위해)
     all_candidates = [
         {
             "sql_id": m.get("sql_id"),
             "sql_type": m.get("sql_type"),
-            "original": m.get("original", "")[:500],  # 개별 SQL 길이 제한
-            "converted": m.get("converted", "")[:500]
+            "original": m.get("original", ""),  # 전체 SQL 포함
+            "converted": m.get("converted", "")  # 전체 변환 결과 포함
         }
         for m in mybatis_xmls
         if m.get("success") and m.get("converted")
@@ -1293,64 +1422,78 @@ def _call_llm_critic(mybatis_xmls: List[Dict], workspace: 'AgentWorkspace') -> D
     if not all_candidates:
         return {"passed": True, "issues": [], "summary": "검토 대상 SQL 없음"}
     
-    # 토큰 제한 적용 (5K 토큰 = 약 20K 문자)
-    MAX_TOKENS = 5000
-    review_targets, total_tokens = _limit_by_tokens(all_candidates, MAX_TOKENS)
+    # 배치 단위로 나눠서 처리 (SQL Critic도 모든 SQL을 반드시 검토)
+    all_issues = []
+    batch_size = Config.BATCH_SIZE_ELEMENTS
     
-    if len(review_targets) < len(all_candidates):
-        logger.info(f"🔍 [SQL Critic] 토큰 제한으로 {len(all_candidates)}개 중 {len(review_targets)}개만 검토 ({total_tokens} tokens)")
-    
-    # MD 파일에서 System Prompt 로드
-    system_prompt = _load_agent_prompt("sql_critic_agent")
-    
-    # {mybatis_xmls} 플레이스홀더 대체
-    user_prompt = json.dumps(review_targets, ensure_ascii=False, indent=2)
-
-    # HTTP 요청으로 LLM 호출
-    import requests
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "temperature": temperature
-    }
-    
-    logger.info(f"🔍 [SQL Critic] LLM 호출: {model} ({len(review_targets)}개 SQL)")
-    
-    response = requests.post(
-        f"{endpoint}/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=360
-    )
-    response.raise_for_status()
-    
-    result = response.json()
-    content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-    
-    # JSON 파싱
-    try:
-        # JSON 블록 추출 (```json ... ``` 형식 처리)
-        import re
-        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
-        if json_match:
-            content = json_match.group(1)
+    for batch_idx, candidate_batch in enumerate(chunk_list(all_candidates, batch_size)):
+        logger.info(f"🔍 [SQL Critic] 배치 {batch_idx + 1} 검토 ({len(candidate_batch)}개 SQL)")
         
-        llm_result = json.loads(content)
-        workspace.save_data("llm_critic_response", llm_result, from_agent="SQL Critic")
-        return llm_result
-    except json.JSONDecodeError as e:
-        logger.warning(f"🔍 [SQL Critic] LLM 응답 JSON 파싱 실패: {e}")
-        workspace.save_data("llm_critic_raw", {"raw": content}, from_agent="SQL Critic")
-        return {"passed": True, "issues": [], "summary": f"LLM 응답 파싱 실패: {str(e)[:50]}"}
+        # MD 파일에서 System Prompt 로드
+        system_prompt = _load_agent_prompt("sql_critic_agent")
+        
+        # {mybatis_xmls} 플레이스홀더 대체
+        user_prompt = json.dumps(candidate_batch, ensure_ascii=False, indent=2)
+
+        # HTTP 요청으로 LLM 호출
+        import requests
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": temperature
+        }
+        
+        logger.info(f"🔍 [SQL Critic] LLM 호출: {model} (배치 {batch_idx + 1}, {len(candidate_batch)}개 SQL)")
+        
+        try:
+            response = requests.post(
+                f"{endpoint}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=Config.LLM_REQUEST_TIMEOUT
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            # JSON 파싱
+            import re
+            json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
+            if json_match:
+                content = json_match.group(1)
+            
+            llm_result = json.loads(content)
+            batch_issues = llm_result.get("issues", [])
+            all_issues.extend(batch_issues)
+            logger.info(f"✅ [SQL Critic] 배치 {batch_idx + 1} 완료: {len(batch_issues)}개 이슈 발견")
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"🔍 [SQL Critic] 배치 {batch_idx + 1} JSON 파싱 실패: {e}")
+            continue
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"🔍 [SQL Critic] 배치 {batch_idx + 1} 요청 실패: {e}")
+            continue
+    
+    # 모든 배치 결과 집계
+    final_result = {
+        "passed": len(all_issues) == 0,
+        "issues": all_issues,
+        "summary": f"총 {len(all_candidates)}개 SQL 검토, {len(all_issues)}개 이슈 발견"
+    }
+    
+    workspace.save_data("llm_critic_response", final_result, from_agent="SQL Critic")
+    logger.info(f"✅ [SQL Critic] 전체 검토 완료: {final_result['summary']}")
+    return final_result
 
 
 def _rule_based_validation(
@@ -1472,7 +1615,7 @@ def fixer_node(state: ParserPipelineState) -> Dict[str, Any]:
     for m in low_confidence:
         # 신뢰도 향상 (실제로는 LLM으로 재처리)
         if m.get("success"):
-            m["confidence"] = 0.75  # 약간 향상
+            m["confidence"] = Config.DEFAULT_CONFIDENCE_BOOST  # 약간 향상
             m["note"] = f"confidence_boosted_retry_{retry_count}"
             fixer_feedback.append(f"신뢰도 향상: {m.get('sql_id')}")
     
@@ -1713,9 +1856,9 @@ def run_pipeline(
     initial_state = create_initial_state(source_code, filename, workspace_path)
     
     print(f"\n📂 Workspace: {Path(workspace_path).absolute()}")
-    print("=" * 60)
+    print("=" * Config.SEPARATOR_WIDTH)
     print("🚀 LangGraph 파이프라인 시작")
-    print("=" * 60)
+    print("=" * Config.SEPARATOR_WIDTH)
     
     # 실행
     final_state = graph.invoke(initial_state)
@@ -1725,14 +1868,14 @@ def run_pipeline(
 
 def print_result(state: ParserPipelineState):
     """결과 출력"""
-    print("\n" + "=" * 60)
+    print("\n" + "=" * Config.SEPARATOR_WIDTH)
     print("📊 파이프라인 결과")
-    print("=" * 60)
+    print("=" * Config.SEPARATOR_WIDTH)
     
     # 메시지 흐름
     print("\n💬 메시지 흐름:")
     for i, msg in enumerate(state.get("messages", []), 1):
-        print(f"  {i}. {msg['from']} → {msg['to']}: {msg['content'][:50]}")
+        print(f"  {i}. {msg['from']} → {msg['to']}: {msg['content'][:Config.MESSAGE_PREVIEW_LENGTH]}")
     
     # 메타데이터 요약
     metadata = state.get("metadata", {})
@@ -1759,7 +1902,7 @@ def print_result(state: ParserPipelineState):
         for e in errors:
             print(f"  - {e}")
     
-    print("\n" + "=" * 60)
+    print("\n" + "=" * Config.SEPARATOR_WIDTH)
     
     if state.get("is_complete"):
         print("✅ 파이프라인 완료!")

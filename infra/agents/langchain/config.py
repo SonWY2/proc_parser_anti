@@ -88,3 +88,43 @@ class AgentSystemConfig:
     
     # 에이전트 정의 경로
     agents_dir: str = ".agents"
+
+
+@dataclass
+class PipelineConfig:
+    """파이프라인 처리 설정"""
+    
+    # 타임아웃 (초)
+    llm_request_timeout: int = 360
+    threadpool_total_timeout: int = 400
+    future_result_timeout: int = 10
+    
+    # 배치 처리
+    batch_size_elements: int = 20
+    batch_size_code_chars: int = 3000
+    
+    # 로깅/표시
+    log_preview_length: int = 200
+    prompt_preview_length: int = 100
+    message_preview_length: int = 50
+    
+    # 기본값
+    default_func_line_range: int = 50
+    default_confidence_boost: float = 0.75
+    
+    # 병렬 처리
+    max_workers: int = 3
+    
+    # 출력 포맷
+    separator_width: int = 60
+    
+    @classmethod
+    def from_env(cls) -> "PipelineConfig":
+        """환경 변수에서 설정 로드"""
+        return cls(
+            llm_request_timeout=int(os.getenv("PIPELINE_LLM_TIMEOUT", "360")),
+            threadpool_total_timeout=int(os.getenv("PIPELINE_THREADPOOL_TIMEOUT", "400")),
+            batch_size_elements=int(os.getenv("PIPELINE_BATCH_ELEMENTS", "20")),
+            batch_size_code_chars=int(os.getenv("PIPELINE_BATCH_CHARS", "3000")),
+            max_workers=int(os.getenv("PIPELINE_MAX_WORKERS", "3")),
+        )
