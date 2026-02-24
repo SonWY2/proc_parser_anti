@@ -1,0 +1,227 @@
+# Pro*C → Java 멀티에이전트 시스템 설정
+# Enhanced Plan v2.0
+
+# =============================================================================
+# Agent 설정
+# =============================================================================
+agents:
+  # 최상위 조율자
+  main_orchestrator:
+    model: gpt-4-turbo
+    temperature: 0.2
+    max_tokens: 4000
+    description: "전체 파이프라인 관리 및 사용자 확인"
+    
+  # 코드 분석 에이전트
+  analysis_agent:
+    model: gpt-4-turbo
+    temperature: 0.1
+    max_tokens: 8000
+    max_chunk_size: 1000
+    enable_cpg: true
+    enable_lineage_tracking: true
+    description: "Pro*C 파일 구조 분석 및 메타데이터 추출"
+    
+  # Java Spring 코드 생성 에이전트
+  java_spring_agent:
+    model: gpt-4-turbo
+    temperature: 0.3
+    max_tokens: 8000
+    default_strategy: preserve  # preserve | refactor
+    base_package: com.modernized
+    service_package: com.modernized.service
+    controller_package: com.modernized.controller
+    stub_package: com.modernized.stub
+    description: "Java Spring 코드 생성 및 Extern Stub 구현"
+    
+  # MyBatis 파일 생성 에이전트
+  mybatis_agent:
+    model: gpt-3.5-turbo
+    temperature: 0.2
+    max_tokens: 6000
+    base_package: com.modernized.mapper
+    dto_package: com.modernized.dto
+    enable_column_alias: true
+    description: "MyBatis DTO/DAO/XML 생성"
+    
+  # 리포트 생성 에이전트
+  report_agent:
+    model: gpt-3.5-turbo
+    temperature: 0.1
+    max_tokens: 4000
+    description: "마이그레이션 리포트 작성"
+
+# =============================================================================
+# Skill 설정
+# =============================================================================
+skills:
+  # 파일 읽기 및 청킹
+  file_reader_chunker:
+    max_loc_threshold: 5000
+    chunk_size: 1000
+    boundary_type: function  # function | loc | block
+    include_context: true
+    context_types:
+      - global_variables
+      - previous_function
+    fallback_strategy: loc  # LOC 기준 폴백
+    
+  # 매크로 타입 매핑
+  macro_type_mapper:
+    enable_typedef_mapping: true
+    enable_macro_extraction: true
+    enable_struct_parsing: true
+    max_nested_depth: 3
+    flag_complex_types: true
+    type_mapping_file: infra/config/type_mappings.py
+    
+  # SQL 추출
+  sql_extractor:
+    use_tree_sitter: true
+    enable_cursor_merge: true
+    enable_dynamic_sql_detection: true
+    remove_proc_syntax: true
+    extract_bind_variables: true
+    classify_input_output: true
+    
+  # 파일 쓰기
+  file_writer:
+    default_encoding: utf-8
+    auto_create_dirs: true
+    overwrite_default: true
+    timestamp_on_conflict: true
+    timestamp_format: "%Y%m%d_%H%M%S"
+
+# =============================================================================
+# 출력 경로 설정
+# =============================================================================
+output:
+  base_path: output/
+  java_path: output/java/
+  service_path: output/java/service/
+  controller_path: output/java/controller/
+  stub_path: output/java/stub/
+  mybatis_path: output/mybatis/
+  dto_path: output/mybatis/dto/
+  mapper_path: output/mybatis/mapper/
+  xml_path: output/mybatis/mapper/
+  report_path: output/report/
+  
+  # 파일명 패턴
+  naming:
+    service_suffix: Service
+    controller_suffix: Controller
+    dto_suffix: Dto
+    mapper_suffix: Mapper
+    stub_suffix: Stub
+
+# =============================================================================
+# 변환 전략 설정
+# =============================================================================
+conversion:
+  # 기본 전략
+  default_strategy: preserve  # preserve | refactor
+  
+  # preserve 모드 설정
+  preserve:
+    one_to_one_mapping: true
+    keep_function_names: true
+    prioritize_service_layer: true
+    minimal_controller: true
+    
+  # refactor 모드 설정
+  refactor:
+    apply_oop_principles: true
+    use_spring_patterns: true
+    enable_dependency_injection: true
+    split_by_domain: true
+    add_transactions: true
+
+# =============================================================================
+# 품질 검증 설정
+# =============================================================================
+validation:
+  # Extern 처리
+  extern_handling:
+    create_stubs: true
+    halt_on_extern: false
+    report_all_externs: true
+    
+  # 파싱 불가 처리
+  unparseable_handling:
+    create_stub_methods: true
+    add_todo_comments: true
+    halt_on_error: false
+    
+  # 동적 SQL 처리
+  dynamic_sql:
+    attempt_conversion: true
+    use_mybatis_tags: true
+    flag_for_review: true
+
+# =============================================================================
+# 로깅 설정
+# =============================================================================
+logging:
+  level: INFO  # DEBUG | INFO | WARNING | ERROR
+  log_file: logs/multiagent_conversion.log
+  console_output: true
+  include_timestamps: true
+  log_agent_calls: true
+  log_skill_calls: true
+
+# =============================================================================
+# 성능 설정
+# =============================================================================
+performance:
+  # 병렬 처리
+  enable_parallel_agents: true
+  max_parallel_workers: 2  # java-spring-agent + mybatis-agent
+  
+  # 타임아웃
+  agent_timeout_seconds: 300
+  skill_timeout_seconds: 60
+  
+  # 재시도
+  max_retries: 3
+  retry_delay_seconds: 5
+
+# =============================================================================
+# LLM API 설정
+# =============================================================================
+llm:
+  # API 제공자
+  provider: openai  # openai | anthropic | azure
+  
+  # OpenAI 설정
+  openai:
+    api_key: ${OPENAI_API_KEY}
+    base_url: https://api.openai.com/v1
+    
+  # Anthropic 설정
+  anthropic:
+    api_key: ${ANTHROPIC_API_KEY}
+    base_url: https://api.anthropic.com
+    
+  # Azure 설정
+  azure:
+    api_key: ${AZURE_API_KEY}
+    endpoint: ${AZURE_ENDPOINT}
+    deployment_name: ${AZURE_DEPLOYMENT_NAME}
+
+# =============================================================================
+# 고급 설정
+# =============================================================================
+advanced:
+  # 메모리 관리
+  max_context_size: 100000  # 토큰
+  context_compression: true
+  
+  # 체크포인트
+  enable_checkpoints: true
+  checkpoint_dir: .checkpoints/
+  
+  # 캐시
+  enable_caching: true
+  cache_dir: .cache/
+  cache_ttl_hours: 24

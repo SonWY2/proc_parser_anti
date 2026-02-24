@@ -115,6 +115,11 @@ class PipelineConfig:
     # 병렬 처리
     max_workers: int = 3
     
+    # Rate Limit 보호
+    llm_call_delay: float = 1.0       # LLM 호출 간 지연 (초)
+    llm_max_retries: int = 3          # 429 에러 시 최대 재시도 횟수
+    llm_retry_base_delay: float = 2.0 # 지수 백오프 초기 대기 (초)
+    
     # 출력 포맷
     separator_width: int = 60
     
@@ -126,5 +131,5 @@ class PipelineConfig:
             threadpool_total_timeout=int(os.getenv("PIPELINE_THREADPOOL_TIMEOUT", "400")),
             batch_size_elements=int(os.getenv("PIPELINE_BATCH_ELEMENTS", "20")),
             batch_size_code_chars=int(os.getenv("PIPELINE_BATCH_CHARS", "3000")),
-            max_workers=int(os.getenv("PIPELINE_MAX_WORKERS", "3")),
+            max_workers=int(os.getenv("PIPELINE_MAX_WORKERS", "2")),
         )

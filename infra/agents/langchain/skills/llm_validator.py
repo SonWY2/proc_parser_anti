@@ -5,7 +5,8 @@ LLM을 활용한 검증 기능을 제공하는 Skill입니다.
 Parser Critic과 SQL Critic 검증을 모두 지원합니다.
 """
 
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Union
 import logging
 
 from .skill_interface import BaseSkill, SkillResult
@@ -67,6 +68,65 @@ class LLMValidatorSkill(BaseSkill):
             self._llm_client = get_llm_client()
         return self._llm_client
     
+    def _get_config(self):
+        """PipelineConfig 지연 로드"""
+        from ..config import PipelineConfig
+        return PipelineConfig.from_env()
+    
+    def _invoke_llm_with_retry(
+        self, 
+        system_prompt: str, 
+        user_prompt: str, 
+        context_label: str = "",
+        parse_json: bool = True
+    ) -> Union[Dict, str]:
+        """
+        LLM 호출 + 429 에러 시 지수 백오프 재시도
+        
+        Args:
+            system_prompt: 시스템 프롬프트
+            user_prompt: 사용자 프롬프트
+            context_label: 로그용 컨텍스트 이름
+            parse_json: JSON 파싱 여부
+            
+        Returns:
+            LLM 응답 (parsed JSON dict or raw string)
+            
+        Raises:
+            마지막 시도에서의 예외를 그대로 전파
+        """
+        cfg = self._get_config()
+        llm = self._get_llm_client()
+        max_retries = cfg.llm_max_retries
+        base_delay = cfg.llm_retry_base_delay
+        
+        for attempt in range(max_retries + 1):
+            try:
+                result = llm.invoke_with_system(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    parse_json=parse_json
+                )
+                return result
+            except Exception as e:
+                error_str = str(e)
+                is_rate_limit = "429" in error_str or "rate limit" in error_str.lower()
+                
+                if is_rate_limit and attempt < max_retries:
+                    wait_time = base_delay * (2 ** attempt)
+                    logger.warning(
+                        f"⏳ [{context_label}] Rate limit (429), "
+                        f"{wait_time:.1f}초 대기 후 재시도 ({attempt + 1}/{max_retries})"
+                    )
+                    if self.debug:
+                        self._write_debug(
+                            f"⏳ Rate limit 재시도: {wait_time:.1f}초 대기 "
+                            f"(attempt {attempt + 1}/{max_retries})"
+                        )
+                    time.sleep(wait_time)
+                else:
+                    raise
+    
     def _get_prompt_loader(self):
         """프롬프트 로더 지연 초기화"""
         if self._prompt_loader is None:
@@ -127,6 +187,116 @@ class LLMValidatorSkill(BaseSkill):
             logger.exception(f"LLM 검증 실패: {e}")
             return SkillResult(success=False, errors=[str(e)])
     
+    def _parse_block_response(self, text: str) -> Dict:
+        """
+        Line-Based Block Format 파싱
+        
+        [ISSUE], [RECLASS], [MISSING] 블록을 파싱합니다.
+        """
+        parsed = {
+            "issues": [],
+            "reclassifications": [],
+            "missing_elements": []
+        }
+        
+        current_block = {}
+        current_type = None
+        
+        lines = text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            if line == "[ISSUE]":
+                if current_type == "ISSUE" and current_block:
+                    parsed["issues"].append(current_block)
+                current_block = {}
+                current_type = "ISSUE"
+            elif line == "[RECLASS]":
+                if current_type == "RECLASS" and current_block:
+                    parsed["reclassifications"].append(current_block)
+                current_block = {}
+                current_type = "RECLASS"
+            elif line == "[MISSING]":
+                if current_type == "MISSING" and current_block:
+                    parsed["missing_elements"].append(current_block)
+                current_block = {}
+                current_type = "MISSING"
+            elif line.startswith("[") and line.endswith("]"):
+                 # 다른 블록 시작 시 이전 블록 저장 (예: [SUMMARY] 등 무시)
+                 if current_type == "ISSUE" and current_block:
+                    parsed["issues"].append(current_block)
+                 elif current_type == "RECLASS" and current_block:
+                    parsed["reclassifications"].append(current_block)
+                 elif current_type == "MISSING" and current_block:
+                    parsed["missing_elements"].append(current_block)
+                 current_block = {}
+                 current_type = None
+            else:
+                if current_type and ":" in line:
+                    key, val = line.split(":", 1)
+                    key = key.strip().lower().replace(" ", "_")
+                    val = val.strip()
+                    current_block[key] = val
+        
+        # 마지막 블록 저장
+        if current_type == "ISSUE" and current_block:
+            parsed["issues"].append(current_block)
+        elif current_type == "RECLASS" and current_block:
+            parsed["reclassifications"].append(current_block)
+        elif current_type == "MISSING" and current_block:
+            parsed["missing_elements"].append(current_block)
+            
+        # 키 매핑 정규화 (LLM이 대소문자나 공백을 섞어 쓸 경우 대비)
+        # [ISSUE] -> element_id, element_type, issue, severity, correct_value
+        # [RECLASS] -> element_id, from_type, to_type
+        # [MISSING] -> type, content, line
+        
+        normalized = {
+            "issues": [],
+            "reclassifications": [],
+            "missing_elements": []
+        }
+        
+        for issue in parsed["issues"]:
+            norm_issue = {}
+            # element / element_id
+            if "element" in issue: norm_issue["element_id"] = issue["element"]
+            elif "element_id" in issue: norm_issue["element_id"] = issue["element_id"]
+            
+            # type / element_type
+            if "type" in issue: norm_issue["element_type"] = issue["type"]
+            elif "element_type" in issue: norm_issue["element_type"] = issue["element_type"]
+            
+            norm_issue["issue"] = issue.get("issue", "")
+            norm_issue["severity"] = issue.get("severity", "error").lower()
+            if "correct_value" in issue: norm_issue["correct_value"] = issue["correct_value"]
+            
+            if "element_id" in norm_issue:
+                normalized["issues"].append(norm_issue)
+
+        for reclass in parsed["reclassifications"]:
+            norm_reclass = {}
+            if "element" in reclass: norm_reclass["element_id"] = reclass["element"]
+            elif "element_id" in reclass: norm_reclass["element_id"] = reclass["element_id"]
+            
+            if "from" in reclass: norm_reclass["from_type"] = reclass["from"]
+            elif "from_type" in reclass: norm_reclass["from_type"] = reclass["from_type"]
+            
+            if "to" in reclass: norm_reclass["to_type"] = reclass["to"]
+            elif "to_type" in reclass: norm_reclass["to_type"] = reclass["to_type"]
+            
+            if "element_id" in norm_reclass and "from_type" in norm_reclass and "to_type" in norm_reclass:
+                normalized["reclassifications"].append(norm_reclass)
+
+        for missing in parsed["missing_elements"]:
+            # missing은 키가 간단해서 그대로 씀 (type, content, line)
+            if "type" in missing and "content" in missing:
+                normalized["missing_elements"].append(missing)
+                
+        return normalized
+
     def _validate_parser_chunks(
         self, 
         chunks: List[Dict], 
@@ -177,23 +347,27 @@ class LLMValidatorSkill(BaseSkill):
                         self._write_debug(f"\n[User Prompt]\n{user_prompt}")
                         self._write_debug(f"{'='*60}")
                     
-                    result = llm.invoke_with_system(
+                    result = self._invoke_llm_with_retry(
                         system_prompt=wrong_prompt,
                         user_prompt=user_prompt,
-                        parse_json=True
+                        context_label=f"Parser Critic:{scope}",
+                        parse_json=False
                     )
+                    
+                    # Rate limit 보호: 호출 간 지연
+                    cfg = self._get_config()
+                    time.sleep(cfg.llm_call_delay)
                     
                     # 디버그 모드: 출력 출력
                     if self.debug:
-                        self._write_debug(f"\n📥 [Parser Critic] LLM 출력")
-                        self._write_debug(f"{json.dumps(result, ensure_ascii=False, indent=2)}")
+                        self._write_debug(f"\n📥 [Parser Critic] LLM 출력 (Block Format)")
+                        self._write_debug(f"{result}")
                         self._write_debug(f"{'='*60}\n")
                     
-                    if isinstance(result, dict):
-                        all_wrong.extend(result.get("issues", []))
-                        all_reclassifications.extend(
-                            result.get("reclassifications", [])
-                        )
+                    # Block Format 파싱
+                    parsed = self._parse_block_response(result)
+                    all_wrong.extend(parsed.get("issues", []))
+                    all_reclassifications.extend(parsed.get("reclassifications", []))
                         
                 except Exception as e:
                     # 디버그 모드: 에러 출력
@@ -272,11 +446,15 @@ class LLMValidatorSkill(BaseSkill):
                     self._write_debug(f"\n[User Prompt]\n{user_prompt}")
                     self._write_debug(f"{'='*60}")
                 
-                result = llm.invoke_with_system(
+                result = self._invoke_llm_with_retry(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    parse_json=True
+                    context_label=f"SQL Critic:배치{batch_idx + 1}"
                 )
+                
+                # Rate limit 보호: 호출 간 지연
+                cfg = self._get_config()
+                time.sleep(cfg.llm_call_delay)
                 
                 # 디버그 모드: 출력 출력
                 if self.debug:
@@ -353,7 +531,7 @@ class LLMValidatorSkill(BaseSkill):
   "has_errors": true 또는 false,
   "issues": [
     {
-      "element_id": "요소 ID",
+      "element_id": "요소의 name 또는 sql_id 필드 값",
       "element_type": "현재 분류된 타입",
       "issue": "문제 설명",
       "correct_value": "수정된 값 (있다면)",
@@ -362,10 +540,18 @@ class LLMValidatorSkill(BaseSkill):
   ],
   "reclassifications": [
     {
-      "element_id": "요소 ID",
-      "from_type": "잘못된 타입",
-      "to_type": "올바른 타입"
+      "element_id": "요소의 name 또는 sql_id 필드 값",
+      "from_type": "현재 잘못된 타입 (sql | variable | function | macro | struct 중 하나)",
+      "to_type": "올바른 타입 (sql | variable | function | macro | struct 중 하나)"
     }
   ],
   "summary": "요약"
-}"""
+}
+
+## 중요 규칙
+- element_id: 반드시 입력 elements 배열에 있는 요소의 "name" 또는 "sql_id" 필드 값을 사용하세요.
+- from_type / to_type: 반드시 다음 5가지 중 하나여야 합니다: sql, variable, function, macro, struct
+- 위 5가지에 해당하지 않는 요소(예: comment, include 등)는 reclassifications에 포함하지 마세요.
+- **중요**: 요소의 타입이 명백히 잘못된 경우(예: 'EXEC SQL'이 variable로 분류됨), issue를 보고함과 동시에 **반드시** reclassifications에도 추가해야 합니다.
+- 'sqlca'가 variable로 분류된 경우, 반드시 struct로 재분류하세요.
+- 'EXEC SQL ...' 형태의 요소가 variable로 분류된 경우, 반드시 sql 또는 macro로 재분류하세요."""

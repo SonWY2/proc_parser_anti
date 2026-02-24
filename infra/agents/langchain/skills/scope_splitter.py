@@ -124,19 +124,35 @@ class ScopeSplitterSkill(BaseSkill):
         
         # extern 청크
         if extern_region.get("code"):
-            extern_elements = extern_region.get("elements", {})
+            # metadata에서 extern 라인 범위에 해당하는 요소를 수집
+            # (metadata 형식: type="variable", name 필드 등 → LLM 재분류와 호환)
+            line_ranges = extern_region.get("line_ranges", [])
             all_extern_elements = []
+            
+            if line_ranges:
+                for lr in line_ranges:
+                    start = lr[0]
+                    end = lr[1] if len(lr) > 1 else lr[0]
+                    range_elements = self._get_elements_in_range(metadata, start, end)
+                    all_extern_elements.extend(range_elements)
+            
+            # extern_region 고유 요소 중 metadata에 없는 것도 추가 (include, macro 등)
+            extern_elements = extern_region.get("elements", {})
+            existing_lines = {(e.get("line_start"), e.get("line_end")) for e in all_extern_elements}
             
             for category, items in extern_elements.items():
                 if isinstance(items, list):
                     for item in items:
-                        all_extern_elements.append({**item, "category": category})
+                        item_key = (item.get("line_start"), item.get("line_end"))
+                        if item_key not in existing_lines:
+                            all_extern_elements.append({**item, "category": category})
+                            existing_lines.add(item_key)
             
             chunks.append({
                 "scope": "extern",
                 "code": extern_region["code"],
                 "elements": all_extern_elements,
-                "line_ranges": extern_region.get("line_ranges", [])
+                "line_ranges": line_ranges
             })
         
         # 함수별 청크
@@ -177,19 +193,34 @@ class ScopeSplitterSkill(BaseSkill):
         
         # extern 청크
         if extern_data.get("code"):
-            extern_elements = extern_data.get("elements", {})
+            # metadata에서 extern 라인 범위에 해당하는 요소를 수집
+            line_ranges = extern_data.get("line_ranges", [])
             all_extern_elements = []
+            
+            if line_ranges:
+                for lr in line_ranges:
+                    start = lr[0]
+                    end = lr[1] if len(lr) > 1 else lr[0]
+                    range_elements = self._get_elements_in_range(metadata, start, end)
+                    all_extern_elements.extend(range_elements)
+            
+            # extern_data 고유 요소 중 metadata에 없는 것도 추가
+            extern_elements = extern_data.get("elements", {})
+            existing_lines = {(e.get("line_start"), e.get("line_end")) for e in all_extern_elements}
             
             for category, items in extern_elements.items():
                 if isinstance(items, list):
                     for item in items:
-                        all_extern_elements.append({**item, "category": category})
+                        item_key = (item.get("line_start"), item.get("line_end"))
+                        if item_key not in existing_lines:
+                            all_extern_elements.append({**item, "category": category})
+                            existing_lines.add(item_key)
             
             chunks.append({
                 "scope": "extern",
                 "code": extern_data["code"],
                 "elements": all_extern_elements,
-                "line_ranges": extern_data.get("line_ranges", [])
+                "line_ranges": line_ranges
             })
         
         # 함수별 청크

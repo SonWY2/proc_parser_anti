@@ -1,1 +1,1 @@
-python -m infra.agents.langchain.pipelines.parsing_pipeline --debug
+python -m infra.agents.langchain.pipelines.parsing_pipeline -s original_source_dup_comment.sqc -c --debug

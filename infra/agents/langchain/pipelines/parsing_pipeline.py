@@ -390,7 +390,7 @@ def parser_critic_node(state: ParserPipelineState) -> Dict[str, Any]:
     
     # 타입 재분류 처리
     if all_reclassifications:
-        metadata = _handle_reclassifications(metadata, all_reclassifications)
+        metadata = _handle_reclassifications(metadata, all_reclassifications, debug_file=state.get("debug_file"))
         workspace.save_data("metadata_reclassified", metadata, from_agent="Parser Critic")
     
     logger.info(f"🔍 [Parser Critic] 검증 완료: 미분석 {len(all_missing)}, 오분석 {len(all_wrong)}, 재분류 {len(all_reclassifications)}")
@@ -407,10 +407,19 @@ def parser_critic_node(state: ParserPipelineState) -> Dict[str, Any]:
     }
 
 
-def _handle_reclassifications(metadata: Dict, reclassifications: List[Dict]) -> Dict:
+def _handle_reclassifications(metadata: Dict, reclassifications: List[Dict], debug_file: str = None) -> Dict:
     """타입 재분류 처리"""
     updated = {k: list(v) for k, v in metadata.items() if isinstance(v, list)}
     
+    def log_debug(msg):
+        logger.info(msg)
+        if debug_file:
+            try:
+                with open(debug_file, "a", encoding="utf-8") as f:
+                    f.write(f"[Reclass] {msg}\n")
+            except Exception:
+                pass
+
     type_to_key = {
         "sql": "sql_blocks",
         "variable": "host_vars",
@@ -427,20 +436,36 @@ def _handle_reclassifications(metadata: Dict, reclassifications: List[Dict]) -> 
         from_key = type_to_key.get(from_type)
         to_key = type_to_key.get(to_type)
         
-        if not from_key or not to_key:
+        if from_key not in updated:
             continue
+            
+        from_list = updated[from_key]
         
-        from_list = updated.get(from_key, [])
-        to_list = updated.get(to_key, [])
+        if to_key not in updated:
+            updated[to_key] = []
+        to_list = updated[to_key]
         
         for i, elem in enumerate(from_list):
-            if elem.get("sql_id") == element_id or elem.get("name") == element_id:
+            # Debugging matching logic
+            match_condition = (elem.get("sql_id") == element_id or 
+                             elem.get("name") == element_id or 
+                             elem.get("raw_content") == element_id)
+            
+            if match_condition:
+                log_debug(f"👉 Matching element found: {element_id} in {from_key}")
                 moved_elem = from_list.pop(i)
                 moved_elem["reclassified_from"] = from_type
                 to_list.append(moved_elem)
-                logger.info(f"🔄 재분류: {element_id} ({from_type} → {to_type})")
+                log_debug(f"✅ Moved element: {element_id} ({from_type} -> {to_type})")
+                log_debug(f"   Now {to_key} has {len(to_list)} elements")
                 break
+        else:
+            log_debug(f"❌ Element not found for reclassification: {element_id} (in {from_key})")
     
+    # Final verification log
+    for key, lst in updated.items():
+        log_debug(f"Final Count [{key}]: {len(lst)}")
+
     return updated
 
 

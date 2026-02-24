@@ -54,18 +54,20 @@ Pro*C 파싱 결과의 **완전성**(미분석)과 **정확성**(오분석)을 L
   "remaining_code": "잔여 코드"
 }
 
-## 출력 형식 (JSON만 출력)
-{
-  "has_missing": true 또는 false,
-  "missing_elements": [
-    {
-      "type": "SQL" | "VARIABLE" | "FUNCTION" | "MACRO" | "STRUCT",
-      "content": "발견된 요소의 원문",
-      "line": 대략적인 라인 번호
-    }
-  ],
-  "summary": "요약"
-}
+## 출력 형식 (Line-Based Block Format)
+반드시 다음 형식을 지켜주세요. JSON을 출력하지 마세요.
+발견된 요소마다 하나의 블록을 작성하세요.
+
+[MISSING]
+Type: <SQL | VARIABLE | FUNCTION | MACRO | STRUCT>
+Content: <발견된 요소의 원문 (한 줄로 요약)>
+Line: <대략적인 라인 번호>
+
+## 예시
+[MISSING]
+Type: SQL
+Content: EXEC SQL SELECT * FROM EMP
+Line: 120
 ```
 
 ---
@@ -76,7 +78,7 @@ Pro*C 파싱 결과의 **완전성**(미분석)과 **정확성**(오분석)을 L
 당신은 Pro*C 코드 파서의 결과를 검증하는 전문가입니다.
 
 사용자가 원본 코드와 파서가 추출한 결과를 JSON으로 제공합니다.
-추출 결과가 정확한지 검증하세요.
+이 중 잘못 추출된 결과가 있는지 확인하세요.
 
 ## 검증 항목
 1. SQL 타입 분류 (SELECT/INSERT/UPDATE/DELETE)
@@ -90,27 +92,41 @@ Pro*C 파싱 결과의 **완전성**(미분석)과 **정확성**(오분석)을 L
   "elements": [추출된 요소 배열]
 }
 
-## 출력 형식 (JSON만 출력)
-{
-  "has_errors": true 또는 false,
-  "issues": [
-    {
-      "element_id": "요소 ID",
-      "element_type": "현재 분류된 타입",
-      "issue": "문제 설명",
-      "correct_value": "수정된 값 (있다면)",
-      "severity": "error" | "warning"
-    }
-  ],
-  "reclassifications": [
-    {
-      "element_id": "요소 ID",
-      "from_type": "잘못된 타입",
-      "to_type": "올바른 타입"
-    }
-  ],
-  "summary": "요약"
-}
+## 출력 형식 (Line-Based Block Format)
+반드시 다음 형식을 지켜주세요. JSON을 출력하지 마세요.
+발견된 문제마다 하나의 블록을 작성하세요.
+
+[ISSUE]
+Element: <요소의 name 또는 sql_id>
+Type: <현재 분류된 타입>
+Issue: <문제 설명>
+Correct Value: <수정된 값 (있다면)>
+Severity: <ERROR | WARNING>
+
+[RECLASS]
+Element: <요소의 name 또는 sql_id>
+From: <현재 잘못된 타입 (sql/variable/function/macro/struct)>
+To: <올바른 타입 (sql/variable/function/macro/struct)>
+
+## 중요 규칙
+- Element 필드에는 반드시 입력 elements 배열에 있는 요소의 "name" 또는 "sql_id" 값을 사용하세요.
+- From / To 필드는 반드시 다음 5가지 중 하나여야 합니다: sql, variable, function, macro, struct
+- 위 5가지에 해당하지 않는 요소(예: comment, include 등)는 [RECLASS] 블록을 작성하지 마세요.
+- **중요**: 요소의 타입이 명백히 잘못된 경우(예: 'EXEC SQL'이 variable로 분류됨), [ISSUE] 블록을 작성함과 동시에 **반드시** [RECLASS] 블록도 추가해야 합니다.
+- 'sqlca'가 variable로 분류된 경우, 반드시 struct로 재분류하세요. (RECLASS 작성)
+- 'EXEC SQL ...' 형태의 요소가 variable로 분류된 경우, 반드시 sql 또는 macro로 재분류하세요. (RECLASS 작성)
+
+## 예시
+[ISSUE]
+Element: ILOG
+Type: function_call
+Issue: 매크로 함수인데 function_call로 분류됨.
+Severity: ERROR
+
+[RECLASS]
+Element: ILOG
+From: function_call
+To: macro
 ```
 
 ---
