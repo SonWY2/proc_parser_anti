@@ -177,3 +177,46 @@ def create_initial_state(
             **base_state,
             "current_step": "",
         }
+
+
+class ConversionState(TypedDict, total=False):
+    """LangGraph 기반 Pro*C -> Java 변환 상태."""
+    # 입력
+    header_paths: list[str]
+    proc_paths: list[str]
+    output_dir: str
+    strategy: str
+    knowledge_doc: Optional[str]
+
+    # 분석 결과
+    analysis_result: dict[str, Any]
+
+    # 병렬 변환 결과
+    java_result: dict[str, Any]
+    mybatis_result: dict[str, Any]
+
+    # 리포트 결과
+    report_path: str
+
+    # 공통 제어 필드
+    errors: list[str]
+    messages: Annotated[list, add_messages]
+
+
+def create_conversion_state(
+    header_paths: list[str],
+    proc_paths: list[str],
+    output_dir: str,
+    strategy: str = "preserve",
+    knowledge_doc: Optional[str] = None,
+) -> ConversionState:
+    """Conversion graph 초기 상태 생성."""
+    return {
+        "header_paths": header_paths,
+        "proc_paths": proc_paths,
+        "output_dir": output_dir,
+        "strategy": strategy,
+        "knowledge_doc": knowledge_doc,
+        "errors": [],
+        "messages": [],
+    }

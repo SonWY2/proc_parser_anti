@@ -242,3 +242,8 @@ python run_multiagent_conversion.py \
 ---
 
 *작성일: 2026-02-25*
+
+
+## 후속 문서
+
+- 구현 체크리스트: `langgraph-implementation-followup.md`
