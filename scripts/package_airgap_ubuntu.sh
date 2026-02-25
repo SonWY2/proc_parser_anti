@@ -118,14 +118,14 @@ resolve_python_bin() {
   done
 
   # Fallback 1: prefer binaries under */bin only (ignore man pages, configs)
-  candidate="$(find "$runtime_dir" -type f \(-path "*/bin/python3" -o -regex ".*/bin/python3\.[0-9]+" -o -path "*/bin/python" \) | head -n 1 || true)"
+  candidate="$(find "$runtime_dir" -type f \( -path "*/bin/python3" -o -regex ".*/bin/python3\.[0-9]+" -o -path "*/bin/python" \) | head -n 1 || true)"
   if [[ -n "$candidate" ]]; then
     echo "$candidate"
     return 0
   fi
 
   # Fallback 2: any python-like file except config/man pages
-  candidate="$(find "$runtime_dir" -type f \(-name "python3" -o -regex ".*python3\.[0-9]+" -o -name "python" \) \! -name "*config*" \! -path "*/share/man/*" | head -n 1 || true)"
+  candidate="$(find "$runtime_dir" -type f \( -name "python3" -o -regex ".*python3\.[0-9]+" -o -name "python" \) \! -name "*config*" \! -path "*/share/man/*" | head -n 1 || true)"
   if [[ -n "$candidate" ]]; then
     echo "$candidate"
     return 0
