@@ -89,3 +89,8 @@ sed -n '1,5p' output/hook_debug/hook_log.jsonl
 - `0`: 정상 완료(에러 없음)
 - `2`: 산출물은 생성됐지만 `errors` 존재
 - `1`: 예외로 실행 실패(런타임 에러)
+
+
+## Air-gap 패키징
+
+- Ubuntu 폐쇄망 배포용 패키징은 `docs/airgap_packaging_guide.md`를 참고하세요.
