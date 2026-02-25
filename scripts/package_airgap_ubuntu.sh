@@ -117,8 +117,15 @@ resolve_python_bin() {
     fi
   done
 
-  # Fallback: find python3/python3.* or plain python (permission bit may be missing in some archives)
-  candidate="$(find "$runtime_dir" -type f \( -name 'python3' -o -name 'python3.*' -o -name 'python' \) | head -n 1 || true)"
+  # Fallback 1: prefer binaries under */bin only (ignore man pages, configs)
+  candidate="$(find "$runtime_dir" -type f \(-path "*/bin/python3" -o -regex ".*/bin/python3\.[0-9]+" -o -path "*/bin/python" \) | head -n 1 || true)"
+  if [[ -n "$candidate" ]]; then
+    echo "$candidate"
+    return 0
+  fi
+
+  # Fallback 2: any python-like file except config/man pages
+  candidate="$(find "$runtime_dir" -type f \(-name "python3" -o -regex ".*python3\.[0-9]+" -o -name "python" \) \! -name "*config*" \! -path "*/share/man/*" | head -n 1 || true)"
   if [[ -n "$candidate" ]]; then
     echo "$candidate"
     return 0
@@ -151,8 +158,10 @@ set_step "extract_python"
 log_info "Extracting archive: $PYTHON_STANDALONE_ARCHIVE"
 tar -xzf "$PYTHON_STANDALONE_ARCHIVE" -C "$BUNDLE_DIR/runtime"
 
-log_debug "Listing extracted python-like binaries"
-find "$BUNDLE_DIR/runtime" -type f \( -name 'python' -o -name 'python3' -o -name 'python3.*' \) | sed 's#^#  - #' || true
+if [[ "$AIRGAP_DEBUG" == "1" || "$AIRGAP_DEBUG" == "true" ]]; then
+  log_debug "Listing extracted python-like binaries"
+  find "$BUNDLE_DIR/runtime" -type f \( -name 'python' -o -name 'python3' -o -name 'python3.*' \) | sed 's#^#  - #' || true
+fi
 
 set_step "resolve_runtime_python"
 PY_BIN="$(resolve_python_bin "$BUNDLE_DIR/runtime" || true)"
