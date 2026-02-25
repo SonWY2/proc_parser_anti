@@ -934,3 +934,8 @@ tail -f logs/debug_conversion.log
 
 **마지막 업데이트**: 2026-02-24
 **버전**: Enhanced Plan v2.0
+
+
+## 최신 실행 가이드 (LangGraph)
+
+- `langgraph_run_guide.md`를 참고하세요.
