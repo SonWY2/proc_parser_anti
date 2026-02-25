@@ -53,3 +53,12 @@ PYTHON_STANDALONE_ARCHIVE_PATH=/path/to/cpython-standalone.tar.gz \
 ```
 
 > 스크립트는 `python3`, `python3.11` 등 실행 가능한 바이너리를 자동 탐색합니다.
+
+
+## 디버그 모드
+실패 지점/실행 명령을 자세히 보려면:
+```bash
+AIRGAP_DEBUG=1 ./scripts/package_airgap_ubuntu.sh
+```
+
+실패 시 `[ERROR][<step>]` 형태로 단계명이 함께 출력됩니다.

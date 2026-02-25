@@ -20,6 +20,7 @@ PYTHON_STANDALONE_URL_DEFAULT="https://github.com/astral-sh/python-build-standal
 PYTHON_STANDALONE_URL="${PYTHON_STANDALONE_URL:-$PYTHON_STANDALONE_URL_DEFAULT}"
 PYTHON_STANDALONE_ARCHIVE="${WORK_DIR}/python-standalone.tar.gz"
 PYTHON_STANDALONE_ARCHIVE_PATH="${PYTHON_STANDALONE_ARCHIVE_PATH:-}"
+AIRGAP_DEBUG="${AIRGAP_DEBUG:-0}"
 
 # Requirements needed for run_multiagent_conversion.py + agents pipeline
 REQ_FILES=(
@@ -30,6 +31,42 @@ REQ_FILES=(
   "generation/merge/requirements.txt"
 )
 
+CURRENT_STEP="init"
+
+log_info() {
+  echo "[INFO][${CURRENT_STEP}] $*"
+}
+
+log_debug() {
+  if [[ "$AIRGAP_DEBUG" == "1" || "$AIRGAP_DEBUG" == "true" ]]; then
+    echo "[DEBUG][${CURRENT_STEP}] $*"
+  fi
+}
+
+log_error() {
+  echo "[ERROR][${CURRENT_STEP}] $*" >&2
+}
+
+set_step() {
+  CURRENT_STEP="$1"
+  echo "[STEP] ${CURRENT_STEP}"
+}
+
+on_error() {
+  local line_no="$1"
+  local cmd="$2"
+  local code="$3"
+
+  log_error "failed at line=${line_no}, exit_code=${code}"
+  log_error "last command: ${cmd}"
+
+  if [[ -d "$BUNDLE_DIR/runtime" ]]; then
+    log_error "runtime dir snapshot (maxdepth=4):"
+    find "$BUNDLE_DIR/runtime" -maxdepth 4 -type d | sed 's#^#  - #' >&2 || true
+  fi
+}
+trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
+
 usage() {
   cat <<USAGE
 Usage: $(basename "$0") [--clean]
@@ -37,6 +74,7 @@ Usage: $(basename "$0") [--clean]
 Environment variables:
   PYTHON_STANDALONE_URL          URL of python-build-standalone archive
   PYTHON_STANDALONE_ARCHIVE_PATH local tar.gz path (skip download)
+  AIRGAP_DEBUG                   1/true면 디버그 로그 출력
 
 Output:
   dist/<bundle>.tar.gz
@@ -56,7 +94,7 @@ fi
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
-    echo "[ERROR] required command missing: $1" >&2
+    log_error "required command missing: $1"
     exit 1
   }
 }
@@ -89,6 +127,7 @@ resolve_python_bin() {
   return 1
 }
 
+set_step "preflight"
 need_cmd tar
 need_cmd rsync
 need_cmd python3
@@ -98,42 +137,48 @@ mkdir -p "$WORK_DIR" "$DIST_DIR"
 rm -rf "$BUNDLE_DIR"
 mkdir -p "$BUNDLE_DIR"/{runtime,wheelhouse,app,scripts}
 
+set_step "download_python"
 if [[ -n "$PYTHON_STANDALONE_ARCHIVE_PATH" ]]; then
-  echo "[1/7] Using local standalone Python archive: $PYTHON_STANDALONE_ARCHIVE_PATH"
+  log_info "Using local standalone Python archive: $PYTHON_STANDALONE_ARCHIVE_PATH"
   cp "$PYTHON_STANDALONE_ARCHIVE_PATH" "$PYTHON_STANDALONE_ARCHIVE"
 else
   need_cmd curl
-  echo "[1/7] Downloading standalone Python..."
+  log_info "Downloading standalone Python from: $PYTHON_STANDALONE_URL"
   curl -fL "$PYTHON_STANDALONE_URL" -o "$PYTHON_STANDALONE_ARCHIVE"
 fi
 
-echo "[2/7] Extracting standalone Python..."
+set_step "extract_python"
+log_info "Extracting archive: $PYTHON_STANDALONE_ARCHIVE"
 tar -xzf "$PYTHON_STANDALONE_ARCHIVE" -C "$BUNDLE_DIR/runtime"
 
+log_debug "Listing extracted python-like binaries"
+find "$BUNDLE_DIR/runtime" -type f \( -name 'python' -o -name 'python3' -o -name 'python3.*' \) | sed 's#^#  - #' || true
+
+set_step "resolve_runtime_python"
 PY_BIN="$(resolve_python_bin "$BUNDLE_DIR/runtime" || true)"
 if [[ -z "$PY_BIN" ]]; then
-  echo "[ERROR] python3 binary not found after extraction" >&2
-  echo "[DEBUG] extracted top-level entries:" >&2
-  find "$BUNDLE_DIR/runtime" -maxdepth 4 -type d | sed 's#^#  - #' >&2
+  log_error "python binary not found after extraction"
   exit 1
 fi
 
 chmod +x "$PY_BIN"
-echo "[INFO] runtime python: $PY_BIN"
+log_info "runtime python resolved: $PY_BIN"
 
-echo "[3/7] Creating embedded virtualenv..."
+set_step "create_venv"
 "$PY_BIN" -m venv "$BUNDLE_DIR/runtime/venv"
 VENV_PIP="$BUNDLE_DIR/runtime/venv/bin/pip"
-
 "$VENV_PIP" install --upgrade pip setuptools wheel
 
-echo "[4/7] Building offline wheelhouse..."
+set_step "build_wheelhouse"
 COMBINED_REQ="$WORK_DIR/combined_requirements.txt"
 : > "$COMBINED_REQ"
 for req in "${REQ_FILES[@]}"; do
   if [[ -f "$ROOT_DIR/$req" ]]; then
+    log_debug "append requirements: $req"
     cat "$ROOT_DIR/$req" >> "$COMBINED_REQ"
     echo >> "$COMBINED_REQ"
+  else
+    log_debug "skip missing requirements file: $req"
   fi
 done
 
@@ -148,14 +193,15 @@ for l in lines:
     if l not in seen:
         seen.append(l)
 p.write_text("\n".join(seen) + "\n", encoding="utf-8")
+print(f"[INFO][build_wheelhouse] deduplicated requirements: {len(seen)}")
 PY
 
 "$VENV_PIP" wheel -r "$COMBINED_REQ" -w "$BUNDLE_DIR/wheelhouse"
 
-echo "[5/7] Installing dependencies from local wheelhouse..."
+set_step "install_offline_deps"
 "$VENV_PIP" install --no-index --find-links "$BUNDLE_DIR/wheelhouse" -r "$COMBINED_REQ"
 
-echo "[6/7] Copying application sources..."
+set_step "copy_sources"
 rsync -a "$ROOT_DIR/" "$BUNDLE_DIR/app/" \
   --exclude '.git' \
   --exclude '.airgap_build' \
@@ -164,6 +210,7 @@ rsync -a "$ROOT_DIR/" "$BUNDLE_DIR/app/" \
   --exclude '.pytest_cache' \
   --exclude 'output'
 
+set_step "write_launchers"
 cat > "$BUNDLE_DIR/scripts/run.sh" <<'RUNEOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -205,8 +252,9 @@ cd proc_parser_anti-airgap-*
 ```
 READEOF
 
-echo "[7/7] Packing tarball..."
+set_step "pack_bundle"
 TARBALL_PATH="$DIST_DIR/${BUNDLE_NAME}.tar.gz"
 tar -czf "$TARBALL_PATH" -C "$WORK_DIR" "$BUNDLE_NAME"
 
-echo "[DONE] $TARBALL_PATH"
+set_step "done"
+log_info "bundle created: $TARBALL_PATH"
