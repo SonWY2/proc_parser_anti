@@ -11,6 +11,11 @@ Python 바이너리가 없는 폐쇄망(air-gap) Ubuntu 환경에서 본 시스�
 ./scripts/package_airgap_ubuntu.sh
 ```
 
+분할 크기(MB)를 인자로 지정하려면:
+```bash
+./scripts/package_airgap_ubuntu.sh --split-size-mb 40
+```
+
 ## 주의
 - `source scripts/package_airgap_ubuntu.sh`로 실행하지 마세요.
 - 반드시 아래처럼 실행 파일로 호출해야 합니다:
@@ -19,12 +24,15 @@ Python 바이너리가 없는 폐쇄망(air-gap) Ubuntu 환경에서 본 시스�
 ```
 
 
-생성물:
-- `dist/proc_parser_anti-airgap-<timestamp>.tar.gz`
+생성물(기본 40MB 분할):
+- `dist/proc_parser_anti-airgap-<timestamp>.tar.gz.part-000`
+- `dist/proc_parser_anti-airgap-<timestamp>.tar.gz.part-001`
+- ...
 
 ## 폐쇄망 서버로 전달 후 실행
 ```bash
-tar -xzf proc_parser_anti-airgap-<timestamp>.tar.gz
+cat proc_parser_anti-airgap-<timestamp>.tar.gz.part-* > proc_parser_anti-airgap.tar.gz
+tar -xzf proc_parser_anti-airgap.tar.gz
 cd proc_parser_anti-airgap-<timestamp>
 ./scripts/healthcheck.sh
 ./scripts/run.sh \

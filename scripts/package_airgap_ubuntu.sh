@@ -21,6 +21,7 @@ PYTHON_STANDALONE_URL="${PYTHON_STANDALONE_URL:-$PYTHON_STANDALONE_URL_DEFAULT}"
 PYTHON_STANDALONE_ARCHIVE="${WORK_DIR}/python-standalone.tar.gz"
 PYTHON_STANDALONE_ARCHIVE_PATH="${PYTHON_STANDALONE_ARCHIVE_PATH:-}"
 AIRGAP_DEBUG="${AIRGAP_DEBUG:-0}"
+SPLIT_SIZE_MB="40"
 
 # Requirements needed for run_multiagent_conversion.py + agents pipeline
 REQ_FILES=(
@@ -69,7 +70,10 @@ trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
 
 usage() {
   cat <<USAGE
-Usage: $(basename "$0") [--clean]
+Usage: $(basename "$0") [--clean] [--split-size-mb N]
+
+Options:
+  --split-size-mb N              split tar.gz into N MB chunks (default: 40)
 
 Environment variables:
   PYTHON_STANDALONE_URL          URL of python-build-standalone archive
@@ -77,20 +81,37 @@ Environment variables:
   AIRGAP_DEBUG                   1/true면 디버그 로그 출력
 
 Output:
-  dist/<bundle>.tar.gz
+  dist/<bundle>.tar.gz.part-000, part-001, ...
 USAGE
 }
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
-
-if [[ "${1:-}" == "--clean" ]]; then
-  rm -rf "$WORK_DIR" "$DIST_DIR"/proc_parser_anti-airgap-*.tar.gz
-  echo "[OK] cleaned previous build artifacts"
-  exit 0
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --clean)
+      rm -rf "$WORK_DIR" "$DIST_DIR"/proc_parser_anti-airgap-*.tar.gz "$DIST_DIR"/proc_parser_anti-airgap-*.tar.gz.part-*
+      echo "[OK] cleaned previous build artifacts"
+      exit 0
+      ;;
+    --split-size-mb)
+      shift
+      if [[ -z "${1:-}" || ! "${1}" =~ ^[0-9]+$ || "${1}" -le 0 ]]; then
+        echo "[ERROR] --split-size-mb requires positive integer" >&2
+        exit 1
+      fi
+      SPLIT_SIZE_MB="$1"
+      ;;
+    *)
+      echo "[ERROR] unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -139,6 +160,7 @@ need_cmd tar
 need_cmd rsync
 need_cmd python3
 need_cmd find
+need_cmd split
 
 mkdir -p "$WORK_DIR" "$DIST_DIR"
 rm -rf "$BUNDLE_DIR"
@@ -240,9 +262,10 @@ chmod +x "$BUNDLE_DIR/scripts/healthcheck.sh"
 cat > "$BUNDLE_DIR/README_AIRGAP.md" <<'READEOF'
 # Air-gap 실행 가이드 (Ubuntu)
 
-## 1) 압축 해제
+## 1) 분할 파일 병합 + 압축 해제
 ```bash
-tar -xzf proc_parser_anti-airgap-*.tar.gz
+cat proc_parser_anti-airgap-*.tar.gz.part-* > proc_parser_anti-airgap.tar.gz
+tar -xzf proc_parser_anti-airgap.tar.gz
 cd proc_parser_anti-airgap-*
 ```
 
@@ -265,5 +288,12 @@ set_step "pack_bundle"
 TARBALL_PATH="$DIST_DIR/${BUNDLE_NAME}.tar.gz"
 tar -czf "$TARBALL_PATH" -C "$WORK_DIR" "$BUNDLE_NAME"
 
+set_step "split_bundle"
+SPLIT_PREFIX="$TARBALL_PATH.part-"
+split -b "${SPLIT_SIZE_MB}m" -d -a 3 "$TARBALL_PATH" "$SPLIT_PREFIX"
+PART_COUNT="$(find "$DIST_DIR" -maxdepth 1 -type f -name "$(basename "$TARBALL_PATH").part-*" | wc -l | tr -d ' ')"
+rm -f "$TARBALL_PATH"
+log_info "split archive created: ${SPLIT_PREFIX}* (parts=${PART_COUNT}, chunk=${SPLIT_SIZE_MB}MB)"
+
 set_step "done"
-log_info "bundle created: $TARBALL_PATH"
+log_info "bundle parts directory: $DIST_DIR"
