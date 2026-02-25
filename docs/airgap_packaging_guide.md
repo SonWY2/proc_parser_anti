@@ -11,6 +11,14 @@ Python 바이너리가 없는 폐쇄망(air-gap) Ubuntu 환경에서 본 시스�
 ./scripts/package_airgap_ubuntu.sh
 ```
 
+## 주의
+- `source scripts/package_airgap_ubuntu.sh`로 실행하지 마세요.
+- 반드시 아래처럼 실행 파일로 호출해야 합니다:
+```bash
+./scripts/package_airgap_ubuntu.sh
+```
+
+
 생성물:
 - `dist/proc_parser_anti-airgap-<timestamp>.tar.gz`
 

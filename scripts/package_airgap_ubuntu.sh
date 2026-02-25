@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  echo "[ERROR] Do not source this script. Run it as: ./scripts/package_airgap_ubuntu.sh" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 # Build an Ubuntu air-gap runnable bundle for this repository.
 # Result: dist/proc_parser_anti-airgap-<timestamp>.tar.gz
 
@@ -60,19 +65,22 @@ resolve_python_bin() {
   local runtime_dir="$1"
   local candidate
 
-  # Common python-build-standalone layout: python/install/bin/python3
+  # Common python-build-standalone layouts
   for candidate in \
     "$runtime_dir/python/install/bin/python3" \
     "$runtime_dir/install/bin/python3" \
-    "$runtime_dir/bin/python3"; do
+    "$runtime_dir/bin/python3" \
+    "$runtime_dir/python/install/bin/python" \
+    "$runtime_dir/install/bin/python" \
+    "$runtime_dir/bin/python"; do
     if [[ -x "$candidate" ]]; then
       echo "$candidate"
       return 0
     fi
   done
 
-  # Fallback: find executable python3* (python3.11 등)
-  candidate="$(find "$runtime_dir" -type f \( -name 'python3' -o -name 'python3.*' \) -perm -111 | head -n 1 || true)"
+  # Fallback: find python3/python3.* or plain python (permission bit may be missing in some archives)
+  candidate="$(find "$runtime_dir" -type f \( -name 'python3' -o -name 'python3.*' -o -name 'python' \) | head -n 1 || true)"
   if [[ -n "$candidate" ]]; then
     echo "$candidate"
     return 0
