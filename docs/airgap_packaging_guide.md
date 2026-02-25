@@ -36,3 +36,12 @@ PYTHON_STANDALONE_URL="<python-build-standalone tar.gz URL>" ./scripts/package_a
 ```bash
 ./scripts/package_airgap_ubuntu.sh --clean
 ```
+
+
+## 다운로드 실패/재사용 시 로컬 아카이브 사용
+```bash
+PYTHON_STANDALONE_ARCHIVE_PATH=/path/to/cpython-standalone.tar.gz \
+./scripts/package_airgap_ubuntu.sh
+```
+
+> 스크립트는 `python3`, `python3.11` 등 실행 가능한 바이너리를 자동 탐색합니다.

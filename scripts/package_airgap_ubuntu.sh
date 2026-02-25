@@ -14,6 +14,7 @@ BUNDLE_DIR="${WORK_DIR}/${BUNDLE_NAME}"
 PYTHON_STANDALONE_URL_DEFAULT="https://github.com/astral-sh/python-build-standalone/releases/download/20250205/cpython-3.11.11%2B20250205-x86_64-unknown-linux-gnu-install_only.tar.gz"
 PYTHON_STANDALONE_URL="${PYTHON_STANDALONE_URL:-$PYTHON_STANDALONE_URL_DEFAULT}"
 PYTHON_STANDALONE_ARCHIVE="${WORK_DIR}/python-standalone.tar.gz"
+PYTHON_STANDALONE_ARCHIVE_PATH="${PYTHON_STANDALONE_ARCHIVE_PATH:-}"
 
 # Requirements needed for run_multiagent_conversion.py + agents pipeline
 REQ_FILES=(
@@ -29,7 +30,8 @@ usage() {
 Usage: $(basename "$0") [--clean]
 
 Environment variables:
-  PYTHON_STANDALONE_URL   URL of python-build-standalone archive
+  PYTHON_STANDALONE_URL          URL of python-build-standalone archive
+  PYTHON_STANDALONE_ARCHIVE_PATH local tar.gz path (skip download)
 
 Output:
   dist/<bundle>.tar.gz
@@ -54,32 +56,65 @@ need_cmd() {
   }
 }
 
-need_cmd curl
+resolve_python_bin() {
+  local runtime_dir="$1"
+  local candidate
+
+  # Common python-build-standalone layout: python/install/bin/python3
+  for candidate in \
+    "$runtime_dir/python/install/bin/python3" \
+    "$runtime_dir/install/bin/python3" \
+    "$runtime_dir/bin/python3"; do
+    if [[ -x "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  # Fallback: find executable python3* (python3.11 등)
+  candidate="$(find "$runtime_dir" -type f \( -name 'python3' -o -name 'python3.*' \) -perm -111 | head -n 1 || true)"
+  if [[ -n "$candidate" ]]; then
+    echo "$candidate"
+    return 0
+  fi
+
+  return 1
+}
+
 need_cmd tar
 need_cmd rsync
 need_cmd python3
+need_cmd find
 
 mkdir -p "$WORK_DIR" "$DIST_DIR"
 rm -rf "$BUNDLE_DIR"
 mkdir -p "$BUNDLE_DIR"/{runtime,wheelhouse,app,scripts}
 
-echo "[1/7] Downloading standalone Python..."
-curl -fL "$PYTHON_STANDALONE_URL" -o "$PYTHON_STANDALONE_ARCHIVE"
+if [[ -n "$PYTHON_STANDALONE_ARCHIVE_PATH" ]]; then
+  echo "[1/7] Using local standalone Python archive: $PYTHON_STANDALONE_ARCHIVE_PATH"
+  cp "$PYTHON_STANDALONE_ARCHIVE_PATH" "$PYTHON_STANDALONE_ARCHIVE"
+else
+  need_cmd curl
+  echo "[1/7] Downloading standalone Python..."
+  curl -fL "$PYTHON_STANDALONE_URL" -o "$PYTHON_STANDALONE_ARCHIVE"
+fi
 
 echo "[2/7] Extracting standalone Python..."
 tar -xzf "$PYTHON_STANDALONE_ARCHIVE" -C "$BUNDLE_DIR/runtime"
 
-PY_BIN="$(find "$BUNDLE_DIR/runtime" -type f -name 'python3' | head -n 1 || true)"
+PY_BIN="$(resolve_python_bin "$BUNDLE_DIR/runtime" || true)"
 if [[ -z "$PY_BIN" ]]; then
   echo "[ERROR] python3 binary not found after extraction" >&2
+  echo "[DEBUG] extracted top-level entries:" >&2
+  find "$BUNDLE_DIR/runtime" -maxdepth 4 -type d | sed 's#^#  - #' >&2
   exit 1
 fi
 
 chmod +x "$PY_BIN"
+echo "[INFO] runtime python: $PY_BIN"
 
 echo "[3/7] Creating embedded virtualenv..."
 "$PY_BIN" -m venv "$BUNDLE_DIR/runtime/venv"
-VENV_PY="$BUNDLE_DIR/runtime/venv/bin/python"
 VENV_PIP="$BUNDLE_DIR/runtime/venv/bin/pip"
 
 "$VENV_PIP" install --upgrade pip setuptools wheel
@@ -93,7 +128,7 @@ for req in "${REQ_FILES[@]}"; do
     echo >> "$COMBINED_REQ"
   fi
 done
-# remove comments/blanks/duplicates
+
 python3 - <<PY
 from pathlib import Path
 p = Path("$COMBINED_REQ")
@@ -104,7 +139,7 @@ for l in lines:
         continue
     if l not in seen:
         seen.append(l)
-p.write_text("\n".join(seen)+"\n", encoding="utf-8")
+p.write_text("\n".join(seen) + "\n", encoding="utf-8")
 PY
 
 "$VENV_PIP" wheel -r "$COMBINED_REQ" -w "$BUNDLE_DIR/wheelhouse"
