@@ -8,6 +8,7 @@ ChatOpenAI를 래핑하여 프로젝트 전반에서 일관된 LLM 호출을 제
 import json
 import re
 import logging
+import time
 from typing import Any, Dict, List, Optional, Union
 
 from dotenv import load_dotenv
@@ -17,6 +18,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from .config import LLMConfig
+from .llm_trace import llm_trace_content_enabled, log_llm_trace, sanitize_url
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -25,14 +27,14 @@ logger = logging.getLogger(__name__)
 class LLMClient:
     """
     통합 LLM 클라이언트
-    
+
     환경변수 기반 설정으로 ChatOpenAI를 초기화하고,
     JSON 응답 파싱 및 배치 처리를 지원합니다.
-    
+
     Example:
         client = LLMClient()
         result = client.invoke("분석해주세요", {"data": "..."})
-        
+
         # 시스템 프롬프트와 함께 사용
         result = client.invoke_with_system(
             system_prompt="당신은 SQL 전문가입니다.",
@@ -40,7 +42,7 @@ class LLMClient:
             variables={"sql": "SELECT * FROM users"}
         )
     """
-    
+
     def __init__(self, config: Optional[LLMConfig] = None):
         """
         Args:
@@ -49,29 +51,37 @@ class LLMClient:
         self.config = config or LLMConfig.from_env()
         self._llm: Optional[ChatOpenAI] = None
         self._json_parser = JsonOutputParser()
-    
+
     @property
     def llm(self) -> ChatOpenAI:
         """ChatOpenAI 인스턴스 (지연 초기화)"""
         if self._llm is None:
             self._llm = ChatOpenAI(**self.config.to_dict())
-            logger.info(f"LLM 초기화: model={self.config.model}, base_url={self.config.base_url}")
+            logger.info(
+                f"LLM 초기화: model={self.config.model}, base_url={self.config.base_url}"
+            )
         return self._llm
-    
+
+    def _normalize_content(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        return str(content)
+
     def invoke(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         variables: Optional[Dict[str, Any]] = None,
-        parse_json: bool = True
-    ) -> Union[Dict, str]:
+        parse_json: bool = True,
+        trace_context: Optional[Dict[str, Any]] = None,
+    ) -> Union[dict[str, Any], str]:
         """
         단순 프롬프트 호출
-        
+
         Args:
             prompt: 프롬프트 템플릿 (변수는 {var} 형식)
             variables: 프롬프트 변수
             parse_json: True면 JSON 파싱 시도
-            
+
         Returns:
             파싱된 JSON 또는 원본 문자열
         """
@@ -80,30 +90,79 @@ class LLMClient:
                 if isinstance(value, (dict, list)):
                     value = json.dumps(value, ensure_ascii=False, indent=2)
                 prompt = prompt.replace(f"{{{key}}}", str(value))
-        
-        response = self.llm.invoke([HumanMessage(content=prompt)])
-        content = response.content
-        
+
+        started = time.perf_counter()
+        include_content = llm_trace_content_enabled()
+        request_payload: dict[str, Any] = {
+            "model": self.config.model,
+            "base_url": sanitize_url(str(self.config.base_url or "")),
+            "parse_json": parse_json,
+            "prompt_chars": len(prompt),
+        }
+        if trace_context:
+            request_payload.update(trace_context)
+        if include_content:
+            request_payload["prompt_preview"] = prompt
+        log_llm_trace(
+            component="langchain_client",
+            event="invoke.request",
+            payload=request_payload,
+        )
+        try:
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            content = self._normalize_content(response.content)
+        except Exception as exc:
+            error_payload: dict[str, Any] = {
+                "model": self.config.model,
+                "base_url": sanitize_url(str(self.config.base_url or "")),
+                "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+                "error": str(exc),
+            }
+            if trace_context:
+                error_payload.update(trace_context)
+            log_llm_trace(
+                component="langchain_client",
+                event="invoke.error",
+                payload=error_payload,
+            )
+            raise
+
+        response_payload: dict[str, Any] = {
+            "model": self.config.model,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+            "response_chars": len(content),
+        }
+        if trace_context:
+            response_payload.update(trace_context)
+        if include_content:
+            response_payload["response_preview"] = str(content)
+        log_llm_trace(
+            component="langchain_client",
+            event="invoke.response",
+            payload=response_payload,
+        )
+
         if parse_json:
             return self._parse_json_response(content)
         return content
-    
+
     def invoke_with_system(
         self,
         system_prompt: str,
         user_prompt: str,
         variables: Optional[Dict[str, Any]] = None,
-        parse_json: bool = True
-    ) -> Union[Dict, str]:
+        parse_json: bool = True,
+        trace_context: Optional[Dict[str, Any]] = None,
+    ) -> Union[dict[str, Any], str]:
         """
         시스템 프롬프트와 함께 호출
-        
+
         Args:
             system_prompt: 시스템 프롬프트
             user_prompt: 사용자 프롬프트
             variables: 프롬프트 변수 (system_prompt와 user_prompt 모두에 적용)
             parse_json: True면 JSON 파싱 시도
-            
+
         Returns:
             파싱된 JSON 또는 원본 문자열
         """
@@ -114,21 +173,71 @@ class LLMClient:
                 str_value = str(value)
                 system_prompt = system_prompt.replace(f"{{{key}}}", str_value)
                 user_prompt = user_prompt.replace(f"{{{key}}}", str_value)
-        
+
         messages = [
             SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
+            HumanMessage(content=user_prompt),
         ]
-        
-        response = self.llm.invoke(messages)
-        content = response.content
-        
+
+        started = time.perf_counter()
+        include_content = llm_trace_content_enabled()
+        request_payload: dict[str, Any] = {
+            "model": self.config.model,
+            "base_url": sanitize_url(str(self.config.base_url or "")),
+            "parse_json": parse_json,
+            "system_prompt_chars": len(system_prompt),
+            "user_prompt_chars": len(user_prompt),
+        }
+        if trace_context:
+            request_payload.update(trace_context)
+        if include_content:
+            request_payload["system_prompt_preview"] = system_prompt
+            request_payload["user_prompt_preview"] = user_prompt
+        log_llm_trace(
+            component="langchain_client",
+            event="invoke_with_system.request",
+            payload=request_payload,
+        )
+        try:
+            response = self.llm.invoke(messages)
+            content = self._normalize_content(response.content)
+        except Exception as exc:
+            error_payload: dict[str, Any] = {
+                "model": self.config.model,
+                "base_url": sanitize_url(str(self.config.base_url or "")),
+                "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+                "error": str(exc),
+            }
+            if trace_context:
+                error_payload.update(trace_context)
+            log_llm_trace(
+                component="langchain_client",
+                event="invoke_with_system.error",
+                payload=error_payload,
+            )
+            raise
+
+        response_payload: dict[str, Any] = {
+            "model": self.config.model,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+            "response_chars": len(content),
+        }
+        if trace_context:
+            response_payload.update(trace_context)
+        if include_content:
+            response_payload["response_preview"] = str(content)
+        log_llm_trace(
+            component="langchain_client",
+            event="invoke_with_system.response",
+            payload=response_payload,
+        )
+
         logger.debug(f"LLM 응답: {len(content)} chars")
-        
+
         if parse_json:
             return self._parse_json_response(content)
         return content
-    
+
     def invoke_batch(
         self,
         items: List[Any],
@@ -136,11 +245,12 @@ class LLMClient:
         item_key: str = "item",
         system_prompt: Optional[str] = None,
         batch_size: int = 10,
-        parse_json: bool = True
-    ) -> List[Union[Dict, str]]:
+        parse_json: bool = True,
+        trace_context: Optional[Dict[str, Any]] = None,
+    ) -> List[Union[dict[str, Any], str]]:
         """
         배치 처리
-        
+
         Args:
             items: 처리할 항목 리스트
             prompt_template: 프롬프트 템플릿 ({item_key} 변수 포함)
@@ -148,58 +258,60 @@ class LLMClient:
             system_prompt: 시스템 프롬프트 (선택)
             batch_size: 배치 크기
             parse_json: True면 JSON 파싱 시도
-            
+
         Returns:
             결과 리스트
         """
         from .utils.chunking import chunk_list
-        
+
         results = []
-        
+
         for batch_idx, batch in enumerate(chunk_list(items, batch_size)):
             logger.info(f"배치 {batch_idx + 1} 처리 ({len(batch)}개 항목)")
-            
+
             variables = {item_key: batch}
-            
+
             if system_prompt:
                 result = self.invoke_with_system(
                     system_prompt=system_prompt,
                     user_prompt=prompt_template,
                     variables=variables,
-                    parse_json=parse_json
+                    parse_json=parse_json,
+                    trace_context=trace_context,
                 )
             else:
                 result = self.invoke(
                     prompt=prompt_template,
                     variables=variables,
-                    parse_json=parse_json
+                    parse_json=parse_json,
+                    trace_context=trace_context,
                 )
-            
+
             if isinstance(result, list):
                 results.extend(result)
             else:
                 results.append(result)
-        
+
         return results
-    
-    def _parse_json_response(self, content: str) -> Union[Dict, str]:
+
+    def _parse_json_response(self, content: str) -> Union[dict[str, Any], str]:
         """
         LLM 응답에서 JSON 추출 및 파싱
-        
+
         ```json ... ``` 블록이 있으면 해당 내용만 추출
         """
         try:
             # JSON 코드 블록 추출 시도
-            json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
+            json_match = re.search(r"```json\s*([\s\S]*?)\s*```", content)
             if json_match:
                 content = json_match.group(1)
-            
+
             # 또는 첫 번째 { 부터 마지막 } 까지
-            elif '{' in content and '}' in content:
-                start = content.find('{')
-                end = content.rfind('}') + 1
+            elif "{" in content and "}" in content:
+                start = content.find("{")
+                end = content.rfind("}") + 1
                 content = content[start:end]
-            
+
             return json.loads(content)
         except json.JSONDecodeError as e:
             logger.warning(f"JSON 파싱 실패: {e}")

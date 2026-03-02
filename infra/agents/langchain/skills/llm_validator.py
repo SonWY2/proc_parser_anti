@@ -6,6 +6,8 @@ Parser Critic과 SQL Critic 검증을 모두 지원합니다.
 """
 
 import time
+from pathlib import Path
+from uuid import uuid4
 from typing import Any, Dict, List, Optional, Union
 import logging
 
@@ -17,9 +19,9 @@ logger = logging.getLogger(__name__)
 class LLMValidatorSkill(BaseSkill):
     """
     LLM 기반 검증 Skill
-    
+
     청크별 파싱 결과 검증과 MyBatis 변환 결과 검증을 LLM으로 수행합니다.
-    
+
     Input:
         {
             "mode": "parser" | "sql",         # 검증 모드
@@ -27,7 +29,7 @@ class LLMValidatorSkill(BaseSkill):
             "mybatis_xmls": [...] (sql mode), # 검증할 MyBatis 변환
             "batch_size": 20 (optional)       # 배치 크기
         }
-        
+
     Output:
         {
             "passed": bool,
@@ -35,85 +37,134 @@ class LLMValidatorSkill(BaseSkill):
             "summary": str
         }
     """
-    
-    def __init__(self, debug: bool = False, debug_file: str = None):
+
+    def __init__(self, debug: bool = False, debug_file: Optional[str] = None):
         self._llm_client = None
         self._prompt_loader = None
         self.debug = debug  # True면 LLM 입/출력 상세 로그
-        self.debug_file = debug_file  # 디버그 로그 파일 경로
-    
+        self.debug_file: Optional[str] = debug_file  # 디버그 로그 파일 경로
+
     def _write_debug(self, content: str):
-        """디버그 내용을 파일에 기록"""
         if not self.debug:
             return
-        
-        if self.debug_file:
-            with open(self.debug_file, "a", encoding="utf-8") as f:
-                f.write(content + "\n")
-        else:
-            print(content)
-    
+
+        try:
+            if self.debug_file:
+                debug_path = Path(self.debug_file)
+                debug_path.parent.mkdir(parents=True, exist_ok=True)
+                with debug_path.open("a", encoding="utf-8") as f:
+                    _ = f.write(content + "\n")
+            else:
+                print(content)
+        except OSError as exc:
+            logger.warning("validator debug log write failed: %s", exc)
+
     @property
     def name(self) -> str:
         return "llm_validator"
-    
+
     @property
     def description(self) -> str:
         return "LLM을 활용한 파싱/SQL 변환 결과 검증"
-    
+
     def _get_llm_client(self):
         """LLM 클라이언트 지연 초기화"""
         if self._llm_client is None:
             from ..llm_client import get_llm_client
+
             self._llm_client = get_llm_client()
         return self._llm_client
-    
+
     def _get_config(self):
         """PipelineConfig 지연 로드"""
         from ..config import PipelineConfig
+
         return PipelineConfig.from_env()
-    
+
     def _invoke_llm_with_retry(
-        self, 
-        system_prompt: str, 
-        user_prompt: str, 
+        self,
+        system_prompt: str,
+        user_prompt: str,
         context_label: str = "",
-        parse_json: bool = True
-    ) -> Union[Dict, str]:
+        parse_json: bool = True,
+    ) -> Union[Dict[str, Any], str]:
         """
         LLM 호출 + 429 에러 시 지수 백오프 재시도
-        
+
         Args:
             system_prompt: 시스템 프롬프트
             user_prompt: 사용자 프롬프트
             context_label: 로그용 컨텍스트 이름
             parse_json: JSON 파싱 여부
-            
+
         Returns:
             LLM 응답 (parsed JSON dict or raw string)
-            
+
         Raises:
             마지막 시도에서의 예외를 그대로 전파
         """
+        from ..llm_trace import log_llm_trace
+
         cfg = self._get_config()
         llm = self._get_llm_client()
         max_retries = cfg.llm_max_retries
         base_delay = cfg.llm_retry_base_delay
-        
+        trace_id = f"validator-{uuid4().hex[:10]}"
+        stage = context_label or "validator"
+
         for attempt in range(max_retries + 1):
             try:
+                log_llm_trace(
+                    component="validator_retry",
+                    event="attempt",
+                    payload={
+                        "context": context_label,
+                        "stage": stage,
+                        "trace_id": trace_id,
+                        "attempt": attempt + 1,
+                        "max_attempts": max_retries + 1,
+                        "parse_json": parse_json,
+                    },
+                )
                 result = llm.invoke_with_system(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    parse_json=parse_json
+                    parse_json=parse_json,
+                    trace_context={
+                        "stage": stage,
+                        "trace_id": trace_id,
+                    },
+                )
+                log_llm_trace(
+                    component="validator_retry",
+                    event="success",
+                    payload={
+                        "context": context_label,
+                        "stage": stage,
+                        "trace_id": trace_id,
+                        "attempt": attempt + 1,
+                    },
                 )
                 return result
             except Exception as e:
                 error_str = str(e)
                 is_rate_limit = "429" in error_str or "rate limit" in error_str.lower()
-                
+
                 if is_rate_limit and attempt < max_retries:
-                    wait_time = base_delay * (2 ** attempt)
+                    wait_time = base_delay * (2**attempt)
+                    log_llm_trace(
+                        component="validator_retry",
+                        event="retry",
+                        payload={
+                            "context": context_label,
+                            "stage": stage,
+                            "trace_id": trace_id,
+                            "attempt": attempt + 1,
+                            "max_attempts": max_retries + 1,
+                            "wait_seconds": wait_time,
+                            "reason": error_str,
+                        },
+                    )
                     logger.warning(
                         f"⏳ [{context_label}] Rate limit (429), "
                         f"{wait_time:.1f}초 대기 후 재시도 ({attempt + 1}/{max_retries})"
@@ -125,89 +176,106 @@ class LLMValidatorSkill(BaseSkill):
                         )
                     time.sleep(wait_time)
                 else:
+                    log_llm_trace(
+                        component="validator_retry",
+                        event="error",
+                        payload={
+                            "context": context_label,
+                            "stage": stage,
+                            "trace_id": trace_id,
+                            "attempt": attempt + 1,
+                            "max_attempts": max_retries + 1,
+                            "error": error_str,
+                        },
+                    )
                     raise
-    
+
+        log_llm_trace(
+            component="validator_retry",
+            event="exhausted",
+            payload={
+                "context": context_label,
+                "stage": stage,
+                "trace_id": trace_id,
+                "max_attempts": max_retries + 1,
+            },
+        )
+        raise RuntimeError(f"LLM invocation retries exhausted: {context_label}")
+
     def _get_prompt_loader(self):
         """프롬프트 로더 지연 초기화"""
         if self._prompt_loader is None:
             from ..subagents.subagent_loader import get_subagent_loader
+
             self._prompt_loader = get_subagent_loader()
         return self._prompt_loader
-    
+
     def validate_input(self, input_data: Any) -> Optional[str]:
         if not isinstance(input_data, dict):
             return "입력은 딕셔너리여야 합니다"
-        
+
         mode = input_data.get("mode", "parser")
         if mode == "parser" and "chunks" not in input_data:
             return "parser 모드에서는 chunks 필드가 필요합니다"
         if mode == "sql" and "mybatis_xmls" not in input_data:
             return "sql 모드에서는 mybatis_xmls 필드가 필요합니다"
-        
+
         return None
-    
+
     def invoke(self, input_data: Any) -> SkillResult:
         """
         LLM 검증 실행
-        
+
         Args:
             input_data: {mode, chunks | mybatis_xmls, batch_size?}
-            
+
         Returns:
             SkillResult with validation results
         """
         error = self.validate_input(input_data)
         if error:
             return SkillResult(success=False, errors=[error])
-        
+
         mode = input_data.get("mode", "parser")
         batch_size = input_data.get("batch_size", 20)
-        
+
         # debug 옵션 반영
         if input_data.get("debug"):
             self.debug = True
         if input_data.get("debug_file"):
             self.debug_file = input_data.get("debug_file")
-        
+
         try:
             if mode == "parser":
-                result = self._validate_parser_chunks(
-                    input_data["chunks"], 
-                    batch_size
-                )
+                result = self._validate_parser_chunks(input_data["chunks"], batch_size)
             else:  # sql mode
                 result = self._validate_sql_conversion(
-                    input_data["mybatis_xmls"],
-                    batch_size
+                    input_data["mybatis_xmls"], batch_size
                 )
-            
+
             return SkillResult(success=True, data=result)
-            
+
         except Exception as e:
             logger.exception(f"LLM 검증 실패: {e}")
             return SkillResult(success=False, errors=[str(e)])
-    
-    def _parse_block_response(self, text: str) -> Dict:
+
+    def _parse_block_response(self, text: str) -> Dict[str, Any]:
         """
         Line-Based Block Format 파싱
-        
+
         [ISSUE], [RECLASS], [MISSING] 블록을 파싱합니다.
         """
-        parsed = {
-            "issues": [],
-            "reclassifications": [],
-            "missing_elements": []
-        }
-        
+        parsed = {"issues": [], "reclassifications": [], "missing_elements": []}
+
         current_block = {}
         current_type = None
-        
-        lines = text.split('\n')
+
+        lines = text.split("\n")
         for line in lines:
             line = line.strip()
             if not line:
                 continue
-                
+
             if line == "[ISSUE]":
                 if current_type == "ISSUE" and current_block:
                     parsed["issues"].append(current_block)
@@ -224,22 +292,22 @@ class LLMValidatorSkill(BaseSkill):
                 current_block = {}
                 current_type = "MISSING"
             elif line.startswith("[") and line.endswith("]"):
-                 # 다른 블록 시작 시 이전 블록 저장 (예: [SUMMARY] 등 무시)
-                 if current_type == "ISSUE" and current_block:
+                # 다른 블록 시작 시 이전 블록 저장 (예: [SUMMARY] 등 무시)
+                if current_type == "ISSUE" and current_block:
                     parsed["issues"].append(current_block)
-                 elif current_type == "RECLASS" and current_block:
+                elif current_type == "RECLASS" and current_block:
                     parsed["reclassifications"].append(current_block)
-                 elif current_type == "MISSING" and current_block:
+                elif current_type == "MISSING" and current_block:
                     parsed["missing_elements"].append(current_block)
-                 current_block = {}
-                 current_type = None
+                current_block = {}
+                current_type = None
             else:
                 if current_type and ":" in line:
                     key, val = line.split(":", 1)
                     key = key.strip().lower().replace(" ", "_")
                     val = val.strip()
                     current_block[key] = val
-        
+
         # 마지막 블록 저장
         if current_type == "ISSUE" and current_block:
             parsed["issues"].append(current_block)
@@ -247,140 +315,202 @@ class LLMValidatorSkill(BaseSkill):
             parsed["reclassifications"].append(current_block)
         elif current_type == "MISSING" and current_block:
             parsed["missing_elements"].append(current_block)
-            
+
         # 키 매핑 정규화 (LLM이 대소문자나 공백을 섞어 쓸 경우 대비)
         # [ISSUE] -> element_id, element_type, issue, severity, correct_value
         # [RECLASS] -> element_id, from_type, to_type
         # [MISSING] -> type, content, line
-        
-        normalized = {
-            "issues": [],
-            "reclassifications": [],
-            "missing_elements": []
-        }
-        
+
+        normalized = {"issues": [], "reclassifications": [], "missing_elements": []}
+
         for issue in parsed["issues"]:
             norm_issue = {}
             # element / element_id
-            if "element" in issue: norm_issue["element_id"] = issue["element"]
-            elif "element_id" in issue: norm_issue["element_id"] = issue["element_id"]
-            
+            if "element" in issue:
+                norm_issue["element_id"] = issue["element"]
+            elif "element_id" in issue:
+                norm_issue["element_id"] = issue["element_id"]
+
             # type / element_type
-            if "type" in issue: norm_issue["element_type"] = issue["type"]
-            elif "element_type" in issue: norm_issue["element_type"] = issue["element_type"]
-            
+            if "type" in issue:
+                norm_issue["element_type"] = issue["type"]
+            elif "element_type" in issue:
+                norm_issue["element_type"] = issue["element_type"]
+
             norm_issue["issue"] = issue.get("issue", "")
             norm_issue["severity"] = issue.get("severity", "error").lower()
-            if "correct_value" in issue: norm_issue["correct_value"] = issue["correct_value"]
-            
+            if "correct_value" in issue:
+                norm_issue["correct_value"] = issue["correct_value"]
+
             if "element_id" in norm_issue:
                 normalized["issues"].append(norm_issue)
 
         for reclass in parsed["reclassifications"]:
             norm_reclass = {}
-            if "element" in reclass: norm_reclass["element_id"] = reclass["element"]
-            elif "element_id" in reclass: norm_reclass["element_id"] = reclass["element_id"]
-            
-            if "from" in reclass: norm_reclass["from_type"] = reclass["from"]
-            elif "from_type" in reclass: norm_reclass["from_type"] = reclass["from_type"]
-            
-            if "to" in reclass: norm_reclass["to_type"] = reclass["to"]
-            elif "to_type" in reclass: norm_reclass["to_type"] = reclass["to_type"]
-            
-            if "element_id" in norm_reclass and "from_type" in norm_reclass and "to_type" in norm_reclass:
+            if "element" in reclass:
+                norm_reclass["element_id"] = reclass["element"]
+            elif "element_id" in reclass:
+                norm_reclass["element_id"] = reclass["element_id"]
+
+            if "from" in reclass:
+                norm_reclass["from_type"] = reclass["from"]
+            elif "from_type" in reclass:
+                norm_reclass["from_type"] = reclass["from_type"]
+
+            if "to" in reclass:
+                norm_reclass["to_type"] = reclass["to"]
+            elif "to_type" in reclass:
+                norm_reclass["to_type"] = reclass["to_type"]
+
+            if (
+                "element_id" in norm_reclass
+                and "from_type" in norm_reclass
+                and "to_type" in norm_reclass
+            ):
                 normalized["reclassifications"].append(norm_reclass)
 
         for missing in parsed["missing_elements"]:
             # missing은 키가 간단해서 그대로 씀 (type, content, line)
             if "type" in missing and "content" in missing:
                 normalized["missing_elements"].append(missing)
-                
+
         return normalized
 
     def _validate_parser_chunks(
-        self, 
-        chunks: List[Dict], 
-        batch_size: int
-    ) -> Dict:
+        self, chunks: List[Dict[str, Any]], batch_size: int
+    ) -> Dict[str, Any]:
         """Parser Critic: 청크별 파싱 결과 검증"""
         import json
         from ..utils.chunking import chunk_list
-        
-        llm = self._get_llm_client()
+
         loader = self._get_prompt_loader()
-        
+
         all_missing = []
         all_wrong = []
         all_reclassifications = []
-        
+
         for chunk in chunks:
             elements = chunk.get("elements", [])
-            if not elements:
-                continue
-            
             code = chunk.get("code", "")
             scope = chunk.get("scope", "unknown")
-            
+            remaining_code = str(chunk.get("remaining_code", "")).strip()
+            if not elements and not remaining_code:
+                continue
+
+            if remaining_code:
+                missing_prompt = loader.get_prompt_section(
+                    "parser_critic_agent",
+                    "미분석 검증",
+                    fallback=self._get_fallback_missing_prompt(),
+                )
+                try:
+                    missing_user_prompt = json.dumps(
+                        {"remaining_code": remaining_code}, ensure_ascii=False, indent=2
+                    )
+                    if self.debug:
+                        self._write_debug(f"\n{'=' * 60}")
+                        self._write_debug(
+                            f"📤 [Parser Critic Missing] LLM 입력 - {scope}"
+                        )
+                        self._write_debug(f"{'=' * 60}")
+                        self._write_debug(f"[System Prompt]\n{missing_prompt}")
+                        self._write_debug(f"\n[User Prompt]\n{missing_user_prompt}")
+                        self._write_debug(f"{'=' * 60}")
+
+                    missing_result = self._invoke_llm_with_retry(
+                        system_prompt=missing_prompt,
+                        user_prompt=missing_user_prompt,
+                        context_label=f"Parser Critic Missing:{scope}",
+                        parse_json=False,
+                    )
+
+                    cfg = self._get_config()
+                    time.sleep(cfg.llm_call_delay)
+
+                    if self.debug:
+                        self._write_debug(
+                            "\n📥 [Parser Critic Missing] LLM 출력 (Block Format)"
+                        )
+                        self._write_debug(f"{missing_result}")
+                        self._write_debug(f"{'=' * 60}\n")
+
+                    parsed_missing = self._parse_block_response(str(missing_result))
+                    all_missing.extend(parsed_missing.get("missing_elements", []))
+                except Exception as e:
+                    if self.debug:
+                        self._write_debug("\n❌ [Parser Critic Missing] LLM 호출 실패")
+                        self._write_debug(f"Error: {e}")
+                        self._write_debug(f"{'=' * 60}\n")
+
+                    logger.warning(f"LLM 미분석 검증 실패 ({scope}): {e}, 룰 기반 폴백")
+                    fallback = self._rule_based_validation(chunk)
+                    all_missing.extend(fallback.get("missing_issues", []))
+
             # 요소가 많으면 배치 단위로 처리
             for batch_idx, element_batch in enumerate(chunk_list(elements, batch_size)):
-                logger.info(f"검증: {scope} 배치 {batch_idx + 1} ({len(element_batch)}개)")
-                
+                logger.info(
+                    f"검증: {scope} 배치 {batch_idx + 1} ({len(element_batch)}개)"
+                )
+
                 # 오분석 검증 프롬프트
                 wrong_prompt = loader.get_prompt_section(
-                    "parser_critic_agent", 
+                    "parser_critic_agent",
                     "오분석 검증",
-                    fallback=self._get_fallback_wrong_prompt()
+                    fallback=self._get_fallback_wrong_prompt(),
                 )
-                
+
                 try:
-                    user_prompt = json.dumps({
-                        "code": code,
-                        "elements": element_batch
-                    }, ensure_ascii=False, indent=2)
-                    
+                    user_prompt = json.dumps(
+                        {"code": code, "elements": element_batch},
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+
                     # 디버그 모드: 입력 출력
                     if self.debug:
-                        self._write_debug(f"\n{'='*60}")
+                        self._write_debug(f"\n{'=' * 60}")
                         self._write_debug(f"📤 [Parser Critic] LLM 입력 - {scope}")
-                        self._write_debug(f"{'='*60}")
+                        self._write_debug(f"{'=' * 60}")
                         self._write_debug(f"[System Prompt]\n{wrong_prompt}")
                         self._write_debug(f"\n[User Prompt]\n{user_prompt}")
-                        self._write_debug(f"{'='*60}")
-                    
+                        self._write_debug(f"{'=' * 60}")
+
                     result = self._invoke_llm_with_retry(
                         system_prompt=wrong_prompt,
                         user_prompt=user_prompt,
                         context_label=f"Parser Critic:{scope}",
-                        parse_json=False
+                        parse_json=False,
                     )
-                    
+
                     # Rate limit 보호: 호출 간 지연
                     cfg = self._get_config()
                     time.sleep(cfg.llm_call_delay)
-                    
+
                     # 디버그 모드: 출력 출력
                     if self.debug:
-                        self._write_debug(f"\n📥 [Parser Critic] LLM 출력 (Block Format)")
+                        self._write_debug(
+                            f"\n📥 [Parser Critic] LLM 출력 (Block Format)"
+                        )
                         self._write_debug(f"{result}")
-                        self._write_debug(f"{'='*60}\n")
-                    
+                        self._write_debug(f"{'=' * 60}\n")
+
                     # Block Format 파싱
-                    parsed = self._parse_block_response(result)
+                    parsed = self._parse_block_response(str(result))
                     all_wrong.extend(parsed.get("issues", []))
                     all_reclassifications.extend(parsed.get("reclassifications", []))
-                        
+
                 except Exception as e:
                     # 디버그 모드: 에러 출력
                     if self.debug:
                         self._write_debug(f"\n❌ [Parser Critic] LLM 호출 실패")
                         self._write_debug(f"Error: {e}")
-                        self._write_debug(f"{'='*60}\n")
-                    
+                        self._write_debug(f"{'=' * 60}\n")
+
                     logger.warning(f"LLM 검증 실패 ({scope}): {e}, 룰 기반 폴백")
                     # 룰 기반 폴백
                     fallback = self._rule_based_validation(chunk)
                     all_missing.extend(fallback.get("missing_issues", []))
-        
+
         return {
             "passed": len(all_wrong) == 0 and len(all_missing) == 0,
             "missing_count": len(all_missing),
@@ -388,125 +518,152 @@ class LLMValidatorSkill(BaseSkill):
             "reclassification_count": len(all_reclassifications),
             "missing_issues": all_missing,
             "wrong_issues": all_wrong,
-            "reclassifications": all_reclassifications
+            "reclassifications": all_reclassifications,
         }
-    
+
+    def _get_fallback_missing_prompt(self) -> str:
+        return """당신은 Pro*C 코드 파서의 결과를 검증하는 전문가입니다.
+
+사용자가 파서가 분석하지 못한 잔여 코드를 JSON으로 제공합니다.
+이 중 추출되어야 할 요소가 있는지 확인하세요.
+
+## 추출 대상
+- EXEC SQL 문 (SELECT, INSERT, UPDATE, DELETE, DECLARE, etc.)
+- 호스트 변수 선언 (EXEC SQL BEGIN/END DECLARE SECTION 내)
+- C 함수 정의
+- 매크로 (#define)
+- 구조체 정의
+
+## 입력 JSON 형식
+{
+  "remaining_code": "잔여 코드"
+}
+
+## 출력 형식 (Line-Based Block Format)
+반드시 다음 형식을 지켜주세요. JSON을 출력하지 마세요.
+발견된 요소마다 하나의 블록을 작성하세요.
+
+[MISSING]
+Type: <SQL | VARIABLE | FUNCTION | MACRO | STRUCT>
+Content: <발견된 요소의 원문 (한 줄로 요약)>
+Line: <대략적인 라인 번호>"""
+
     def _validate_sql_conversion(
-        self, 
-        mybatis_xmls: List[Dict],
-        batch_size: int
-    ) -> Dict:
+        self, mybatis_xmls: List[Dict[str, Any]], batch_size: int
+    ) -> Dict[str, Any]:
         """SQL Critic: MyBatis 변환 결과 검증"""
         import json
         from ..utils.chunking import chunk_list
-        
-        llm = self._get_llm_client()
+
         loader = self._get_prompt_loader()
-        
+
         # 검토 대상 필터링
         candidates = [
             {
                 "sql_id": m.get("sql_id"),
                 "sql_type": m.get("sql_type"),
                 "original": m.get("original", ""),
-                "converted": m.get("converted", "")
+                "converted": m.get("converted", ""),
             }
             for m in mybatis_xmls
-            if m.get("success") and m.get("converted")
+            if m.get("success")
+            and m.get("converted")
             and m.get("note") != "skip_declare_section"
             and not str(m.get("note", "")).startswith("merged_into_cursor_")
         ]
-        
+
         if not candidates:
-            return {
-                "passed": True, 
-                "issues": [], 
-                "summary": "검토 대상 SQL 없음"
-            }
-        
+            return {"passed": True, "issues": [], "summary": "검토 대상 SQL 없음"}
+
         # 시스템 프롬프트 로드
-        system_prompt = loader.get_prompt(
-            "sql_critic_agent"
-        )
-        
+        system_prompt = loader.get_prompt("sql_critic_agent")
+
         all_issues = []
-        
+
         for batch_idx, batch in enumerate(chunk_list(candidates, batch_size)):
             logger.info(f"SQL Critic: 배치 {batch_idx + 1} ({len(batch)}개)")
-            
+
             try:
                 user_prompt = json.dumps(batch, ensure_ascii=False, indent=2)
-                
+
                 # 디버그 모드: 입력 출력
                 if self.debug:
-                    self._write_debug(f"\n{'='*60}")
-                    self._write_debug(f"📤 [SQL Critic] LLM 입력 - 배치 {batch_idx + 1}")
-                    self._write_debug(f"{'='*60}")
+                    self._write_debug(f"\n{'=' * 60}")
+                    self._write_debug(
+                        f"📤 [SQL Critic] LLM 입력 - 배치 {batch_idx + 1}"
+                    )
+                    self._write_debug(f"{'=' * 60}")
                     self._write_debug(f"[System Prompt]\n{system_prompt}")
                     self._write_debug(f"\n[User Prompt]\n{user_prompt}")
-                    self._write_debug(f"{'='*60}")
-                
+                    self._write_debug(f"{'=' * 60}")
+
                 result = self._invoke_llm_with_retry(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    context_label=f"SQL Critic:배치{batch_idx + 1}"
+                    context_label=f"SQL Critic:배치{batch_idx + 1}",
                 )
-                
+
                 # Rate limit 보호: 호출 간 지연
                 cfg = self._get_config()
                 time.sleep(cfg.llm_call_delay)
-                
+
                 # 디버그 모드: 출력 출력
                 if self.debug:
                     self._write_debug(f"\n📥 [SQL Critic] LLM 출력")
-                    self._write_debug(f"{json.dumps(result, ensure_ascii=False, indent=2)}")
-                    self._write_debug(f"{'='*60}\n")
-                
+                    self._write_debug(
+                        f"{json.dumps(result, ensure_ascii=False, indent=2)}"
+                    )
+                    self._write_debug(f"{'=' * 60}\n")
+
                 if isinstance(result, dict):
                     all_issues.extend(result.get("issues", []))
-                    
+
             except Exception as e:
                 # 디버그 모드: 에러 출력
                 if self.debug:
-                    self._write_debug(f"\n❌ [SQL Critic] LLM 호출 실패 - 배치 {batch_idx + 1}")
+                    self._write_debug(
+                        f"\n❌ [SQL Critic] LLM 호출 실패 - 배치 {batch_idx + 1}"
+                    )
                     self._write_debug(f"Error: {e}")
-                    self._write_debug(f"{'='*60}\n")
-                
+                    self._write_debug(f"{'=' * 60}\n")
+
                 logger.warning(f"SQL Critic 배치 {batch_idx + 1} 실패: {e}")
-        
+
         return {
             "passed": len(all_issues) == 0,
             "issues": all_issues,
-            "summary": f"총 {len(candidates)}개 SQL 검토, {len(all_issues)}개 이슈"
+            "summary": f"총 {len(candidates)}개 SQL 검토, {len(all_issues)}개 이슈",
         }
-    
-    def _rule_based_validation(self, chunk: Dict) -> Dict:
+
+    def _rule_based_validation(self, chunk: Dict[str, Any]) -> Dict[str, Any]:
         """룰 기반 폴백 검증"""
         import re
-        
+
         result = {
             "chunk_id": chunk.get("scope", "unknown"),
             "missing_issues": [],
             "wrong_issues": [],
-            "reclassifications": []
+            "reclassifications": [],
         }
-        
+
         code = chunk.get("code", "")
         elements = chunk.get("elements", [])
-        
+
         # 간단한 미분석 체크: EXEC SQL이 추출되지 않은 경우
-        exec_sql_count = len(re.findall(r'EXEC\s+SQL', code, re.IGNORECASE))
+        exec_sql_count = len(re.findall(r"EXEC\s+SQL", code, re.IGNORECASE))
         sql_elements = [e for e in elements if e.get("category") == "sql_blocks"]
-        
+
         if exec_sql_count > len(sql_elements):
-            result["missing_issues"].append({
-                "type": "SQL",
-                "content": f"EXEC SQL {exec_sql_count}개 중 {len(sql_elements)}개만 추출됨",
-                "line": 0
-            })
-        
+            result["missing_issues"].append(
+                {
+                    "type": "SQL",
+                    "content": f"EXEC SQL {exec_sql_count}개 중 {len(sql_elements)}개만 추출됨",
+                    "line": 0,
+                }
+            )
+
         return result
-    
+
     def _get_fallback_wrong_prompt(self) -> str:
         """오분석 검증 폴백 프롬프트"""
         return """당신은 Pro*C 코드 파서의 결과를 검증하는 전문가입니다.
@@ -526,32 +683,25 @@ class LLMValidatorSkill(BaseSkill):
   "elements": [추출된 요소 배열]
 }
 
-## 출력 형식 (JSON만 출력)
-{
-  "has_errors": true 또는 false,
-  "issues": [
-    {
-      "element_id": "요소의 name 또는 sql_id 필드 값",
-      "element_type": "현재 분류된 타입",
-      "issue": "문제 설명",
-      "correct_value": "수정된 값 (있다면)",
-      "severity": "error" | "warning"
-    }
-  ],
-  "reclassifications": [
-    {
-      "element_id": "요소의 name 또는 sql_id 필드 값",
-      "from_type": "현재 잘못된 타입 (sql | variable | function | macro | struct 중 하나)",
-      "to_type": "올바른 타입 (sql | variable | function | macro | struct 중 하나)"
-    }
-  ],
-  "summary": "요약"
-}
+## 출력 형식 (Line-Based Block Format)
+반드시 다음 형식을 지켜주세요. JSON을 출력하지 마세요.
+
+[ISSUE]
+Element: <요소의 name 또는 sql_id>
+Type: <현재 분류된 타입>
+Issue: <문제 설명>
+Correct Value: <수정된 값 (있다면)>
+Severity: <ERROR | WARNING>
+
+[RECLASS]
+Element: <요소의 name 또는 sql_id>
+From: <현재 잘못된 타입 (sql/variable/function/macro/struct)>
+To: <올바른 타입 (sql/variable/function/macro/struct)>
 
 ## 중요 규칙
-- element_id: 반드시 입력 elements 배열에 있는 요소의 "name" 또는 "sql_id" 필드 값을 사용하세요.
-- from_type / to_type: 반드시 다음 5가지 중 하나여야 합니다: sql, variable, function, macro, struct
-- 위 5가지에 해당하지 않는 요소(예: comment, include 등)는 reclassifications에 포함하지 마세요.
-- **중요**: 요소의 타입이 명백히 잘못된 경우(예: 'EXEC SQL'이 variable로 분류됨), issue를 보고함과 동시에 **반드시** reclassifications에도 추가해야 합니다.
+- Element: 반드시 입력 elements 배열의 "name" 또는 "sql_id" 값을 사용하세요.
+- From / To: 반드시 다음 5가지 중 하나여야 합니다: sql, variable, function, macro, struct
+- 위 5가지에 해당하지 않는 요소는 [RECLASS]를 작성하지 마세요.
+- 타입이 명백히 잘못된 경우, [ISSUE]와 [RECLASS]를 동시에 작성하세요.
 - 'sqlca'가 variable로 분류된 경우, 반드시 struct로 재분류하세요.
 - 'EXEC SQL ...' 형태의 요소가 variable로 분류된 경우, 반드시 sql 또는 macro로 재분류하세요."""

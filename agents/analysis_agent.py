@@ -7,7 +7,7 @@ import re
 from typing import Any, Dict, List
 
 from parsing.header.integrated_parser import IntegratedHeaderParser
-from parsing.core.core import ProCParser
+from infra.agents.langchain.skills.parse_proc_code import ParseProcCodeSkill
 
 
 _SQL_PATTERN = re.compile(r"EXEC\s+SQL[\s\S]*?;", re.IGNORECASE)
@@ -26,7 +26,9 @@ def _extract_sql_blocks(code: str, source_file: str) -> List[Dict[str, Any]]:
     blocks: List[Dict[str, Any]] = []
     for idx, match in enumerate(_SQL_PATTERN.finditer(code), start=1):
         block = match.group(0)
-        sql_type_match = re.search(r"\b(SELECT|INSERT|UPDATE|DELETE|MERGE)\b", block, re.IGNORECASE)
+        sql_type_match = re.search(
+            r"\b(SELECT|INSERT|UPDATE|DELETE|MERGE)\b", block, re.IGNORECASE
+        )
         sql_type = sql_type_match.group(1).lower() if sql_type_match else "unknown"
         blocks.append(
             {
@@ -40,6 +42,38 @@ def _extract_sql_blocks(code: str, source_file: str) -> List[Dict[str, Any]]:
     return blocks
 
 
+def _normalize_parsed_sql_blocks(
+    parsed_sql_blocks: List[Dict[str, Any]], source_file: str
+) -> List[Dict[str, Any]]:
+    blocks: List[Dict[str, Any]] = []
+    for idx, item in enumerate(parsed_sql_blocks, start=1):
+        sql_id = item.get("id") or f"{Path(source_file).stem}_sql_{idx}"
+        sql_type = str(item.get("sql_type", "unknown")).lower()
+        sql_content = item.get("content", "")
+        block = {
+            "id": sql_id,
+            "name": f"{sql_type}_{idx}",
+            "sql_type": sql_type,
+            "sql": sql_content,
+            "parsed_sql": sql_content,
+            "input_vars": item.get("inputs", []),
+            "output_vars": item.get("outputs", []),
+            "function_name": item.get("function_name"),
+            "source_file": source_file,
+        }
+        blocks.append(block)
+    return blocks
+
+
+def _normalize_parsed_functions(parsed_functions: List[Dict[str, Any]]) -> List[str]:
+    names: List[str] = []
+    for item in parsed_functions:
+        name = str(item.get("name", "")).strip()
+        if name:
+            names.append(name)
+    return names
+
+
 def _extract_functions(code: str) -> List[str]:
     return [m.group(2) for m in _FUNC_PATTERN.finditer(code)]
 
@@ -51,7 +85,9 @@ def _extract_externs(code: str) -> List[str]:
 def _parse_headers(header_paths: List[str], proc_paths: List[str]) -> Dict[str, Any]:
     # 통합 파서를 우선 시도하고 실패하면 빈 맵으로 대체
     type_map: Dict[str, Any] = {}
-    parser = IntegratedHeaderParser(include_paths=[str(Path(p).parent) for p in header_paths])
+    parser = IntegratedHeaderParser(
+        include_paths=[str(Path(p).parent) for p in header_paths]
+    )
 
     for proc_path in proc_paths:
         try:
@@ -84,27 +120,47 @@ def run_analysis(state: Dict[str, Any]) -> Dict[str, Any]:
     sql_blocks: List[Dict[str, Any]] = []
     extern_list: List[str] = []
 
-    try:
-        parser = ProCParser()
-    except Exception:
-        parser = None
+    parse_skill = ParseProcCodeSkill()
 
     type_map = _parse_headers(header_paths, proc_paths)
+    parsed_ir_by_file: Dict[str, Dict[str, Any]] = {}
+    ast_by_file: Dict[str, Dict[str, Any]] = {}
+    source_by_file: Dict[str, str] = {}
 
     for proc_path in proc_paths:
         try:
             code = Path(proc_path).read_text(encoding="utf-8", errors="replace")
+            source_by_file[proc_path] = code
             loc = _line_count(code)
-            functions = _extract_functions(code)
             externs = _extract_externs(code)
-            file_sql_blocks = _extract_sql_blocks(code, proc_path)
+            parsed = parse_skill.invoke({"source_code": code, "file_path": proc_path})
 
-            # 기존 파서 호출은 베스트 에포트(실패해도 fallback 유지)
-            if parser is not None:
-                try:
-                    parser.parse_file(proc_path)
-                except Exception:
-                    pass
+            if parsed.success:
+                parsed_data = parsed.data
+                parsed_ir_by_file[proc_path] = parsed_data
+                ast_by_file[proc_path] = parsed_data
+                functions = _normalize_parsed_functions(
+                    parsed_data.get("functions", [])
+                )
+                file_sql_blocks = _normalize_parsed_sql_blocks(
+                    parsed_data.get("sql_blocks", []), proc_path
+                )
+            else:
+                functions = _extract_functions(code)
+                file_sql_blocks = _extract_sql_blocks(code, proc_path)
+                ast_by_file[proc_path] = {
+                    "headers": [],
+                    "host_vars": [],
+                    "sql_blocks": [],
+                    "functions": [],
+                    "macros": [],
+                    "structs": [],
+                    "unknown_segments": [],
+                }
+                if parsed.errors:
+                    errors.append(
+                        f"parser fallback used for {proc_path}: {'; '.join(parsed.errors)}"
+                    )
 
             files.append(
                 {
@@ -126,6 +182,7 @@ def run_analysis(state: Dict[str, Any]) -> Dict[str, Any]:
         "files": files,
         "sql_blocks": sql_blocks,
         "extern_list": extern_list,
+        "parsed_ir_by_file": parsed_ir_by_file,
         "stats": {
             "file_count": len(files),
             "total_loc": sum(file_info["loc"] for file_info in files),
@@ -135,5 +192,7 @@ def run_analysis(state: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "analysis_result": analysis_result,
+        "ast_by_file": ast_by_file,
+        "source_by_file": source_by_file,
         "errors": state.get("errors", []) + errors,
     }

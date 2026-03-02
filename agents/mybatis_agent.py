@@ -13,6 +13,20 @@ def _camel_name(value: str) -> str:
     return "".join(part.capitalize() for part in value.split("_"))
 
 
+def _normalize_var_names(values: List[Any]) -> List[str]:
+    names: List[str] = []
+    for item in values:
+        if isinstance(item, dict):
+            candidate = str(item.get("name", "")).strip()
+            if candidate:
+                names.append(candidate)
+        else:
+            candidate = str(item).strip()
+            if candidate:
+                names.append(candidate)
+    return names
+
+
 def run_mybatis_generation(state: Dict[str, Any]) -> Dict[str, Any]:
     analysis_result = state.get("analysis_result") or {}
     output_dir = Path(state.get("output_dir", "output"))
@@ -52,11 +66,19 @@ def run_mybatis_generation(state: Dict[str, Any]) -> Dict[str, Any]:
         try:
             sql_calls = [
                 {
-                    "name": block.get("name", "sqlCall"),
-                    "sql_type": block.get("sql_type", "select"),
-                    "parsed_sql": block.get("sql", ""),
-                    "input_vars": [],
-                    "output_vars": [],
+                    "name": block.get("name") or block.get("id", "sqlCall"),
+                    "sql_type": str(
+                        block.get("sql_type", "select") or "select"
+                    ).lower(),
+                    "parsed_sql": block.get("parsed_sql")
+                    or block.get("sql")
+                    or block.get("content", ""),
+                    "input_vars": _normalize_var_names(
+                        block.get("input_vars") or block.get("inputs") or []
+                    ),
+                    "output_vars": _normalize_var_names(
+                        block.get("output_vars") or block.get("outputs") or []
+                    ),
                 }
                 for block in calls
             ]
